@@ -40,6 +40,7 @@ is on the list, the address field shows a warning icon.
 | `RIPPL_LEAN=1` | WebKit's smaller cache model: less RAM, slower Back |
 | `RIPPL_CONTROL=1` | Opens the control socket ([testing.md](testing.md)) |
 | `RIPPL_DEBUG=1` | Logs tab life and Shield activity to stderr |
+| `RIPPL_KEYRING=memory` | Keep passwords in memory instead of the system keyring (tests) |
 | `XDG_DATA_HOME`, `XDG_CACHE_HOME`, `XDG_CONFIG_HOME` | Where everything is kept; point them at a temporary folder to test without touching your real profile |
 
 ## Keys
@@ -60,6 +61,7 @@ is on the list, the address field shows a warning icon.
 | `Ctrl+H` | `rippl://history`: search, forget, clear |
 | `Ctrl+Shift+O` | `rippl://bookmarks`: remove, import from another browser |
 | `Ctrl+,` | `rippl://settings`: permissions, Shield exceptions, hidden elements, configuration |
+| `Ctrl+Alt+P` | `rippl://passwords`: saved accounts (delete), sites never offered saving |
 | `Ctrl+Shift+P` | Pin or unpin the tab |
 | `F9`, `Ctrl+Alt+R` | Reading mode on/off |
 | `Ctrl+Shift+H` | Hide something on this site (click it; `Esc` cancels) |

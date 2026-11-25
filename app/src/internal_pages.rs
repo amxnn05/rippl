@@ -29,6 +29,13 @@ pub fn new_token() -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+fn finish(request: &URISchemeRequest, html: String) {
+    let bytes = glib::Bytes::from_owned(html.into_bytes());
+    let len = bytes.len() as i64;
+    let stream = gio::MemoryInputStream::from_bytes(&bytes);
+    request.finish(&stream, len, Some("text/html"));
+}
+
 fn other_browsers() -> Vec<import::Source> {
     import::sources(&glib::home_dir())
 }
@@ -44,11 +51,18 @@ impl Browser {
         let weak = self.weak();
         context.register_uri_scheme("rippl", move |request| {
             let Some(b) = weak.upgrade() else { return };
+            let url = request.uri().map(|u| u.to_string()).unwrap_or_default();
+            // Passwords come from the keyring, which answers later.
+            if pages::page_name(&url) == "passwords" {
+                let request = request.clone();
+                glib::MainContext::default().spawn_local(async move {
+                    let html = b.passwords_page(&url).await;
+                    finish(&request, html);
+                });
+                return;
+            }
             let html = b.internal_page(request);
-            let bytes = glib::Bytes::from_owned(html.into_bytes());
-            let len = bytes.len() as i64;
-            let stream = gio::MemoryInputStream::from_bytes(&bytes);
-            request.finish(&stream, len, Some("text/html"));
+            finish(request, html);
         });
     }
 
@@ -99,6 +113,34 @@ impl Browser {
                 )
             }
         }
+    }
+
+    async fn passwords_page(&self, url: &str) -> String {
+        let token_ok = pages::param(url, "token").as_deref() == Some(self.token.as_str());
+        if let Some(act) = pages::param(url, "do") {
+            let arg = pages::param(url, "arg").unwrap_or_default();
+            if !token_ok {
+                eprintln!("rippl: refused an action without this launch's token: {act}");
+            } else if act == "delete" {
+                let (origin, username) = arg.split_once('\n').unwrap_or((&arg, ""));
+                if let Err(e) = self.keyring.delete(origin, username).await {
+                    eprintln!("rippl: keyring: {e}");
+                }
+            } else if act == "allow-saving" {
+                let _ = self.places.set_never_save(&arg, false);
+            }
+        }
+        let accounts: Vec<(String, String)> = self
+            .keyring
+            .accounts(None)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|a| (a.origin, a.username))
+            .collect();
+        let never = self.places.never_save_list().unwrap_or_default();
+        let store = if self.keyring.is_memory() { "a test keyring in memory" } else { "your system keyring" };
+        pages::passwords(&accounts, &never, store, &self.token)
     }
 
     /// A button on one of the pages. Returns a note to show, if any.

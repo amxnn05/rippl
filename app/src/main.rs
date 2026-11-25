@@ -8,11 +8,13 @@ mod downloads;
 mod engine;
 mod find;
 mod internal_pages;
+mod keyring;
 mod omnibox;
 mod permissions;
 mod pressure;
 mod reader;
 mod shield;
+mod signin;
 
 use std::cell::RefCell;
 use std::rc::Rc;

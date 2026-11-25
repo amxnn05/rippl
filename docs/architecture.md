@@ -34,6 +34,7 @@ crates/rippl-core/        no GTK, no WebKit: everything here runs under `cargo t
   src/downloads.rs        safe, never-overwriting download file names
   src/pages.rs            rippl:// pages and the reader page, as escaped HTML
   src/import.rs           bookmarks from Chromium- and Firefox-family browsers
+  src/passwords.rs        origins, which pages may save, save/update/nothing
   examples/shield_convert.rs   runs the converter on a list file, for inspection
 
 app/src/
@@ -50,7 +51,9 @@ app/src/
   downloads.rs            the downloads list at the foot of the column
   reader.rs               reading mode: extractor (isolated world) + reader page
   curtain.rs              hide elements: picker, per-site user style sheets
-  internal_pages.rs       serves rippl://history|bookmarks|settings, token-checked buttons
+  internal_pages.rs       serves rippl://history|bookmarks|passwords|settings, token-checked buttons
+  keyring.rs              the Secret Service through libsecret (or memory, for tests)
+  signin.rs               form watching, the save question, the account list, filling
   pressure.rs             Linux PSI reading; malloc_trim
   control.rs              Unix socket for tests and measurement (opt-in)
 
@@ -101,9 +104,9 @@ its `close` signal. Two rules keep that safe:
 
 ## Isolated script world
 
-rippl's own scripts (the reading-mode extractor, the hide picker) run in a separate JavaScript
+rippl's own scripts (the reading-mode extractor, the hide picker, the sign-in form watcher) run in a separate JavaScript
 world named `rippl`. They see the same page, but the page can't see their variables, call their
-functions or post to their message handler (`ripplHide` is registered only in that world). This
+functions or post to their message handlers (`ripplHide` and `ripplPasswords` are registered only in that world). This
 is the same idea `WKContentWorld "Search"`.
 
 ## rippl:// pages
@@ -130,6 +133,7 @@ in pages. Details: [phases/phase-3-shield.md](phases/phase-3-shield.md).
 |---|---|
 | `~/.local/share/rippl/session` | open tabs (not private ones), plain text |
 | `~/.local/share/rippl/places.sqlite` | history, bookmarks, site permission answers, hidden elements |
+| System keyring (GNOME Keyring …) | saved passwords, items "rippl: user on site" |
 | `~/.cache/rippl/import/` | a moment's copy of a Firefox database while importing, deleted after |
 | `~/.local/share/rippl/web/cookies.sqlite` | cookies (sign-ins) |
 | `~/Downloads` (XDG download dir) | downloaded files |

@@ -10,6 +10,8 @@ rippl-core = { path = "../crates/rippl-core" }
 webkit6 = { version = "0.6.1", features = ["v2_52", "gtk_v4_18"] }
 libc = "0.2"
 serde_json = "1"
+libsecret = { version = "0.9", features = ["v0_21"] }
+zeroize = "1"
 glib-unix = "0.22"
 # Same gtk4 webkit6 uses; v4_20 for the interface colour scheme (theme = light/dark).
 gtk4 = { version = "0.11", features = ["v4_20"] }

@@ -23,7 +23,8 @@ development phase did.
 | 3. Shield (ad/tracker blocker) and privacy | done | [phase-3-shield.md](phases/phase-3-shield.md) |
 | 4. Daily use: history, suggestions, bookmarks, downloads, find, permissions, theme | done | [phase-4-daily-use.md](phases/phase-4-daily-use.md) |
 | 5. Extras: pins, reading mode, hide elements, rippl:// pages, bookmark import | done | [phase-5-extras.md](phases/phase-5-extras.md) |
-| 6. Passwords in the system keyring | next | [roadmap.md](roadmap.md) |
+| 6. Passwords in the system keyring | done | [phase-6-passwords.md](phases/phase-6-passwords.md) |
+| 7. Split view, bookmark folders, settings editing, more privacy | next | [roadmap.md](roadmap.md) |
 
 ## Keeping these docs current
 

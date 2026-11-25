@@ -96,6 +96,7 @@ impl Places {
              CREATE TABLE IF NOT EXISTS hidden (
                  host TEXT NOT NULL, selector TEXT NOT NULL, added INTEGER NOT NULL,
                  PRIMARY KEY (host, selector));
+             CREATE TABLE IF NOT EXISTS never_save (origin TEXT PRIMARY KEY, added INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS permissions (
                  host TEXT NOT NULL, kind TEXT NOT NULL, allow INTEGER NOT NULL,
                  PRIMARY KEY (host, kind));",
@@ -282,6 +283,27 @@ impl Places {
         Ok(out)
     }
 
+    // ---- passwords: sites never to offer saving on ----------------------
+
+    pub fn never_save(&self, origin: &str) -> Result<bool, Error> {
+        Ok(self.db.query_row("SELECT 1 FROM never_save WHERE origin = ?1", [origin], |_| Ok(())).optional()?.is_some())
+    }
+
+    pub fn set_never_save(&self, origin: &str, never: bool) -> Result<(), Error> {
+        if never {
+            self.db.execute("INSERT OR IGNORE INTO never_save (origin, added) VALUES (?1, ?2)", params![origin, now()])?;
+        } else {
+            self.db.execute("DELETE FROM never_save WHERE origin = ?1", [origin])?;
+        }
+        Ok(())
+    }
+
+    pub fn never_save_list(&self) -> Result<Vec<String>, Error> {
+        let mut stmt = self.db.prepare_cached("SELECT origin FROM never_save ORDER BY origin")?;
+        let rows = stmt.query_map([], |r| r.get(0))?;
+        rows.collect()
+    }
+
     // ---- permissions ---------------------------------------------------
 
     /// What was answered for `host` and `kind`, if anything.
@@ -408,6 +430,17 @@ mod tests {
         p.visit("https://b.com/", "", false).unwrap();
         p.forget("https://a.com/").unwrap();
         assert_eq!(p.recent(5).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn never_save_list() {
+        let p = Places::open(None).unwrap();
+        p.set_never_save("https://bank.com", true).unwrap();
+        assert!(p.never_save("https://bank.com").unwrap());
+        assert!(!p.never_save("https://other.com").unwrap());
+        assert_eq!(p.never_save_list().unwrap(), vec!["https://bank.com".to_string()]);
+        p.set_never_save("https://bank.com", false).unwrap();
+        assert!(p.never_save_list().unwrap().is_empty());
     }
 
     #[test]

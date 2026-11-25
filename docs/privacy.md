@@ -58,6 +58,7 @@ models do not depend on profiling you. If you want certainty, host SearXNG yours
 | **rippl:// pages unreachable from the web** | The scheme is local and display-isolated; buttons need a per-launch random token, so neither a website nor a downloaded HTML file can clear history or change permissions | `internal_pages.rs` |
 | **Scripts pages can't see** | Reading mode and the hide picker run in an isolated script world; the reading-mode page runs no script at all | `reader.rs`, `curtain.rs` |
 | **Import only reads** | Other browsers' bookmark files are read (Firefox's from a temporary copy) and never written; nothing is sent anywhere | `rippl_core::import` |
+| **Passwords in the system keyring** | Kept by the Secret Service (GNOME Keyring), never in rippl's files. Saved only after a sign-in worked, only on https (or this machine), never from private tabs. Offered only on the exact origin, never filled without a click, and re-checked against the page right before filling. In-memory copies are wiped (`zeroize`) | `keyring.rs`, `signin.rs`, [phase 6](phases/phase-6-passwords.md) |
 | **Safe download names** | A site can't choose a path, a hidden file, or overwrite an existing file | `rippl_core::downloads` |
 | **Clipboard** | Pages can't read the clipboard on their own | `engine.rs` |
 | **Private tabs** (`Ctrl+Shift+N`) | Each has its own throwaway cookie jar and storage, and is never written to the session | `engine.rs` `view(private)` |

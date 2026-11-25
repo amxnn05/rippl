@@ -99,7 +99,7 @@ input[type=search] {{ font: inherit; width: 100%; box-sizing: border-box; paddin
 .allow {{ color: #2a2; }} .deny {{ color: #e44; }}
 code {{ font-size: 13px; }}
 </style></head><body>
-<nav><a href="rippl://history"{h}>History</a><a href="rippl://bookmarks"{b}>Bookmarks</a><a href="rippl://settings"{s}>Settings</a></nav>
+<nav><a href="rippl://history"{h}>History</a><a href="rippl://bookmarks"{b}>Bookmarks</a><a href="rippl://passwords"{p}>Passwords</a><a href="rippl://settings"{s}>Settings</a></nav>
 {body}
 <script>
 const TOKEN = "{token}", PAGE = "{page}";
@@ -121,6 +121,7 @@ if (new URLSearchParams(location.search).has("do")) {{
         h = if page == "history" { r#" class="here""# } else { "" },
         b = if page == "bookmarks" { r#" class="here""# } else { "" },
         s = if page == "settings" { r#" class="here""# } else { "" },
+        p = if page == "passwords" { r#" class="here""# } else { "" },
         token = token.chars().filter(char::is_ascii_hexdigit).collect::<String>(),
         page = page,
     )
@@ -189,6 +190,40 @@ pub fn bookmarks(places: &[Place], sources: &[String], note: &str, now: i64, tok
         ));
     }
     frame("bookmarks", "Bookmarks", token, &body)
+}
+
+/// `accounts`: (origin, username); `never`: origins never offered saving.
+/// No password is ever on this page: only which accounts exist.
+pub fn passwords(accounts: &[(String, String)], never: &[String], store: &str, token: &str) -> String {
+    let mut body = format!(
+        "<h1>Passwords</h1><p class=\"sub\">Kept in {}, never in rippl's files. To see a password, open your keyring app (Passwords and Keys).</p>",
+        escape(store)
+    );
+    if accounts.is_empty() {
+        body.push_str(r#"<p class="empty">None saved yet. rippl offers to save a sign-in once it has worked.</p>"#);
+    }
+    for (origin, username) in accounts {
+        let host = crate::passwords::host_of_origin(origin);
+        let who = if username.is_empty() { "(no username)" } else { username };
+        body.push_str(&format!(
+            r#"<div class="row"><div class="main">{who}<div class="sub">{host}</div></div><button class="danger" data-do="delete" data-arg="{arg}" data-confirm="Delete the saved password for {who} on {host}?">Delete</button></div>"#,
+            who = escape(who),
+            host = escape(host),
+            arg = escape(&format!("{origin}\n{username}")),
+        ));
+    }
+    body.push_str("<h2>Never offered on</h2>");
+    if never.is_empty() {
+        body.push_str(r#"<p class="empty">No site.</p>"#);
+    }
+    for origin in never {
+        body.push_str(&format!(
+            r#"<div class="row"><div class="main">{h}</div><button data-do="allow-saving" data-arg="{o}">Offer again</button></div>"#,
+            h = escape(crate::passwords::host_of_origin(origin)),
+            o = escape(origin)
+        ));
+    }
+    frame("passwords", "Passwords", token, &body)
 }
 
 /// What the settings page shows.
@@ -328,6 +363,13 @@ mod tests {
         let html = reader("<b>t</b>", "by <i>x</i>", "site", "https://a/?\"><x", "<p>body</p>");
         assert!(html.contains("&lt;b&gt;t&lt;/b&gt;") && html.contains("<p>body</p>"));
         assert!(html.contains("default-src 'none'") && !html.contains("script-src"));
+    }
+
+    #[test]
+    fn passwords_page_has_no_secrets_and_escapes() {
+        let html = passwords(&[("https://x.com".into(), "<b>bob</b>".into())], &[], "test", "ff");
+        assert!(html.contains("&lt;b&gt;bob&lt;/b&gt;") && html.contains("x.com"));
+        assert!(html.contains("rippl://passwords"));
     }
 
     #[test]

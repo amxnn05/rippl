@@ -8,8 +8,8 @@
 | 3 | Shield (EasyList + EasyPrivacy), privacy defaults, private search engines, config | ✅ done, [notes](phases/phase-3-shield.md) |
 | 4 | History + ranked suggestions + inline completion, bookmarks, downloads, find in page, permission prompts, theme | ✅ done, [notes](phases/phase-4-daily-use.md) |
 | 5 | Pinned tabs, reading mode, hide elements for good, `rippl://` history/bookmarks/settings pages, bookmark import (Chromium family, Firefox family) | ✅ done, [notes](phases/phase-5-extras.md) |
-| 6 | **Passwords**: sign-in form detection, save after a sign-in works, offer saved accounts under the field, Secret Service keyring (`oo7`), never filled without a click, never offered to another site | next |
-| 7 | **More**: split view, bookmark folders, editing settings from `rippl://settings`, Global Privacy Control header (web-process extension), HTTPS-only mode, instant per-site Shield toggle, capped HTTP cache | planned |
+| 6 | Passwords in the system keyring (libsecret): saved after a sign-in works, offered under the box for the exact origin, never filled without a click | ✅ done, [notes](phases/phase-6-passwords.md) |
+| 7 | **More** (next): split view, bookmark folders, editing settings from `rippl://settings`, Global Privacy Control header (web-process extension), HTTPS-only mode, instant per-site Shield toggle, capped HTTP cache | planned |
 | 8 | **Ship**: `.desktop` file, icon, default-browser registration, AUR `PKGBUILD`, Flatpak | planned |
 
 ## Ideas to measure later

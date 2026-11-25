@@ -54,7 +54,19 @@ scripts/ctl.sh hide <selector>      # hide on the front site, as the picker woul
 scripts/ctl.sh unhide               # as Ctrl+Shift+U
 scripts/ctl.sh sources              # other browsers' profiles found; `import <n>` imports one
 scripts/ctl.sh js <code>            # run script in the front page, answer as JSON
+scripts/ctl.sh passwords            # every saved account (origin, username); `accounts` for the front page
+scripts/ctl.sh save                 # the save question shown, if any; `save save|later|never` answers it
+scripts/ctl.sh fill <username>      # pick that account for the front page, as the list under a box does
+scripts/ctl.sh passwords delete <origin> <username>
+scripts/ctl.sh pending              # sign-ins sent and waiting to be confirmed
+scripts/ctl.sh popover              # whether the account list is showing
 ```
+
+**Passwords: test with `RIPPL_KEYRING=memory`.** That never touches your real keyring. To sign in
+on a test page:
+`scripts/ctl.sh js "document.querySelector('#u').value='bob'; document.querySelector('#p').value='pw-123x'; document.querySelector('form').requestSubmit(); 1"`.
+If you test the real keyring, use an origin like `http://127.0.0.1:8765`, check with
+`secret-tool search --all origin http://127.0.0.1:8765`, and delete the item afterwards.
 
 `js` is how tests read a page, for example
 `scripts/ctl.sh js 'getComputedStyle(document.querySelector("#x")).display'`.

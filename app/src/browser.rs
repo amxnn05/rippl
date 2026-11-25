@@ -80,6 +80,20 @@ pub struct Browser {
     pub(crate) toast_gen: Cell<u32>,
     /// This launch's secret for rippl:// page buttons (internal_pages.rs).
     pub(crate) token: String,
+    // Passwords (signin.rs, keyring.rs).
+    pub(crate) keyring: Rc<crate::keyring::Keyring>,
+    pub(crate) pending: RefCell<HashMap<TabId, crate::signin::Pending>>,
+    pub(crate) save_question: RefCell<Option<crate::signin::SaveQuestion>>,
+    pub(crate) save_bar: gtk::Box,
+    pub(crate) save_label: gtk::Label,
+    pub(crate) save_never: gtk::Button,
+    pub(crate) save_later: gtk::Button,
+    pub(crate) save_yes: gtk::Button,
+    pub(crate) accounts_popover: gtk::Popover,
+    pub(crate) accounts_list: gtk::ListBox,
+    pub(crate) offered: RefCell<Vec<crate::keyring::Account>>,
+    /// The page and what floats over it.
+    pub(crate) page_area: gtk::Overlay,
     pub(crate) dirty: Cell<bool>,
     me: RefCell<Weak<Browser>>,
 }
@@ -137,6 +151,11 @@ impl Browser {
         let overlay = gtk::Overlay::builder().child(&stage).hexpand(true).vexpand(true).build();
         overlay.add_overlay(&find_bar);
         overlay.add_overlay(&ask_bar);
+        let (save_bar, save_label, save_never, save_later, save_yes) = Browser::save_bar();
+        overlay.add_overlay(&save_bar);
+        let accounts_list = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
+        accounts_list.add_css_class("accounts");
+        let accounts_popover = gtk::Popover::builder().child(&accounts_list).build();
         let toast = gtk::Label::builder()
             .halign(gtk::Align::Center)
             .valign(gtk::Align::End)
@@ -217,6 +236,18 @@ impl Browser {
             toast,
             toast_gen: Cell::new(0),
             token: crate::internal_pages::new_token(),
+            keyring: Rc::new(crate::keyring::Keyring::new()),
+            pending: RefCell::new(HashMap::new()),
+            save_question: RefCell::new(None),
+            save_bar,
+            save_label,
+            save_never,
+            save_later,
+            save_yes,
+            accounts_popover,
+            accounts_list,
+            offered: RefCell::new(Vec::new()),
+            page_area: overlay.clone(),
             dirty: Cell::new(false),
             me: RefCell::new(Weak::new()),
         });
@@ -228,6 +259,7 @@ impl Browser {
         browser.wire_permission_bar();
         browser.wire_internal_pages();
         browser.wire_curtain();
+        browser.wire_signin();
         let weak = Rc::downgrade(&browser);
         browser.field.connect_icon_press(move |_, position| {
             if let (Some(b), gtk::EntryIconPosition::Primary) = (weak.upgrade(), position) {
@@ -306,6 +338,8 @@ impl Browser {
         }
         self.show_front();
         self.show_question();
+        self.show_save_question();
+        self.accounts_popover.popdown();
         self.render();
     }
 
@@ -385,6 +419,11 @@ impl Browser {
         self.family.borrow_mut().remove(&id);
         self.typed_next.borrow_mut().remove(&id);
         self.drop_questions(id);
+        self.pending.borrow_mut().remove(&id);
+        if self.save_question.borrow().as_ref().is_some_and(|q| q.tab == id) {
+            self.save_question.borrow_mut().take();
+            self.save_bar.set_visible(false);
+        }
         let next = self.tabs.borrow_mut().close(id);
         match next {
             Some(n) => self.select(n),
@@ -503,6 +542,7 @@ impl Browser {
             if b.front() == Some(id) {
                 b.field.set_progress_fraction(0.0);
             }
+            b.signin_page_loaded(id, v);
             // Reading mode starts at the top, not where the page was scrolled.
             if b.reading.borrow().contains_key(&id) {
                 v.evaluate_javascript("scrollTo(0, 0)", None, None, None::<&gio::Cancellable>, |_| {});
@@ -844,6 +884,28 @@ impl Browser {
                 _ => "error: permissions [forget [host] | answer allow|deny]".into(),
             },
             "downloads" => self.downloads.status(),
+            "save" => match rest.trim() {
+                "" => match self.save_question.borrow().as_ref() {
+                    Some(q) => format!("{:?}\t{}\t{}", q.ask, q.pending.origin, q.pending.capture.username),
+                    None => "none".into(),
+                },
+                answer @ ("save" | "later" | "never") => {
+                    self.answer_save(answer);
+                    "ok".into()
+                }
+                _ => "error: save [save|later|never]".into(),
+            },
+            "fill" => {
+                let Some(origin) =
+                    self.front_view().and_then(|v| v.uri()).and_then(|u| rippl_core::passwords::origin_of(&u))
+                else {
+                    return "error: no page".into();
+                };
+                self.fill(crate::keyring::Account { origin, username: rest.trim().to_string() });
+                "ok".into()
+            }
+            "pending" => self.pending.borrow().len().to_string(),
+            "popover" => self.accounts_popover.is_visible().to_string(),
             "pin" => {
                 self.toggle_pin();
                 "ok".into()
@@ -893,6 +955,35 @@ impl Browser {
     /// A control-socket command whose answer may come later: `js <code>`
     /// runs script in the front page and answers with its result as JSON.
     pub fn command_with(&self, line: &str, reply: Box<dyn FnOnce(String)>) {
+        // Keyring commands answer when the keyring does.
+        if line == "passwords" || line == "accounts" {
+            let origin = if line == "accounts" {
+                self.front_view().and_then(|v| v.uri()).and_then(|u| rippl_core::passwords::origin_of(&u))
+            } else {
+                None
+            };
+            let keyring = self.keyring.clone();
+            glib::MainContext::default().spawn_local(async move {
+                let list = keyring.accounts(origin.as_deref()).await;
+                reply(match list {
+                    Ok(list) => list.iter().map(|a| format!("{}\t{}", a.origin, a.username)).collect::<Vec<_>>().join("\n"),
+                    Err(e) => format!("error: {e}"),
+                });
+            });
+            return;
+        }
+        if let Some(rest) = line.strip_prefix("passwords delete ") {
+            let (origin, username) = rest.split_once(' ').unwrap_or((rest, ""));
+            let (origin, username) = (origin.to_string(), username.to_string());
+            let keyring = self.keyring.clone();
+            glib::MainContext::default().spawn_local(async move {
+                reply(match keyring.delete(&origin, &username).await {
+                    Ok(()) => "ok".into(),
+                    Err(e) => format!("error: {e}"),
+                });
+            });
+            return;
+        }
         let Some(code) = line.strip_prefix("js ") else { return reply(self.command(line)) };
         let Some(view) = self.front_view() else { return reply("error: no page".into()) };
         view.evaluate_javascript(code, None, None, None::<&gio::Cancellable>, move |result| {
@@ -1038,6 +1129,7 @@ impl Browser {
         self.action(app, "bookmarks", &["<Ctrl><Shift>o"], |b| b.open_internal("bookmarks"));
         self.action(app, "settings", &["<Ctrl>comma"], |b| b.open_internal("settings"));
         self.action(app, "pin", &["<Ctrl><Shift>p"], |b| b.toggle_pin());
+        self.action(app, "passwords", &["<Ctrl><Alt>p"], |b| b.open_internal("passwords"));
         self.action(app, "reader", &["F9", "<Ctrl><Alt>r"], |b| b.toggle_reader());
         self.action(app, "hide-element", &["<Ctrl><Shift>h"], |b| b.pick_to_hide());
         self.action(app, "unhide", &["<Ctrl><Shift>u"], |b| b.unhide_here());
@@ -1215,6 +1307,7 @@ impl Browser {
             .tabs row.pinned label { font-weight: 600; }
             .tabs row.last-pin { margin-bottom: 8px; box-shadow: 0 5px 0 -4px alpha(currentColor, 0.15); }
             .tabs .pin { opacity: 0.6; -gtk-icon-size: 12px; }
+            .accounts row { padding: 6px 12px; border-radius: 6px; }
             .toast { background: rgba(28, 28, 30, 0.96); color: white; border-radius: 18px; padding: 8px 16px;
                      box-shadow: 0 2px 10px alpha(black, 0.35); }
             .find, .ask { background: rgba(28, 28, 30, 0.96); color: white;
