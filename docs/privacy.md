@@ -65,6 +65,8 @@ models do not depend on profiling you. If you want certainty, host SearXNG yours
 | **Pop-ups need a click** | A window a page opens without a click or key just before is refused and offered in a bar; nothing opens by itself | `sitecard.rs` |
 | **Safe download names** | A site can't choose a path, a hidden file, or overwrite an existing file | `rippl_core::downloads` |
 | **Clipboard** | Pages can't read the clipboard on their own | `engine.rs` |
+| **Spaces keep sign-ins apart** | Each space has its own cookies and site data; a site you're signed in to in one space doesn't know you in another. Deleting a space deletes its data | `spaces.rs`, `engine.rs` |
+| **Profiles** (`--profile`) | Whole separate browsers: their own sign-ins, history, bookmarks | `engine.rs` |
 | **Private tabs** (`Ctrl+Shift+N`) | Each has its own throwaway cookie jar and storage, and is never written to the session | `engine.rs` `view(private)` |
 | **Sandboxed pages** | WebKitGTK runs every web process in a `bwrap` sandbox | WebKit |
 | **Local data only** | History, session, cookies and settings live in your home folder (see [architecture.md](architecture.md#files-on-disk)) | — |

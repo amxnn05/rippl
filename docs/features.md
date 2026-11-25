@@ -40,12 +40,14 @@ the header of each of its source files, with rippl's status for each.
 | Keep a site awake (site card) | ✅ |
 | Reopen closed tab with history and scroll (⇧⌘T) | ✅ Ctrl+Shift+T |
 | Pinned tabs | ✅ Ctrl+Shift+P |
-| Pin folders, live folders from feeds | 🔨 batch 2 |
-| Tab groups | 🔨 batch 2 |
+| Pin folders, live folders from feeds | 🔨 batch 4 (pins as rows first) |
+| Tab groups | ✅ fold, rename, ungroup |
 | Split view, up to 4 pages | ✅ 2 pages; 3–4 🔨 batch 4 |
-| Spaces: sets of tabs, each with its own sign-ins | 🔨 batch 2 (a NetworkSession per space) |
-| Profiles | 🔨 batch 2 |
-| Send links to a space | 🔨 batch 2 |
+| Spaces: sets of tabs, each with its own sign-ins | ✅ Alt+1–9, own store per space |
+| Space swipes and colours | 🔨 batch 4 |
+| Profiles | ✅ `rippl --profile NAME`, a window each |
+| Profiles in one window | 🔨 later |
+| Send links to a space | 🔨 Phase 9 (with links from other apps) |
 | Several windows, same tabs in every window | 🔨 batch 4 |
 | ⌃Tab tab switcher with pictures | 🔨 batch 4 |
 | ⌘K switch to a tab | ✅ Ctrl+K: the field finds open tabs |
@@ -55,7 +57,7 @@ the header of each of its source files, with rippl's status for each.
 | Tab menu (right-click a tab) | ✅ |
 | Peek at a link in a panel | 🔨 batch 3 |
 | Little window for links from other apps | 🔨 with Phase 9 (default browser) |
-| Choose the space a link opens in | 🔨 batch 2 |
+| Choose the space a link opens in | 🔨 Phase 9 |
 | Private tabs (⇧⌘N) | ✅ Ctrl+Shift+N |
 | Unread counts from titles | 🔨 batch 3 |
 | Media player at the foot of the column | 🔨 batch 3 |
@@ -175,8 +177,8 @@ the header of each of its source files, with rippl's status for each.
 1. ✅ **Small, daily** ([notes](phases/batch-1.md)): site card, keep awake, duplicate,
    tab menu, blocked pop-ups, typos, site search, your own keywords, page commands, print, opt-in
    engine suggestions.
-2. **Organising**: spaces (each with its own sign-ins), profiles, tab groups, pin folders, sending
-   links to a space.
+2. ✅ **Organising** ([notes](phases/batch-2.md)): spaces with their own sign-ins, profiles,
+   tab groups. (Pin folders moved to 4, sending links to a space to Phase 9.)
 3. **Pages**: dark pages (Dusk), your own CSS per site, capture, save as archive, site icons, peek,
    YouTube ads, unread counts, video keys, player in the column.
 4. **Layout**: tabs across the top, icon column, several windows, Ctrl+Tab switcher, bookmarks bar,

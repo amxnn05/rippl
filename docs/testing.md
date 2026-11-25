@@ -70,6 +70,12 @@ scripts/ctl.sh awake on|off         # keep the front tab's site awake
 scripts/ctl.sh popups               # pop-ups refused in the front tab, and whether the bar shows
 scripts/ctl.sh popup-open           # the bar's Open
 scripts/ctl.sh offers               # what the field offers now (engine suggestions arrive later)
+scripts/ctl.sh spaces               # id, name, tab count, * for the one on screen
+scripts/ctl.sh space new <name> | space <id> | space delete <id>
+scripts/ctl.sh move-to-space <tab index> <space id>
+scripts/ctl.sh group <tab index> <name>   # a new group; join <tab index> <group id>; fold <group id>
+scripts/ctl.sh groups
+scripts/ctl.sh rows                 # what the column shows, as text
 ```
 
 **GPC:** serve a page with a server that logs request headers, and check `Sec-GPC: 1` on the page

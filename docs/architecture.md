@@ -65,6 +65,8 @@ app/src/
   split.rs                split view: place/detach views, pairs, pane focus
   look.rs                 the design: palette, column rows, letters, pins, CSS
   closed.rs               reopen closed tabs, copy clean address, paste and go
+  sitecard.rs             site card, tab menu, duplicate, print, blocked pop-ups
+  spaces.rs               spaces: switch, new, rename, delete, move tabs; the foot's buttons
   pressure.rs             Linux PSI reading; malloc_trim
   control.rs              Unix socket for tests and measurement (opt-in)
 
@@ -144,7 +146,9 @@ in pages. Details: [phases/phase-3-shield.md](phases/phase-3-shield.md).
 
 | Path | What |
 |---|---|
-| `~/.local/share/rippl/session` | open tabs (not private ones), plain text |
+| `~/.local/share/rippl/session` | open tabs (not private ones), spaces, groups: plain text, format 2 |
+| `~/.local/share/rippl/spaces/<id>/web/` | a space's own cookies and site data (space 0 uses `web/`) |
+| `~/.local/share/rippl/profiles/<name>/`, `~/.cache/rippl/profiles/<name>/` | a profile: all of the above, its own |
 | `~/.local/share/rippl/places.sqlite` | history, bookmarks, site permission answers, hidden elements |
 | System keyring (GNOME Keyring …) | saved passwords, items "rippl: user on site" |
 | `~/.cache/rippl/web-extension/` | the copy of the web process extension WebKit loads |

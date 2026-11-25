@@ -17,7 +17,7 @@ use rippl_core::tabs::{self, Life, Pressure, TabId, Tabs};
 use webkit6::prelude::*;
 use webkit6::{gio, glib, gtk, LoadEvent, MediaCaptureState, WebProcessTerminationReason, WebView};
 
-use crate::config::{Config, Theme};
+use crate::config::Config;
 use crate::downloads::Downloads;
 use crate::engine::{self, Engine};
 use crate::omnibox::Offer;
@@ -64,6 +64,8 @@ pub struct Browser {
     pub(crate) pins: gtk::FlowBox,
     pub(crate) new_tab: gtk::Button,
     pub(crate) settings_button: gtk::Button,
+    /// One button per space, at the column's foot (spaces.rs).
+    pub(crate) spaces_box: gtk::Box,
     pub(crate) tabs_area: gtk::ScrolledWindow,
     // The field's offers (omnibox.rs).
     pub(crate) suggest_area: gtk::ScrolledWindow,
@@ -125,6 +127,8 @@ pub struct Browser {
     /// The page and what floats over it.
     pub(crate) page_area: gtk::Overlay,
     pub(crate) dirty: Cell<bool>,
+    /// The GTK theme the desktop gave rippl at start (look.rs).
+    pub(crate) desktop_theme: std::cell::OnceCell<Option<String>>,
     /// Tabs closed lately (closed.rs).
     pub(crate) closed: RefCell<Vec<crate::closed::Closed>>,
     me: RefCell<Weak<Browser>>,
@@ -183,6 +187,7 @@ impl Browser {
         let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
         column.add_css_class("column");
         column.set_size_request(232, -1);
+        column.set_hexpand(false);
         column.append(&field);
         column.append(&suggest_area);
         column.append(&tabs_area);
@@ -243,7 +248,6 @@ impl Browser {
         window.set_child(Some(&body));
 
         let config = Config::load();
-        apply_theme(config.theme);
         let shield = Shield::new(config.shield);
         let _ = std::fs::create_dir_all(engine::data_dir());
         let places = Places::open(Some(&engine::data_dir().join("places.sqlite"))).unwrap_or_else(|e| {
@@ -281,6 +285,7 @@ impl Browser {
             pins,
             new_tab,
             settings_button: foot.1,
+            spaces_box: foot.2,
             tabs_area,
             suggest_area,
             suggest_list,
@@ -329,12 +334,15 @@ impl Browser {
             popup_always,
             popup_dismiss,
             dirty: Cell::new(false),
+            desktop_theme: std::cell::OnceCell::new(),
             closed: RefCell::new(Vec::new()),
             me: RefCell::new(Weak::new()),
         });
         *browser.me.borrow_mut() = Rc::downgrade(&browser);
 
         browser.style();
+        browser.apply_look();
+        browser.follow_desktop_look();
         browser.wire_look();
         browser.wire_omnibox();
         browser.wire_find();
@@ -430,11 +438,11 @@ impl Browser {
     /// asleep (history and scroll), or from its address if it never had one.
     fn wake(&self, id: TabId) {
         debug!("wake {id}");
-        let (url, private, memory) = {
+        let (url, private, memory, space) = {
             let mut tabs = self.tabs.borrow_mut();
             let Some(tab) = tabs.get_mut(id) else { return };
             tab.life = Life::Awake;
-            (tab.url.clone(), tab.private, tab.memory.take())
+            (tab.url.clone(), tab.private, tab.memory.take(), tab.space)
         };
         // Another awake tab of the same site: share its page process (each
         // process costs ~160 MB before any page content). Same site only,
@@ -447,7 +455,7 @@ impl Browser {
                 debug!("wake {id}: sharing tab {other}'s page process");
                 self.engine.related_view(opener)
             }
-            None => self.engine.view(private),
+            None => self.engine.view(private, space),
         };
         self.adopt(id, &view);
         debug!("wake {id}: kept state = {:?} bytes", memory.as_ref().map(Vec::len));
@@ -477,11 +485,18 @@ impl Browser {
         let host = shield::host_of(url)?;
         let tabs = self.tabs.borrow();
         let views = self.views.borrow();
+        // Only within one space: each space has its own sign-ins.
+        let space = tabs.get(id).map(|t| t.space)?;
         tabs.list
             .iter()
-            .filter(|t| t.id != id && t.private == private && t.life == Life::Awake)
+            .filter(|t| t.id != id && t.private == private && t.life == Life::Awake && t.space == space)
             .find(|t| shield::host_of(&t.url).as_deref() == Some(host.as_str()))
             .and_then(|t| views.get(&t.id).map(|v| (t.id, v.clone())))
+    }
+
+    /// Puts one tab to sleep now (spaces.rs moves a tab between stores).
+    pub(crate) fn sleep_tab(&self, id: TabId) {
+        self.sleep(id);
     }
 
     /// Takes `id`'s view away, keeping what it needs to come back. Its web
@@ -897,7 +912,11 @@ impl Browser {
         let off = shield::host_of(&url).is_some_and(|h| self.shield.is_allowed(&h));
         self.field.set_secondary_icon_name(off.then_some("security-low-symbolic"));
         self.field.set_secondary_icon_tooltip_text(off.then_some("Shield is off for this site (Ctrl+Shift+B)"));
-        self.window.set_title(Some(if title.is_empty() { "rippl" } else { &title }));
+        let base = if title.is_empty() { "rippl".to_string() } else { title };
+        self.window.set_title(Some(&match engine::profile() {
+            Some(p) => format!("{base} · {p}"),
+            None => base,
+        }));
     }
 
     // ---- wiring -------------------------------------------------------
@@ -934,7 +953,7 @@ impl Browser {
                         let front = if tabs.front == Some(t.id) { "front" } else { "-" };
                         // Why it can't sleep, if it can't.
                         let why = tabs::kept_awake(t, &[]).map_or("-".to_string(), |k| format!("{k:?}"));
-                        format!("{}\t{}\t{:?}\t{front}\t{}\t{}\t{why}", i + 1, t.id, t.life, t.url, t.title)
+                        format!("{}\t{}\t{:?}\t{front}\t{}\t{}\t{why}\tspace={}", i + 1, t.id, t.life, t.url, t.title, t.space)
                     })
                     .collect();
                 lines.join("\n")
@@ -1083,6 +1102,93 @@ impl Browser {
                 }
                 None => "error: no site".into(),
             },
+            "spaces" => {
+                let tabs = self.tabs.borrow();
+                tabs.spaces
+                    .iter()
+                    .map(|s| format!("{}\t{}\t{}{}", s.id, s.name, tabs.list.iter().filter(|t| t.space == s.id).count(), if s.id == tabs.space { "\t*" } else { "" }))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            }
+            "space" => match rest.split_once(' ').unwrap_or((rest, "")) {
+                ("new", name) => {
+                    let id = self.tabs.borrow_mut().add_space(name);
+                    self.switch_space(id);
+                    format!("ok {id}")
+                }
+                ("delete", id) => {
+                    self.delete_space(id.trim().parse().unwrap_or(u32::MAX));
+                    "ok".into()
+                }
+                (id, _) => {
+                    self.switch_space(id.trim().parse().unwrap_or(u32::MAX));
+                    "ok".into()
+                }
+            },
+            "move-to-space" => {
+                let (n, space) = rest.split_once(' ').unwrap_or((rest, ""));
+                match (at(n), space.trim().parse()) {
+                    (Some(id), Ok(space)) => {
+                        self.move_tab_to_space(id, space);
+                        "ok".into()
+                    }
+                    _ => "error: move-to-space <tab index> <space id>".into(),
+                }
+            }
+            "group" => {
+                let (n, name) = rest.split_once(' ').unwrap_or((rest, ""));
+                match at(n) {
+                    Some(id) => {
+                        let g = self.tabs.borrow_mut().new_group(id, name);
+                        self.dirty.set(true);
+                        self.render();
+                        format!("ok {g:?}")
+                    }
+                    None => "error: no such tab".into(),
+                }
+            }
+            "join" => {
+                let (n, g) = rest.split_once(' ').unwrap_or((rest, ""));
+                if let (Some(id), Ok(g)) = (at(n), g.trim().parse()) {
+                    self.tabs.borrow_mut().set_group(id, Some(g));
+                    self.dirty.set(true);
+                    self.render();
+                }
+                "ok".into()
+            }
+            "fold" => {
+                if let Ok(g) = rest.trim().parse() {
+                    self.tabs.borrow_mut().toggle_group(g);
+                    self.render();
+                }
+                "ok".into()
+            }
+            "groups" => {
+                let tabs = self.tabs.borrow();
+                tabs.groups.iter().map(|g| format!("{}\t{}\t{}\tcollapsed={}", g.id, g.space, g.name, g.collapsed)).collect::<Vec<_>>().join("\n")
+            }
+            "rows" => {
+                // What the column shows, as text.
+                let mut out = Vec::new();
+                let mut child = self.list.first_child();
+                while let Some(w) = child {
+                    let mut text = Vec::new();
+                    let mut stack = vec![w.clone()];
+                    while let Some(x) = stack.pop() {
+                        if let Some(l) = x.downcast_ref::<gtk::Label>() {
+                            text.push(l.label().to_string());
+                        }
+                        let mut c = x.last_child();
+                        while let Some(cc) = c {
+                            stack.push(cc.clone());
+                            c = cc.prev_sibling();
+                        }
+                    }
+                    out.push(text.join(" "));
+                    child = w.next_sibling();
+                }
+                out.join("\n")
+            }
             "reopen" => {
                 self.reopen_closed();
                 "ok".into()
@@ -1370,12 +1476,23 @@ impl Browser {
                 v.set_zoom_level(1.0);
             }
         });
+        // Alt+1 … Alt+9: the spaces, in order.
+        for n in 1..=9usize {
+            self.action(app, &format!("space-{n}"), &[&format!("<Alt>{n}")], move |b| {
+                let id = b.tabs.borrow().spaces.get(n - 1).map(|s| s.id);
+                if let Some(id) = id {
+                    b.switch_space(id);
+                }
+            });
+        }
+        self.action(app, "new-space", &["<Ctrl><Alt>t"], |b| b.new_space());
         // Ctrl+1 … Ctrl+8 go to that tab, Ctrl+9 to the last.
         for n in 1..=9usize {
             self.action(app, &format!("tab-{n}"), &[&format!("<Ctrl>{n}")], move |b| {
                 let id = {
                     let tabs = b.tabs.borrow();
-                    if n == 9 { tabs.list.last() } else { tabs.list.get(n - 1) }.map(|t| t.id)
+                    let here: Vec<TabId> = tabs.here().map(|t| t.id).collect();
+                    if n == 9 { here.last().copied() } else { here.get(n - 1).copied() }
                 };
                 if let Some(id) = id {
                     b.select(id);
@@ -1528,7 +1645,16 @@ impl Browser {
     fn restore(&self) {
         let session = std::fs::read_to_string(Self::session_path()).map(|t| Session::read(&t)).unwrap_or_default();
         let front = session.restore_into(&mut self.tabs.borrow_mut());
-        let asked: Vec<String> = std::env::args().skip(1).filter(|a| !a.starts_with('-')).collect();
+        // URLs from the command line (not `--profile` and its name).
+        let mut args = std::env::args().skip(1);
+        let mut asked = Vec::new();
+        while let Some(a) = args.next() {
+            if a == "--profile" {
+                args.next();
+            } else if !a.starts_with('-') {
+                asked.push(a);
+            }
+        }
         if let Some(front) = front.filter(|_| asked.is_empty()) {
             self.select(front);
         }
@@ -1544,14 +1670,4 @@ impl Browser {
         self.render();
     }
 
-}
-
-/// The window's light or dark look (and with it, pages that offer both).
-pub(crate) fn apply_theme(theme: Theme) {
-    let Some(settings) = gtk::Settings::default() else { return };
-    settings.set_gtk_interface_color_scheme(match theme {
-        Theme::System => gtk::InterfaceColorScheme::Default,
-        Theme::Dark => gtk::InterfaceColorScheme::Dark,
-        Theme::Light => gtk::InterfaceColorScheme::Light,
-    });
 }

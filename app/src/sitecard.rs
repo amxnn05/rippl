@@ -26,6 +26,9 @@ pub const AWAKE: &str = "awake";
 
 /// One line of the tab menu: its words, and what it does to the tab.
 type MenuItem = (&'static str, fn(&Browser, TabId));
+
+/// A menu line built at the time: its words, and what it does.
+type MenuAction = (String, std::rc::Rc<dyn Fn(&Browser, TabId)>);
 pub const POPUPS: &str = "popups";
 
 impl Browser {
@@ -299,13 +302,52 @@ impl Browser {
     pub(crate) fn tab_menu(&self, id: TabId, anchor: &impl IsA<gtk::Widget>) {
         let pinned = self.tabs.borrow().get(id).is_some_and(|t| t.pinned);
         let menu = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        let items: [MenuItem; 7] = [
-            ("Duplicate", |b, id| b.duplicate(id)),
-            (if pinned { "Unpin" } else { "Pin" }, |b, id| {
-                b.select(id);
-                b.toggle_pin();
-            }),
-            ("Put beside this tab", |b, id| b.split_with(id)),
+        let (group, space, spaces, groups_here) = {
+            let tabs = self.tabs.borrow();
+            let tab = tabs.get(id);
+            (
+                tab.and_then(|t| t.group),
+                tab.map_or(0, |t| t.space),
+                tabs.spaces.iter().map(|s| (s.id, s.name.clone())).collect::<Vec<_>>(),
+                tabs.groups.iter().filter(|g| Some(g.space) == tab.map(|t| t.space)).map(|g| (g.id, g.name.clone())).collect::<Vec<_>>(),
+            )
+        };
+        let mut items: Vec<MenuAction> = vec![
+            ("Duplicate".into(), std::rc::Rc::new(|b: &Browser, id| b.duplicate(id))),
+            (
+                if pinned { "Unpin" } else { "Pin" }.into(),
+                std::rc::Rc::new(|b: &Browser, id| {
+                    b.select(id);
+                    b.toggle_pin();
+                }),
+            ),
+            ("Put beside this tab".into(), std::rc::Rc::new(|b: &Browser, id| b.split_with(id))),
+        ];
+        if !pinned {
+            items.push(("Add to a new group".into(), std::rc::Rc::new(|b: &Browser, id| {
+                b.tabs.borrow_mut().new_group(id, "");
+                b.dirty.set(true);
+                b.render();
+            })));
+            for (g, name) in groups_here.into_iter().filter(|(g, _)| Some(*g) != group) {
+                items.push((format!("Add to “{name}”"), std::rc::Rc::new(move |b: &Browser, id| {
+                    b.tabs.borrow_mut().set_group(id, Some(g));
+                    b.dirty.set(true);
+                    b.render();
+                })));
+            }
+            if group.is_some() {
+                items.push(("Remove from group".into(), std::rc::Rc::new(|b: &Browser, id| {
+                    b.tabs.borrow_mut().set_group(id, None);
+                    b.dirty.set(true);
+                    b.render();
+                })));
+            }
+        }
+        for (sid, name) in spaces.into_iter().filter(|(s, _)| *s != space) {
+            items.push((format!("Move to {name}"), std::rc::Rc::new(move |b: &Browser, id| b.move_tab_to_space(id, sid))));
+        }
+        let rest: [MenuItem; 4] = [
             ("Copy address", |b, id| {
                 b.select(id);
                 b.copy_address();
@@ -317,15 +359,22 @@ impl Browser {
             }),
             ("Close", |b, id| b.close(id)),
             ("Close other tabs", |b, id| {
-                let others: Vec<TabId> =
-                    b.tabs.borrow().list.iter().filter(|t| t.id != id && !t.pinned).map(|t| t.id).collect();
+                // In this tab's space only; pins stay.
+                let others: Vec<TabId> = {
+                    let tabs = b.tabs.borrow();
+                    let space = tabs.get(id).map_or(0, |t| t.space);
+                    tabs.list.iter().filter(|t| t.id != id && !t.pinned && t.space == space).map(|t| t.id).collect()
+                };
                 for o in others {
                     b.close(o);
                 }
             }),
         ];
+        for (label, run) in rest {
+            items.push((label.to_string(), std::rc::Rc::new(run)));
+        }
         for (label, run) in items {
-            let button = gtk::Button::builder().label(label).build();
+            let button = gtk::Button::builder().label(label.as_str()).build();
             button.add_css_class("flat");
             button.add_css_class("menu-item");
             if let Some(l) = button.child().and_downcast::<gtk::Label>() {
@@ -336,6 +385,7 @@ impl Browser {
                 let Some(b) = weak.upgrade() else { return };
                 b.tab_menu.popdown();
                 // After the popover has gone: these redraw the column.
+                let run = run.clone();
                 webkit6::glib::idle_add_local_once(move || run(&b, id));
             });
             menu.append(&button);

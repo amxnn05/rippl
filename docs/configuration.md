@@ -20,7 +20,8 @@ sleep = 30
 # Keep history (on, default) or not (off). Bookmarks are kept either way.
 history = on
 
-# system (default), light or dark: the window, and pages that offer both
+# system (default), light or dark: the window, and pages that offer both.
+# system follows the desktop's own setting, live.
 theme = system
 
 # Upgrade every http request to https before it leaves (on, default)
@@ -48,6 +49,12 @@ See [privacy.md](privacy.md) for how to choose a search engine.
 Sites Shield is turned off for, one host per line (subdomains included). `Ctrl+Shift+B` adds or
 removes the site in front, recompiles the filters (about 6 s) and reloads the page. While a site
 is on the list, the address field shows a warning icon.
+
+## Profiles
+
+`rippl --profile work` runs a separate browser: its own spaces, tabs, sign-ins, history, bookmarks
+and session. Settings, passwords, downloads and the ad-block lists are shared. It can run beside the
+default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work scripts/ctl.sh …`).
 
 ## Environment
 
@@ -92,6 +99,10 @@ is on the list, the address field shows a warning icon.
 | Right-click a tab | Duplicate, Pin, Put beside this tab, Copy address, Reload, Close, Close other tabs |
 | `Ctrl+Shift+D` | Duplicate the tab, with its history and scroll |
 | `Ctrl+P` | Print |
+| `Alt+1`–`Alt+9` | Go to that space |
+| `Ctrl+Alt+T`, **+** at the column's foot | New space (its own tabs and sign-ins) |
+| Right-click a space's button | Rename it, or delete it with its tabs and sign-ins |
+| Click / right-click a group's heading | Fold or unfold / rename or ungroup |
 | `Ctrl+Shift+C` | Copy the address, without tracking parameters |
 | `Ctrl+Shift+V` | Paste and go: open what's on the clipboard |
 | `Ctrl+K` | Switch to a tab: the field, empty; type to find open tabs |

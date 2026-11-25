@@ -24,6 +24,9 @@ pub struct Engine {
     pub on_download: std::cell::RefCell<Option<DownloadHook>>,
     /// Whether rippl's web process extension (GPC, HTTPS-only) is loaded.
     pub extension: bool,
+    /// Each space's own store of cookies and site data (space 0 uses
+    /// `session`, the store rippl always had).
+    spaces: std::cell::RefCell<std::collections::HashMap<u32, NetworkSession>>,
     /// What every new page process is told at start: (gpc, https_only,
     /// hosts allowed on http this session).
     start: std::cell::RefCell<(bool, bool, Vec<String>)>,
@@ -41,7 +44,7 @@ fn install_extension() -> Option<PathBuf> {
         Some(PathBuf::from("/usr/lib/rippl").join(NAME)),
     ];
     let source = candidates.into_iter().flatten().find(|p| p.is_file())?;
-    let dir = cache_dir().join("web-extension");
+    let dir = shared_cache_dir().join("web-extension");
     let target = dir.join(NAME);
     let same = |a: &std::path::Path, b: &std::path::Path| -> bool {
         match (std::fs::metadata(a), std::fs::metadata(b)) {
@@ -77,13 +80,49 @@ fn harden(session: &NetworkSession) {
     }
 }
 
-/// `~/.local/share/rippl` (or `$XDG_DATA_HOME/rippl`).
-pub fn data_dir() -> PathBuf {
-    webkit6::glib::user_data_dir().join("rippl")
+/// The profile this run is (`rippl --profile work`), if not the default
+/// one. A profile is a whole separate browser: its own spaces, tabs,
+/// sign-ins, history and bookmarks. Shared by
+/// every profile: settings, passwords (the keyring), downloads, and the
+/// ad-blocking lists.
+static PROFILE: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
+/// Sets the profile, once, before anything reads a folder. Names are
+/// letters, digits, `-` and `_`, up to 32.
+pub fn set_profile(name: Option<&str>) -> Result<(), String> {
+    let name = name.map(str::trim).filter(|n| !n.is_empty() && *n != "default");
+    if let Some(n) = name
+        && (n.len() > 32 || !n.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+    {
+        return Err(format!("{n:?} isn't a profile name: letters, digits, - and _ only"));
+    }
+    let _ = PROFILE.set(name.map(str::to_string));
+    Ok(())
 }
 
-/// `~/.cache/rippl` (or `$XDG_CACHE_HOME/rippl`).
+pub fn profile() -> Option<&'static str> {
+    PROFILE.get().and_then(|p| p.as_deref())
+}
+
+fn profiled(base: PathBuf) -> PathBuf {
+    match profile() {
+        Some(p) => base.join("profiles").join(p),
+        None => base,
+    }
+}
+
+/// `~/.local/share/rippl` (or `$XDG_DATA_HOME/rippl`), or the profile's.
+pub fn data_dir() -> PathBuf {
+    profiled(webkit6::glib::user_data_dir().join("rippl"))
+}
+
+/// `~/.cache/rippl`, or the profile's.
 pub fn cache_dir() -> PathBuf {
+    profiled(webkit6::glib::user_cache_dir().join("rippl"))
+}
+
+/// The cache every profile shares: Shield's lists, the web extension.
+pub fn shared_cache_dir() -> PathBuf {
     webkit6::glib::user_cache_dir().join("rippl")
 }
 
@@ -186,6 +225,7 @@ impl Engine {
             on_download: Default::default(),
             extension,
             start: std::cell::RefCell::new((gpc, https_only, Vec::new())),
+            spaces: Default::default(),
         }
     }
 
@@ -227,9 +267,56 @@ impl Engine {
         }
     }
 
-    /// A new page view. `private`: its own throwaway network session, so
-    /// its cookies and sign-ins exist only while it does.
-    pub fn view(&self, private: bool) -> WebView {
+    /// The store of `space`: cookies, sign-ins, site data of its own, in
+    /// `spaces/<id>/` beside the first space's.
+    pub fn session_for(&self, space: u32) -> NetworkSession {
+        if space == 0 {
+            return self.session.clone();
+        }
+        if let Some(s) = self.spaces.borrow().get(&space) {
+            return s.clone();
+        }
+        let data = data_dir().join("spaces").join(space.to_string()).join("web");
+        let cache = cache_dir().join("spaces").join(space.to_string()).join("web");
+        let session = NetworkSession::new(data.to_str(), cache.to_str());
+        harden(&session);
+        if let Some(cookies) = session.cookie_manager() {
+            let file = data.join("cookies.sqlite");
+            cookies.set_persistent_storage(&file.to_string_lossy(), CookiePersistentStorage::Sqlite);
+        }
+        if let Some(hook) = self.on_download.borrow().clone() {
+            session.connect_download_started(move |_, d| hook(d));
+        }
+        self.spaces.borrow_mut().insert(space, session.clone());
+        session
+    }
+
+    /// A space was deleted: its sign-ins and site data go with it.
+    pub fn forget_space(&self, space: u32) {
+        if space == 0 {
+            return;
+        }
+        let session = self.spaces.borrow_mut().remove(&space);
+        let data = data_dir().join("spaces").join(space.to_string());
+        let cache = cache_dir().join("spaces").join(space.to_string());
+        let remove = move || {
+            let _ = std::fs::remove_dir_all(&data);
+            let _ = std::fs::remove_dir_all(&cache);
+        };
+        match session.and_then(|s| s.website_data_manager()) {
+            Some(manager) => manager.clear(
+                webkit6::WebsiteDataTypes::ALL,
+                webkit6::glib::TimeSpan::from_seconds(0),
+                None::<&webkit6::gio::Cancellable>,
+                move |_| remove(),
+            ),
+            None => remove(),
+        }
+    }
+
+    /// A new page view in `space`. `private`: its own throwaway network
+    /// session, so its cookies and sign-ins exist only while it does.
+    pub fn view(&self, private: bool, space: u32) -> WebView {
         let session = if private {
             let own = NetworkSession::new_ephemeral();
             harden(&own);
@@ -238,7 +325,7 @@ impl Engine {
             }
             own
         } else {
-            self.session.clone()
+            self.session_for(space)
         };
         WebView::builder()
             .web_context(&self.context)

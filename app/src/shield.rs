@@ -62,7 +62,7 @@ pub struct Shield {
 }
 
 fn dir() -> PathBuf {
-    engine::cache_dir().join("shield")
+    engine::shared_cache_dir().join("shield")
 }
 
 fn allow_path() -> PathBuf {

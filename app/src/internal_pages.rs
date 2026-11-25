@@ -191,7 +191,7 @@ impl Browser {
         self.config.borrow_mut().set(key, value)?;
         let config = self.config.borrow().clone();
         match key {
-            "theme" => crate::browser::apply_theme(config.theme),
+            "theme" => self.apply_look(),
             "gpc" | "https_only" => self.engine.send_settings(config.gpc, config.https_only),
             "shield" => return Ok("Saved. Blocking changes after rippl restarts.".into()),
             _ => {}

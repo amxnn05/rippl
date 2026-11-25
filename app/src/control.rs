@@ -35,8 +35,13 @@ thread_local! {
     static BROWSER: RefCell<Weak<Browser>> = const { RefCell::new(Weak::new()) };
 }
 
+/// `rippl.sock`, or `rippl-<profile>.sock` for a profile's.
 pub fn socket_path() -> PathBuf {
-    webkit6::glib::user_runtime_dir().join("rippl.sock")
+    let name = match crate::engine::profile() {
+        Some(p) => format!("rippl-{p}.sock"),
+        None => "rippl.sock".to_string(),
+    };
+    webkit6::glib::user_runtime_dir().join(name)
 }
 
 /// Starts listening, if RIPPL_CONTROL is set.

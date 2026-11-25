@@ -9,15 +9,20 @@
 //! - A faint **+ New tab** row closes the list; the sliders at the foot
 //!   open Settings.
 //!
-//! Every colour is one of the light/dark pairs, written once below
-//! (GTK 4.16+ CSS variables, GTK 4.20+ `prefers-color-scheme`), and follows
-//! the theme setting (system, light, dark). Nothing else in rippl knows
-//! which it is.
+//! Every colour is one of the light/dark pairs, written once below as
+//! CSS variables (GTK 4.16+), and the dark ones apply when the window has
+//! the `dark` class. `apply_look` decides: `theme = light | dark`, or for
+//! `system` the desktop's own choice, read from the XDG settings portal
+//! (`org.freedesktop.appearance color-scheme`) and followed live. Pages are
+//! told the same through GTK's interface colour scheme, which WebKit reads
+//! for `prefers-color-scheme`. Nothing else in rippl knows which it is.
 
 use rippl_core::address::monogram;
 use rippl_core::tabs::Life;
 use webkit6::prelude::*;
-use webkit6::{gdk, glib, gtk};
+use webkit6::{gdk, gio, glib, gtk};
+
+use crate::config::Theme;
 
 use crate::browser::Browser;
 
@@ -31,13 +36,13 @@ window.rippl {
   --hover: rgba(0,0,0,0.042); --tile: rgba(0,0,0,0.031); --pin-live: rgba(0,0,0,0.10);
   --mark: rgba(23,23,23,0.06); --accent: #171717;
 }
-@media (prefers-color-scheme: dark) {
-  window.rippl {
-    --ground: #1c1c1c; --frame: #131313; --ink: #ededed; --muted: rgba(255,255,255,0.546);
-    --faint: rgba(255,255,255,0.265); --hairline: #333333; --wash: rgba(255,255,255,0.087);
-    --hover: rgba(255,255,255,0.06); --tile: rgba(255,255,255,0.043); --pin-live: rgba(255,255,255,0.124);
-    --mark: rgba(237,237,237,0.06); --accent: #ededed;
-  }
+/* Dark: set by rippl (apply_look), not by a media query, which GTK
+   doesn't evaluate from the desktop's preference without libadwaita. */
+window.rippl.dark {
+  --ground: #1c1c1c; --frame: #131313; --ink: #ededed; --muted: rgba(255,255,255,0.546);
+  --faint: rgba(255,255,255,0.265); --hairline: #333333; --wash: rgba(255,255,255,0.087);
+  --hover: rgba(255,255,255,0.06); --tile: rgba(255,255,255,0.043); --pin-live: rgba(255,255,255,0.124);
+  --mark: rgba(237,237,237,0.06); --accent: #ededed;
 }
 
 window.rippl { background: var(--frame); color: var(--ink);
@@ -68,6 +73,14 @@ window.rippl .tabs row.front { background: var(--wash); color: var(--ink); }
 window.rippl .tabs row.asleep { opacity: 0.55; }
 window.rippl .tabs row.asleep:hover { opacity: 1; }
 window.rippl .tabs row.split { box-shadow: inset 2px 0 0 var(--accent); }
+window.rippl .tabs row.in-group { margin-left: 12px; }
+window.rippl .tabs row.group-head { min-height: 24px; color: var(--muted); font-size: 11.5px; font-weight: 600;
+  padding: 6px 6px 0 8px; }
+window.rippl .tabs row.group-head:hover { background: transparent; color: var(--ink); }
+window.rippl .foot .space { min-width: 22px; min-height: 22px; padding: 0; border-radius: 6px; border: none;
+  box-shadow: none; background: transparent; color: var(--faint); font-size: 11px; font-weight: 600; }
+window.rippl .foot .space:hover { color: var(--ink); background: var(--hover); }
+window.rippl .foot .space.here { color: var(--ink); background: var(--wash); }
 window.rippl .tabs row button.close { opacity: 0; min-height: 18px; min-width: 18px; padding: 0; color: var(--muted); }
 window.rippl .tabs row:hover button.close { opacity: 0.8; }
 
@@ -118,15 +131,101 @@ window.rippl popover.card > contents, window.rippl popover.tab-menu > contents {
 window.rippl .card-title { font-weight: 600; font-size: 14px; }
 window.rippl .safe { color: #15803d; font-size: 12px; }
 window.rippl .unsafe { color: #b45309; font-size: 12px; }
-@media (prefers-color-scheme: dark) {
-  window.rippl .safe { color: #4ade80; }
-  window.rippl .unsafe { color: #fbbf24; }
-}
+window.rippl.dark .safe { color: #4ade80; }
+window.rippl.dark .unsafe { color: #fbbf24; }
 window.rippl popover.card button { font-size: 12.5px; padding: 3px 10px; }
 window.rippl .menu-item { font-size: 13px; padding: 5px 14px; min-width: 180px; }
 "#;
 
+/// What the desktop prefers, from the settings portal: Some(true) dark,
+/// Some(false) light, None no preference (or no portal).
+fn desktop_prefers_dark() -> Option<bool> {
+    let bus = gio::bus_get_sync(gio::BusType::Session, None::<&gio::Cancellable>).ok()?;
+    let reply = bus
+        .call_sync(
+            Some("org.freedesktop.portal.Desktop"),
+            "/org/freedesktop/portal/desktop",
+            "org.freedesktop.portal.Settings",
+            "ReadOne",
+            Some(&("org.freedesktop.appearance", "color-scheme").to_variant()),
+            None,
+            gio::DBusCallFlags::NONE,
+            500,
+            None::<&gio::Cancellable>,
+        )
+        .ok()?;
+    // (v) holding a u32: 1 prefer dark, 2 prefer light, 0 no preference.
+    let value = reply.child_value(0).as_variant()?.get::<u32>()?;
+    match value {
+        1 => Some(true),
+        2 => Some(false),
+        _ => None,
+    }
+}
+
 impl Browser {
+    /// Light or dark, everywhere: rippl's palette, GTK's widgets, and pages.
+    pub(crate) fn apply_look(&self) {
+        let theme = self.config.borrow().theme;
+        let dark = match theme {
+            Theme::Dark => true,
+            Theme::Light => false,
+            Theme::System => desktop_prefers_dark().unwrap_or(false),
+        };
+        if dark {
+            self.window.add_css_class("dark");
+        } else {
+            self.window.remove_css_class("dark");
+        }
+        if let Some(settings) = gtk::Settings::default() {
+            settings.set_gtk_interface_color_scheme(if dark {
+                gtk::InterfaceColorScheme::Dark
+            } else {
+                gtk::InterfaceColorScheme::Light
+            });
+            // WebKit also reads darkness from the GTK theme's name: a theme
+            // called "…-dark" (Omarchy's Adwaita-dark) makes every page
+            // dark whatever the colour scheme says. In rippl only, the light
+            // look takes the theme's light variant, and the dark look gets
+            // the desktop's own theme back.
+            let desktop = self.desktop_theme.get_or_init(|| settings.gtk_theme_name().map(|n| n.to_string()));
+            let wanted = match (dark, desktop.as_deref()) {
+                (false, Some(name)) if name.ends_with("-dark") => Some(name.trim_end_matches("-dark").to_string()),
+                (_, Some(name)) => Some(name.to_string()),
+                (_, None) => None,
+            };
+            if settings.gtk_theme_name().map(|n| n.to_string()) != wanted {
+                settings.set_gtk_theme_name(wanted.as_deref());
+            }
+            #[allow(deprecated)]
+            settings.set_gtk_application_prefer_dark_theme(dark);
+        }
+    }
+
+    /// With `theme = system`, a change of the desktop's colour scheme is
+    /// followed at once.
+    pub(crate) fn follow_desktop_look(&self) {
+        let Ok(bus) = gio::bus_get_sync(gio::BusType::Session, None::<&gio::Cancellable>) else { return };
+        let weak = self.weak();
+        #[allow(deprecated)]
+        bus.signal_subscribe(
+            Some("org.freedesktop.portal.Desktop"),
+            Some("org.freedesktop.portal.Settings"),
+            Some("SettingChanged"),
+            Some("/org/freedesktop/portal/desktop"),
+            None,
+            gio::DBusSignalFlags::NONE,
+            move |_, _, _, _, _, params| {
+                let namespace = params.child_value(0).get::<String>().unwrap_or_default();
+                let key = params.child_value(1).get::<String>().unwrap_or_default();
+                if namespace == "org.freedesktop.appearance" && key == "color-scheme"
+                    && let Some(b) = weak.upgrade() {
+                        b.apply_look();
+                    }
+            },
+        );
+    }
+
     pub(crate) fn style(&self) {
         self.window.add_css_class("rippl");
         let css = gtk::CssProvider::new();
@@ -152,15 +251,19 @@ impl Browser {
         button
     }
 
-    /// The column's foot: the sliders that open Settings.
-    pub(crate) fn column_foot() -> (gtk::Box, gtk::Button) {
-        let foot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    /// The column's foot: Settings, then one button per space and a +.
+    pub(crate) fn column_foot() -> (gtk::Box, gtk::Button, gtk::Box) {
+        let foot = gtk::Box::new(gtk::Orientation::Horizontal, 4);
         foot.add_css_class("foot");
         let settings = gtk::Button::from_icon_name("emblem-system-symbolic");
         settings.set_tooltip_text(Some("Settings (Ctrl+,)"));
         settings.set_focusable(false);
+        // Never expanding: an expanding child makes the whole column take
+        // half the window.
+        let spaces = gtk::Box::new(gtk::Orientation::Horizontal, 2);
         foot.append(&settings);
-        (foot, settings)
+        foot.append(&spaces);
+        (foot, settings, spaces)
     }
 
     pub(crate) fn wire_look(&self) {
@@ -190,8 +293,21 @@ impl Browser {
         let tabs = self.tabs.borrow();
         let partner = self.partner.borrow();
         let mut any_pin = false;
-        for tab in &tabs.list {
+        let mut in_group: Option<rippl_core::tabs::GroupId> = None;
+        // Only the space on screen; a group's tabs under its heading.
+        for tab in tabs.here() {
             let id = tab.id;
+            if !tab.pinned && tab.group != in_group {
+                in_group = tab.group;
+                if let Some(group) = tab.group.and_then(|g| tabs.groups.iter().find(|x| x.id == g)) {
+                    let count = tabs.here().filter(|t| t.group == Some(group.id)).count();
+                    self.list.append(&self.group_heading(group, count));
+                }
+            }
+            let folded = tab.group.and_then(|g| tabs.groups.iter().find(|x| x.id == g)).is_some_and(|g| g.collapsed);
+            if folded && !tab.pinned {
+                continue;
+            }
             let live = Some(id) == tabs.front;
             if tab.pinned {
                 any_pin = true;
@@ -240,6 +356,9 @@ impl Browser {
             if tab.life != Life::Awake && !tab.url.is_empty() {
                 row.add_css_class("asleep");
             }
+            if tab.group.is_some() {
+                row.add_css_class("in-group");
+            }
             if partner.contains_key(&id) {
                 row.add_css_class("split");
                 row.set_tooltip_text(Some(&format!("{} · side by side (Ctrl+Alt+S separates)", tab.url)));
@@ -254,6 +373,100 @@ impl Browser {
             self.list.append(&row);
         }
         self.pins.set_visible(any_pin);
+        drop(tabs);
+        drop(partner);
+        self.render_spaces();
+    }
+
+    /// A group's heading: its name, a fold mark, and how many tabs; a
+    /// click folds or unfolds it, a right-click renames it.
+    fn group_heading(&self, group: &rippl_core::tabs::Group, count: usize) -> gtk::ListBoxRow {
+        let row = gtk::ListBoxRow::new();
+        row.set_activatable(false);
+        row.add_css_class("group-head");
+        let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let mark = gtk::Label::new(Some(if group.collapsed { "▸" } else { "▾" }));
+        let name = gtk::Label::builder()
+            .label(&group.name)
+            .xalign(0.0)
+            .hexpand(true)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .max_width_chars(1)
+            .build();
+        let n = gtk::Label::new(Some(&count.to_string()));
+        n.add_css_class("dim");
+        line.append(&mark);
+        line.append(&name);
+        line.append(&n);
+        row.set_child(Some(&line));
+        let gid = group.id;
+        let click = gtk::GestureClick::builder().button(0).build();
+        let weak = self.weak();
+        click.connect_released(move |gesture, _, _, _| {
+            let Some(b) = weak.upgrade() else { return };
+            let button = gesture.current_button();
+            let anchor = gesture.widget();
+            glib::idle_add_local_once(move || {
+                if button == 3 {
+                    if let Some(w) = anchor {
+                        b.group_menu(gid, &w);
+                    }
+                } else {
+                    b.tabs.borrow_mut().toggle_group(gid);
+                    b.dirty.set(true);
+                    b.render();
+                }
+            });
+        });
+        row.add_controller(click);
+        row
+    }
+
+    /// Right-click on a group's heading: rename it, or ungroup its tabs.
+    fn group_menu(&self, group: rippl_core::tabs::GroupId, anchor: &gtk::Widget) {
+        let name = self.tabs.borrow().groups.iter().find(|g| g.id == group).map(|g| g.name.clone()).unwrap_or_default();
+        let menu = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        menu.set_margin_top(8);
+        menu.set_margin_bottom(8);
+        menu.set_margin_start(8);
+        menu.set_margin_end(8);
+        let entry = gtk::Entry::builder().text(&name).placeholder_text("Group name").build();
+        let ungroup = gtk::Button::with_label("Ungroup tabs");
+        ungroup.add_css_class("flat");
+        ungroup.add_css_class("menu-item");
+        menu.append(&entry);
+        menu.append(&ungroup);
+        let popover = gtk::Popover::builder().child(&menu).has_arrow(false).build();
+        popover.add_css_class("tab-menu");
+        popover.set_parent(anchor);
+        popover.connect_closed(|p| {
+            let p = p.clone();
+            glib::idle_add_local_once(move || p.unparent());
+        });
+        let weak = self.weak();
+        let pop = popover.clone();
+        entry.connect_activate(move |e| {
+            let Some(b) = weak.upgrade() else { return };
+            b.tabs.borrow_mut().rename_group(group, &e.text());
+            pop.popdown();
+            b.dirty.set(true);
+            glib::idle_add_local_once(move || b.render());
+        });
+        let weak = self.weak();
+        let pop = popover.clone();
+        ungroup.connect_clicked(move |_| {
+            let Some(b) = weak.upgrade() else { return };
+            pop.popdown();
+            let members: Vec<rippl_core::tabs::TabId> =
+                b.tabs.borrow().list.iter().filter(|t| t.group == Some(group)).map(|t| t.id).collect();
+            for id in members {
+                b.tabs.borrow_mut().set_group(id, None);
+            }
+            b.dirty.set(true);
+            glib::idle_add_local_once(move || b.render());
+        });
+        popover.popup();
+        entry.grab_focus();
     }
 
     /// Click: select. Middle-click: close. Alt-click: beside the front tab.

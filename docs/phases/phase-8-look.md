@@ -41,8 +41,20 @@ Taken from the ,  and , and from its screenshot:
 - The letter comes from the name people know a site by: **W** for en.wikipedia.org, **B** for
   bbc.co.uk (`address::monogram`, tested).
 - A faint **+ New tab** row ends the list; the gear at the column's foot opens Settings.
-- Every colour is a CSS variable, set twice: once for light and once under
-  `@media (prefers-color-scheme: dark)` (GTK 4.20+). It follows `theme = system | light | dark`.
+- Every colour is a CSS variable, set twice: once for light and once for the window's `dark` class.
+  It follows `theme = system | light | dark`.
+- **Dark mode, fixed after this phase.** It didn't work at first, for three reasons:
+  - With `theme = system`, rippl told GTK "Default", and GTK without libadwaita doesn't fill that in
+    from the desktop, so everything stayed light on a dark desktop.
+  - The dark colours sat under a `prefers-color-scheme` media query, which GTK didn't apply.
+  - WebKit also reads darkness from the GTK theme's *name*: Omarchy's `Adwaita-dark` made pages
+    dark even with `theme = light`.
+
+  Now `apply_look` (look.rs) reads the desktop's preference from the XDG settings portal
+  (`org.freedesktop.appearance color-scheme`) and follows changes live. It sets rippl's `dark`
+  class, GTK's interface colour scheme and prefer-dark, and, in rippl only, the light or dark
+  variant of the GTK theme. Checked: `system` on a dark desktop → dark column and dark pages;
+  `dark` → dark; `light` → light column and light pages (`matchMedia` in the page).
 - **About transparency:** Omarchy's Hyprland config makes every window slightly see-through, so the
   wallpaper shows behind rippl's card and column. For the solid look, give the window class
   `dev.rippl.Rippl` full opacity in your Hyprland window rules. rippl doesn't change your

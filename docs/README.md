@@ -29,7 +29,8 @@ development phase did.
 | 7. Split view, bookmark folders, settings editing, HTTPS-only, Global Privacy Control | done | [phase-7-more.md](phases/phase-7-more.md) |
 | 8. Shared processes for same-site tabs, the look, first features | done | [phase-8-look.md](phases/phase-8-look.md) |
 | Feature batch 1: site card, keep awake, pop-ups, duplicate, typos, site search, print | done | [batch-1.md](phases/batch-1.md) |
-| Feature batch 2: spaces, profiles, tab groups, pin folders | next | [features.md](features.md) |
+| Feature batch 2: spaces, profiles, tab groups (and dark mode fixed) | done | [batch-2.md](phases/batch-2.md) |
+| Feature batch 3: dark pages, site CSS, capture, site icons, peek | next | [features.md](features.md) |
 | 9. Ship: desktop entry, default browser, packages | planned | [roadmap.md](roadmap.md) |
 
 ## Keeping these docs current
