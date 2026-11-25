@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = ["crates/rippl-core", "app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[profile.release]
+# Small binary, fast code: the UI process should cost as little as possible.
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

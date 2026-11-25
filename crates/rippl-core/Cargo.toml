@@ -1,0 +1,10 @@
+[package]
+name = "rippl-core"
+description = "Browser logic with no GTK or WebKit in it: addresses, tabs, the sleep policy."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# The system's SQLite, not a bundled copy: smaller binary, distro security updates.
+rusqlite = "0.43"
