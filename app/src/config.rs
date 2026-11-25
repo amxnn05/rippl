@@ -17,6 +17,8 @@
 //! dusk = off
 //! # sites' icons on tabs (on, default) or their letters
 //! icons = on
+//! # the new tab shows the sites of the bookmark folder "Home" (off, default)
+//! home_grid = off
 //! # minutes a tab sits unseen before it sleeps (default 30)
 //! sleep = 30
 //! # keep history (on, default) or not (off); bookmarks are kept either way
@@ -57,6 +59,7 @@ pub struct Config {
     pub glass: bool,
     pub dusk: bool,
     pub icons: bool,
+    pub home_grid: bool,
     pub sleep_after: Duration,
     pub history: bool,
     pub theme: Theme,
@@ -88,6 +91,7 @@ impl Default for Config {
             glass: true,
             dusk: false,
             icons: true,
+            home_grid: false,
             sleep_after: Duration::from_secs(30 * 60),
             history: true,
             theme: Theme::System,
@@ -126,6 +130,7 @@ impl Config {
             "glass" => self.glass = on(value).ok_or_else(bad)?,
             "dusk" => self.dusk = on(value).ok_or_else(bad)?,
             "icons" => self.icons = on(value).ok_or_else(bad)?,
+            "home_grid" => self.home_grid = on(value).ok_or_else(bad)?,
             "history" => self.history = on(value).ok_or_else(bad)?,
             "https_only" => self.https_only = on(value).ok_or_else(bad)?,
             "gpc" => self.gpc = on(value).ok_or_else(bad)?,
@@ -200,6 +205,7 @@ impl Config {
             choice("glass", "Glass column (the compositor blurs behind it)", onoff(self.glass), &["on", "off"], ""),
             choice("dusk", "Darken pages that have no dark look", onoff(self.dusk), &["on", "off"], "In the dark theme"),
             choice("icons", "Sites' icons on tabs", onoff(self.icons), &["on", "off"], "Off: their letters"),
+            choice("home_grid", "New tab: the sites in the bookmark folder Home", onoff(self.home_grid), &["on", "off"], "Four to a row, sixteen at most"),
             choice("history", "Keep history", onoff(self.history), &["on", "off"], ""),
             choice(
                 "suggestions",

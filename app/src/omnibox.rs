@@ -187,6 +187,12 @@ impl Browser {
         let mut offers = Vec::new();
         let mut rows: Vec<(String, String, &'static str)> = Vec::new(); // title, detail, kind
 
+        // The new tab's empty field offers nothing: the page
+        // stays quiet, with only the Home grid under it.
+        if typed.trim().is_empty() && self.field_at_home() {
+            self.hide_offers();
+            return;
+        }
         if typed.trim().is_empty() {
             let mut seen = Vec::new();
             for p in self.places.bookmarks().unwrap_or_default().into_iter().take(SHOWN) {
@@ -283,13 +289,21 @@ impl Browser {
         *self.offers.borrow_mut() = offers;
         let any = !rows.is_empty();
         self.suggest_area.set_visible(any);
-        self.tabs_area.set_visible(!any);
+        // On the new tab the offers hang under the field and the column
+        // keeps its tabs; the Home grid makes way while you type.
+        self.tabs_area.set_visible(!any || self.field_at_home());
+        if self.field_at_home() {
+            self.home_grid.set_visible(!any && self.home_grid.first_child().is_some());
+        }
     }
 
     pub(crate) fn hide_offers(&self) {
         self.suggest_list.unselect_all();
         self.suggest_area.set_visible(false);
         self.tabs_area.set_visible(true);
+        if self.field_at_home() {
+            self.home_grid.set_visible(self.home_grid.first_child().is_some());
+        }
         self.typed.borrow_mut().clear();
     }
 

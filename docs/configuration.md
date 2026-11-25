@@ -42,6 +42,9 @@ dusk = off
 # Sites' icons on tabs (on, default); off: their letters
 icons = on
 
+# The new tab shows the sites of the bookmark folder "Home" (off, default)
+home_grid = off
+
 # Suggestions from the search engine while you type (off, default).
 # On, each keystroke is sent to the engine (DuckDuckGo and Brave offer them).
 suggestions = off

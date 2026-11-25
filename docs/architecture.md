@@ -68,6 +68,7 @@ app/src/
   sitecard.rs             site card, tab menu, duplicate, print, blocked pop-ups
   spaces.rs               spaces: switch, new, rename, delete, move tabs; the foot's buttons
   pagelook.rs             dark pages, your CSS per site, capture, site icons
+  home.rs                 the new tab: the field in the middle of the page, the Home grid
   pressure.rs             Linux PSI reading; malloc_trim
   control.rs              Unix socket for tests and measurement (opt-in)
 

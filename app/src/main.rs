@@ -11,6 +11,7 @@ mod find;
 mod internal_pages;
 mod keyring;
 mod look;
+mod home;
 mod omnibox;
 mod pagelook;
 mod permissions;

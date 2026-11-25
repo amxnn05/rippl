@@ -29,7 +29,8 @@ the header of each of its source files, with rippl's status for each.
 | Liquid Glass | 🍎 |
 | Traffic lights, title bar | 🍎; rippl hides the title bar on tiling compositors |
 | Blank-tab walls, stickers, themes | 🔨 batch 4 |
-| Home grid of bookmarks on a new tab | 🔨 batch 4 |
+| The new tab: field in the middle of the page | ✅ |
+| Home grid of bookmarks on a new tab | ✅ `home_grid = on` |
 
 ## Tabs and windows
 

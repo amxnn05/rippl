@@ -193,6 +193,7 @@ impl Browser {
         match key {
             "theme" | "glass" => self.apply_look(),
             "icons" => self.render(),
+            "home_grid" => self.fill_home_grid(),
             "gpc" | "https_only" => self.engine.send_settings(config.gpc, config.https_only),
             "shield" | "ublock" => return Ok("Saved. Blocking changes after rippl restarts.".into()),
             _ => {}

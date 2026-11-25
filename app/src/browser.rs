@@ -83,6 +83,10 @@ pub struct Browser {
     pub(crate) partner: RefCell<HashMap<TabId, TabId>>,
     pub(crate) shown_split: RefCell<Option<(TabId, TabId)>>,
     pub(crate) blank: gtk::Box,
+    /// The new tab's field, offers and Home grid, in the blank page (home.rs).
+    pub(crate) home: gtk::Box,
+    pub(crate) home_grid: gtk::FlowBox,
+    pub(crate) home_mode: Cell<bool>,
     // Find in page (find.rs).
     pub(crate) find_bar: gtk::Box,
     pub(crate) find_entry: gtk::Entry,
@@ -200,7 +204,24 @@ impl Browser {
 
         let stage = gtk::Stack::builder().hexpand(true).vexpand(true).build();
         stage.add_css_class("stage");
+        // The card's rounded corners cut the page too: without this the
+        // page paints square corners over them.
+        stage.set_overflow(gtk::Overflow::Hidden);
         let blank = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let home_grid = gtk::FlowBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .min_children_per_line(4)
+            .max_children_per_line(4)
+            .homogeneous(true)
+            .column_spacing(8)
+            .row_spacing(8)
+            .valign(gtk::Align::Start)
+            .visible(false)
+            .build();
+        home_grid.add_css_class("home-grid");
+        let home = gtk::Box::new(gtk::Orientation::Vertical, 8);
+        home.add_css_class("home");
+        home.append(&home_grid);
         stage.add_named(&blank, Some("blank"));
         let paned = gtk::Paned::builder()
             .orientation(gtk::Orientation::Horizontal)
@@ -302,6 +323,9 @@ impl Browser {
             partner: RefCell::new(HashMap::new()),
             shown_split: RefCell::new(None),
             blank,
+            home,
+            home_grid,
+            home_mode: Cell::new(false),
             find_bar,
             find_entry,
             find_count,
@@ -367,6 +391,7 @@ impl Browser {
         });
         browser.wire_actions(app);
         browser.wire_window();
+        browser.wire_home();
         browser.watch();
         browser.window.present();
         // Pages load once Shield's filters are in place (a second at most),
@@ -920,7 +945,8 @@ impl Browser {
         }
         // A star in the field for a bookmarked page; click it to toggle.
         let starred = !url.is_empty() && self.places.is_bookmarked(&url).unwrap_or(false);
-        self.field.set_primary_icon_name(Some(if starred { "starred-symbolic" } else { "non-starred-symbolic" }));
+        // No page, nothing to bookmark: the new tab's field is bare.
+        self.field.set_primary_icon_name((!url.is_empty()).then_some(if starred { "starred-symbolic" } else { "non-starred-symbolic" }));
         self.field.set_primary_icon_tooltip_text(Some(if starred { "Remove bookmark (Ctrl+D)" } else { "Bookmark (Ctrl+D)" }));
         // A sign in the field while Shield is off for this site.
         let off = shield::host_of(&url).is_some_and(|h| self.shield.is_allowed(&h));

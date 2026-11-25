@@ -109,6 +109,22 @@ window.rippl .foot button:hover { color: var(--ink); background: var(--hover); }
 /* The page: a white card. */
 window.rippl .stage { background: var(--ground); border-radius: 10px; margin: 8px 8px 8px 0;
   box-shadow: 0 0 0 1px var(--hairline); }
+/* The new tab: the field on its own in the middle of the page. */
+window.rippl .field.home-field { min-height: 50px; padding: 0 22px; border-radius: 14px; font-size: 15.5px;
+  background: var(--ground); color: var(--ink);
+  box-shadow: 0 0 0 1px var(--hairline), 0 8px 24px rgba(0,0,0,0.06); }
+window.rippl .field.home-field:focus-within { background: var(--ground);
+  box-shadow: 0 0 0 1px var(--hairline), 0 8px 24px rgba(0,0,0,0.06); }
+window.rippl .field.home-field > text > placeholder { color: var(--faint); }
+window.rippl .field.home-field > image { color: var(--faint); }
+window.rippl .home-offers { background: var(--ground); border-radius: 14px; padding: 6px;
+  box-shadow: 0 0 0 1px var(--hairline), 0 6px 20px rgba(0,0,0,0.07); }
+window.rippl .home-offers row { padding: 9px 12px; font-size: 13px; }
+window.rippl .home-grid { margin-top: 2px; }
+window.rippl .home-grid > flowboxchild { padding: 0; }
+window.rippl .home-tile { min-height: 50px; padding: 0 10px; border-radius: 14px; background: transparent;
+  box-shadow: inset 0 0 0 1px var(--hairline); border: none; color: var(--muted); font-size: 12px; }
+window.rippl .home-tile:hover { background: var(--hover); color: var(--ink); }
 window.rippl paned.split > separator { background: var(--hairline); min-width: 6px; }
 window.rippl webview.pane-front { box-shadow: inset 0 2px 0 var(--accent); }
 

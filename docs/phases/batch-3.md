@@ -133,6 +133,33 @@ the site and the time (never overwriting), and put on the clipboard. Tested: fil
 
 Tested: GitHub's 32×32 icon; a column with GitHub, Wikipedia, YouTube and Reddit icons.
 
+## The new tab (home.rs)
+
+- **The field stands on its own in the middle of the page card** `Omnibox` on a blank
+  tab:
+  - size: 560 wide (less in a narrow window, keeping 14 each side) and 50 tall;
+  - look: rounded 14, a hairline, a soft shadow, 15.5 px text, "Enter a web address";
+  - place: lifted 30 above centre.
+- **It is the column's own field, moved.** Offers, keywords and Tab-to-search work the same.
+  - On a page it goes back to the top of the column.
+  - On the new tab the column keeps showing its tabs.
+- **What it offers hangs under it** in its own rounded card (padding 6, rows rounded 9), so the field
+  never moves. An empty field offers nothing.
+- **Home grid** (`home_grid = on`, off by default): the sites of the bookmark folder
+  *Home*. Four to a row, sixteen at most, tiles 50 tall with a hairline. Hidden while you type.
+- **No bookmark star** in the field when there's no page.
+- **Not copied:** the slow "breath" under the field, since an animation that never stops keeps
+  the frame clock running on an idle window. Painted walls (Themes) come in batch 4.
+- **Placement:** a small layout manager (`HomeLayout`), because GTK has no "at most this wide" and a
+  fixed 560 would make the window at least that wide.
+
+## Fix: the page card's corners
+
+The page card was rounded (10 px), but a page painted square corners over it: GTK only cuts
+children to a widget's rounded edge when the widget's overflow is hidden. The stage now sets it.
+Checked on a white page (Wikipedia, light theme): all four corners are round.
+
 ## Tests
 
-75 (71 core, 4 app), clippy clean.
+75 (71 core, 4 app), clippy clean. Also checked by keyboard: Ctrl+T, type, Enter loads in the new
+tab; Ctrl+L on a page uses the column's field.
