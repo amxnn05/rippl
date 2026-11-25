@@ -270,6 +270,7 @@ impl Browser {
                 }
             }
         });
+        self.install_page_scripts();
     }
 
     /// Every tab of a kept-awake site is marked so it never sleeps.

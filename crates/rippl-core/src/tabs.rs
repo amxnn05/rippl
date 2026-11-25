@@ -495,9 +495,44 @@ impl Tabs {
     }
 }
 
+/// What a page says is waiting for you, read off the front of its title
+/// the way WhatsApp, Messenger, X and Discord put it there: "(3) WhatsApp",
+/// "(12+) …". Only a count at the very front,
+/// in brackets: a number further along is as likely to be a year
+/// ("Dune (2021) - IMDb"). Over 99 is "99+".
+pub fn unread(title: &str) -> Option<String> {
+    let title = title.trim_start();
+    let inside = title.strip_prefix('(')?.split_once(')')?.0.trim();
+    let (digits, more) = match inside.strip_suffix('+') {
+        Some(d) => (d, true),
+        None => (inside, false),
+    };
+    if !(1..=5).contains(&digits.len()) || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let n: u32 = digits.parse().ok()?;
+    match n {
+        0 => None,
+        100.. => Some("99+".into()),
+        _ if more => Some(format!("{n}+")),
+        _ => Some(n.to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unread_counts_from_titles() {
+        assert_eq!(unread("(3) WhatsApp").as_deref(), Some("3"));
+        assert_eq!(unread("(12+) Messenger").as_deref(), Some("12+"));
+        assert_eq!(unread("(250) Inbox").as_deref(), Some("99+"));
+        assert_eq!(unread("Dune (2021) - IMDb"), None);
+        assert_eq!(unread("(0) Nothing"), None);
+        assert_eq!(unread("(new) Chat"), None);
+        assert_eq!(unread("(123456) x"), None);
+    }
 
     fn awake(id: TabId, ago: u64) -> Tab {
         let mut t = Tab::new(id, "https://example.com");

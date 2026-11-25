@@ -12,6 +12,9 @@
 //!   elements as one user style sheet before the page draws.
 //! - **Capture**: the whole page as a
 //!   PNG in `~/Pictures/rippl/`, and on the clipboard.
+//! - **Save as a web archive** (Ctrl+Alt+A): the page and everything it
+//!   shows in one `.mhtml` file in Downloads, which rippl opens again as
+//!   it was.
 //! - **Site icons**: WebKit's favicon store is on, and a tab shows its
 //!   site's icon instead of its letter once there is one (letters while
 //!   none is known, or with `icons = off`).
@@ -138,6 +141,26 @@ impl Browser {
             } else {
                 "Captured and copied (couldn't save the file)".into()
             });
+        });
+    }
+
+    /// Ctrl+Alt+A: the page as one web archive (MHTML) in Downloads.
+    pub(crate) fn save_archive(&self) {
+        let Some(view) = self.front_view() else { return };
+        let title = view.title().map(|t| t.to_string()).filter(|t| !t.trim().is_empty());
+        let name = title.or_else(|| view.uri().and_then(|u| host_of(&u))).unwrap_or_else(|| "page".into());
+        let dir = glib::user_special_dir(glib::UserDirectory::Downloads).unwrap_or_else(|| glib::home_dir().join("Downloads"));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = rippl_core::downloads::destination(&dir, &format!("{name}.mhtml"), |p| p.exists());
+        let file = gio::File::for_path(&path);
+        let weak = self.weak();
+        view.save_to_file(&file, webkit6::SaveMode::Mhtml, None::<&gio::Cancellable>, move |r| {
+            if let Some(b) = weak.upgrade() {
+                b.notice(&match r {
+                    Ok(()) => format!("Saved: {}", path.display()),
+                    Err(e) => format!("Couldn't save this page: {e}"),
+                });
+            }
         });
     }
 

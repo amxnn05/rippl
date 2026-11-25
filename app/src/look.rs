@@ -64,12 +64,14 @@ window.rippl .field image { color: var(--muted); -gtk-icon-size: 13px; }
 
 /* Pinned tabs: squares holding one letter. */
 window.rippl .pins { margin-bottom: 8px; }
-window.rippl .pins flowboxchild { padding: 0; min-width: 0; min-height: 0; background: none; }
 window.rippl .pin { min-width: 30px; min-height: 30px; padding: 0; border-radius: 9px; border: none;
   background: var(--tile); color: var(--muted); font-size: 12px; font-weight: 500; box-shadow: none; }
 window.rippl .pin:hover { background: var(--wash); color: var(--ink); }
 window.rippl .pin.front { background: var(--pin-live); color: var(--ink); }
 window.rippl .pin.asleep { opacity: 0.6; }
+window.rippl .pin .unread { background: #ed3d36; color: white; font-size: 9px; font-weight: 700;
+  min-width: 13px; min-height: 13px; padding: 0 3px; border-radius: 7px;
+  box-shadow: 0 0 0 1.5px var(--frame); }
 
 /* Tab rows. */
 window.rippl .tabs, window.rippl .tabs row { background: transparent; }
@@ -125,6 +127,21 @@ window.rippl .home-grid > flowboxchild { padding: 0; }
 window.rippl .home-tile { min-height: 50px; padding: 0 10px; border-radius: 14px; background: transparent;
   box-shadow: inset 0 0 0 1px var(--hairline); border: none; color: var(--muted); font-size: 12px; }
 window.rippl .home-tile:hover { background: var(--hover); color: var(--ink); }
+/* Peek: the page dimmed, a panel over it. */
+window.rippl .peek-dim { background: rgba(0,0,0,0.22); }
+window.rippl .peek-panel { background: var(--ground); border-radius: 12px;
+  box-shadow: 0 0 0 1px var(--hairline), 0 10px 30px rgba(0,0,0,0.25); }
+window.rippl .peek-knob { min-width: 28px; min-height: 28px; padding: 0; border-radius: 14px; border: none;
+  background: var(--ground); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hairline); }
+window.rippl .peek-knob:hover { background: var(--hover); }
+
+/* The player at the foot: a hairline, not a tab's ground. */
+window.rippl .player { min-height: 28px; padding: 0 7px 0 10px; border-radius: 9px; margin: 0 0 4px 0;
+  box-shadow: inset 0 0 0 1px var(--hairline); color: var(--muted); font-size: 12.5px; }
+window.rippl .player:hover { background: var(--hover); color: var(--ink); }
+window.rippl .player-button { min-width: 15px; min-height: 15px; padding: 0; border-radius: 8px; border: none;
+  background: transparent; color: var(--muted); box-shadow: none; -gtk-icon-size: 9px; }
+window.rippl .player-button:hover { background: var(--wash); }
 window.rippl paned.split > separator { background: var(--hairline); min-width: 6px; }
 window.rippl webview.pane-front { box-shadow: inset 0 2px 0 var(--accent); }
 
@@ -323,6 +340,7 @@ impl Browser {
         let tabs = self.tabs.borrow();
         let partner = self.partner.borrow();
         let mut any_pin = false;
+        let mut pin_at = 0;
         let mut in_group: Option<rippl_core::tabs::GroupId> = None;
         // Only the space on screen; a group's tabs under its heading.
         for tab in tabs.here() {
@@ -341,7 +359,26 @@ impl Browser {
             let live = Some(id) == tabs.front;
             if tab.pinned {
                 any_pin = true;
-                let pin = gtk::Button::with_label(&monogram(&tab.url, &tab.title));
+                let pin = gtk::Button::new();
+                // What the page says is waiting, hung from the pin's corner
+                //: a pin shows no title to say it.
+                let face = gtk::Overlay::builder().child(&gtk::Label::new(Some(&monogram(&tab.url, &tab.title)))).build();
+                if let Some(count) = rippl_core::tabs::unread(&tab.title).filter(|_| tab.life == Life::Awake) {
+                    // Centred on the letter's top right corner, a touch
+                    // outside it, as an app's count hangs from its icon in
+                    // on a wide pin the square's corner is far off.
+                    let badge = gtk::Label::builder()
+                        .label(&count)
+                        .halign(gtk::Align::Center)
+                        .valign(gtk::Align::Center)
+                        .margin_start(20)
+                        .margin_bottom(13)
+                        .build();
+                    badge.add_css_class("unread");
+                    badge.set_can_target(false);
+                    face.add_overlay(&badge);
+                }
+                pin.set_child(Some(&face));
                 pin.add_css_class("pin");
                 pin.set_focusable(false);
                 pin.set_tooltip_text(Some(&tab.title));
@@ -352,7 +389,8 @@ impl Browser {
                     pin.add_css_class("asleep");
                 }
                 self.on_click(&pin, id);
-                self.pins.append(&pin);
+                self.pins.attach(&pin, pin_at % 6, pin_at / 6, 1, 1);
+                pin_at += 1;
                 continue;
             }
             let row = gtk::ListBoxRow::new();
@@ -416,6 +454,7 @@ impl Browser {
             self.list.append(&row);
         }
         self.pins.set_visible(any_pin);
+        self.render_player();
         drop(tabs);
         drop(partner);
         self.render_spaces();

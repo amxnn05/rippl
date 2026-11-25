@@ -33,8 +33,17 @@ gpc = on
 # uBlock Origin's filter lists as well as EasyList's (on, default)
 ublock = on
 
-# The column as frosted glass the compositor blurs (on, default); off: solid
-glass = on
+# The column as frosted glass the compositor blurs
+glass = off
+
+# Shift+click a link: its page in a panel over this one (on, default)
+peek = on
+
+# What plays in another tab, at the foot of the column, with its pause (off, default)
+player = off
+
+# Space and arrow keys on a video with the browser's own controls (off, default)
+video_keys = off
 
 # Darken pages that have no dark look of their own, in the dark theme (off, default)
 dusk = off
@@ -67,7 +76,7 @@ is on the list, the address field shows a warning icon.
 
 ## Glass and Hyprland
 
-With `glass = on`, rippl asks the compositor to blur behind its column (GTK 4.24's
+With `glass = on` (off by default), rippl asks the compositor to blur behind its column (GTK 4.24's
 `backdrop-filter`, sent as `ext-background-effect-v1`). Hyprland's own blur settings decide how it
 looks. Omarchy also makes every window 95% opaque, which shows the desktop faintly through the page
 too; a window rule giving `dev.rippl.Rippl` opacity 1 keeps the page solid while the column stays
@@ -123,6 +132,8 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 | `Ctrl+Shift+D` | Duplicate the tab, with its history and scroll |
 | `Ctrl+P` | Print |
 | `Ctrl+Shift+S` | Capture the whole page: PNG in ~/Pictures/rippl, and on the clipboard |
+| `Ctrl+Alt+A` | Save the page as a web archive (.mhtml) in Downloads |
+| `Shift+click` a link | Peek at it; `Esc` puts it away, `Ctrl+Return` keeps it as a tab |
 | `Alt+1`–`Alt+9` | Go to that space |
 | `Ctrl+Alt+T`, **+** at the column's foot | New space (its own tabs and sign-ins) |
 | Right-click a space's button | Rename it, or delete it with its tabs and sign-ins |

@@ -25,7 +25,7 @@ the header of each of its source files, with rippl's status for each.
 | Tabs across the top instead | 🔨 batch 4 |
 | Column folds away | ✅ Ctrl+S hides it; the slide animation 🔨 |
 | Column as icons only | 🔨 batch 4 |
-| Glass window | ✅ `glass = on`: the compositor's blur through `ext-background-effect` |
+| Glass window | ✅ `glass = on` (off by default): the compositor's blur through `ext-background-effect` |
 | Liquid Glass | 🍎 |
 | Traffic lights, title bar | 🍎; rippl hides the title bar on tiling compositors |
 | Blank-tab walls, stickers, themes | 🔨 batch 4 |
@@ -57,12 +57,12 @@ the header of each of its source files, with rippl's status for each.
 | Tabs close themselves; archive of closed tabs | 🔨 batch 4 |
 | Duplicate tab (⌘D) | ✅ Ctrl+Shift+D, tab menu |
 | Tab menu (right-click a tab) | ✅ |
-| Peek at a link in a panel | 🔨 batch 3 |
+| Peek at a link in a panel | ✅ Shift+click |
 | Little window for links from other apps | 🔨 with Phase 9 (default browser) |
 | Choose the space a link opens in | 🔨 Phase 9 |
 | Private tabs (⇧⌘N) | ✅ Ctrl+Shift+N |
-| Unread counts from titles | 🔨 batch 3 |
-| Media player at the foot of the column | 🔨 batch 3 |
+| Unread counts from titles | ✅ on pins |
+| Media player at the foot of the column | ✅ `player = on` |
 | Floating video / picture in picture | ⛔ WebKitGTK has no picture-in-picture API |
 | Media keys for the playing tab | 🔨 batch 5 (MPRIS) |
 
@@ -85,8 +85,8 @@ the header of each of its source files, with rippl's status for each.
 
 | Feature | rippl |
 |---|---|
-| Ad blocker before the page | ✅ EasyList + EasyPrivacy |
-| YouTube ads | 🔨 batch 3 (needs rippl's own scriptlets) |
+| Ad blocker before the page | ✅ EasyList, EasyPrivacy, uBlock Origin's lists |
+| YouTube ads | ✅ the scripts and rules |
 | uBlock Origin's lists | ✅ in Shield (lists only: the extension can't run in WebKitGTK) |
 | Off per site | ✅ Ctrl+Shift+B (6 s recompile; instant 🔨) |
 | Hide anything, for good | ✅ Ctrl+Shift+H / U |
@@ -121,12 +121,13 @@ the header of each of its source files, with rippl's status for each.
 | Find on page | ✅ Ctrl+F |
 | Translate on device | 🔨 batch 6 (needs a local model) |
 | Capture part or all of a page | ✅ whole page, Ctrl+Shift+S; a chosen part 🔨 |
-| Save page as web archive | 🔨 batch 3 (WebView save as MHTML) |
+| Save page as web archive | ✅ Ctrl+Alt+A (MHTML) |
 | Print | ✅ Ctrl+P |
 | Web Inspector | ✅ Ctrl+Shift+I |
 | Developer tools packages | ⛔/🍎 (the Web Inspector is built in) |
 | Zoom, smooth wheel, 120 Hz | ✅ zoom; WebKitGTK scrolls smoothly; refresh rate follows the compositor |
-| Video keys, autoplay choice | 🔨 batch 3 |
+| Video keys | ✅ `video_keys = on` |
+| Autoplay choice | 🔨 batch 4 |
 | Swipe back/forward | ✅ WebKit's gestures |
 | Middle-button autoscroll | 🔨 batch 4 |
 

@@ -12,6 +12,7 @@ you is collected, because there is nowhere for it to go.
 | Files you download | When you download them | Saved in your Downloads folder; the request goes to the site |
 | Filter-list downloads | First launch, then when older than 4 days (checked every 6 hours) | `easylist.to` (EasyList, EasyPrivacy) and `ublockorigin.github.io` (uBlock Origin's lists, with the files they include): plain GETs with user agent `rippl`, no cookies. `ublock = off` drops the second |
 | Site icons | When a page names its icon | The site itself, as part of loading it |
+| YouTube's ad reports | Never | Answered in the page with an empty 200 before they leave: blocked, and not seen as failing |
 | Anything else | Never | — |
 
 There is no update check, no "phone home", no favicon service and no safe-browsing lookup. If any

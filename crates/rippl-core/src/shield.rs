@@ -28,7 +28,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Bump when the conversion changes, so compiled filters are rebuilt.
-pub const CONVERTER_VERSION: u32 = 2;
+pub const CONVERTER_VERSION: u32 = 3;
 
 /// Generic hiding selectors per rule. One rule per selector would multiply
 /// the rule count; one huge rule makes one bad selector hide nothing.
@@ -462,6 +462,11 @@ pub fn convert(lists: &[&str], allowed: &[String]) -> (String, Stats) {
     stats.block = blocks.len();
     stats.hide = hides.len();
     stats.allow = allows.len();
+    // YouTube's ads, which no list stops alone (see `youtube_rules`);
+    // not counted, being rippl's own.
+    let (yt_blocks, yt_allows) = youtube_rules();
+    blocks.extend(yt_blocks);
+    allows.splice(0..0, yt_allows);
     // Order matters: an exception only cancels the rules before it.
     let mut out = String::with_capacity((blocks.len() + hides.len() + allows.len()) * 120);
     out.push('[');
@@ -473,6 +478,35 @@ pub fn convert(lists: &[&str], allowed: &[String]) -> (String, Stats) {
     }
     out.push(']');
     (out, stats)
+}
+
+/// Where YouTube's player reports ads and fetches them, never the video
+///. Each path is anchored on YouTube's own hosts.
+pub const YOUTUBE_PATHS: [&str; 6] =
+    ["/api/stats/ads", "/pagead/", "/ptracking", "/get_midroll_info", "/youtubei/v1/player/ad_break", "/pcs/activeview"];
+
+/// Shield's rules for YouTube, in every compiled filter: blocks, and the
+/// one exception, which has to sit in the same filter as the rule it
+/// cancels (WebKit's exceptions only reach their own filter).
+///
+/// - the ad paths above, and the quality reports for an ad (`adformat=`);
+/// - Google's own ad paths and the video-ads SDK, only from YouTube's pages
+///   (other sites' players may need the SDK to play at all);
+/// - YouTube's blocker test, `ad_status.js` (one line setting a flag), let
+///   through on YouTube's pages: when it fails, YouTube may wall the video.
+fn youtube_rules() -> (Vec<Rule>, Vec<Rule>) {
+    let yt = |path: &str| format!("^https?://([^/]+\\.)?youtube\\.com{}", path.replace('.', "\\."));
+    let on_youtube = || vec!["*youtube.com".to_string(), "*youtube-nocookie.com".to_string()];
+    let mut blocks: Vec<Rule> = YOUTUBE_PATHS.iter().map(|p| Rule::new(yt(p), Action::Block)).collect();
+    blocks.push(Rule::new("^https?://([^/]+\\.)?youtube\\.com/api/stats/qoe\\?.*adformat=", Action::Block));
+    for filter in ["^https?://([^/]+\\.)?google\\.com/pagead/", "^https?://imasdk\\.googleapis\\.com/"] {
+        let mut r = Rule::new(filter, Action::Block);
+        r.if_domain = on_youtube();
+        blocks.push(r);
+    }
+    let mut status = Rule::new("^https?://static\\.doubleclick\\.net/instream/ad_status\\.js", Action::Ignore);
+    status.if_domain = on_youtube();
+    (blocks, vec![status])
 }
 
 /// A few of the largest ad and tracking networks: what blocks on first
@@ -533,6 +567,17 @@ mod tests {
         let json = one("/banner/*.gif$~third-party").unwrap();
         assert!(json.contains(r#""url-filter":"/banner/.*\\.gif""#), "{json}");
         assert!(json.contains(r#""load-type":["first-party"]"#));
+    }
+
+    #[test]
+    fn youtube_rules_in_every_filter() {
+        let (json, _) = convert(&["||doubleclick.net^"], &[]);
+        assert!(json.contains(r#"youtube\\.com/api/stats/ads"#), "{json}");
+        // The ad_status.js exception comes after the block it cancels.
+        let block = json.find(r#"doubleclick\\.net"#).unwrap();
+        let status = json.find("ad_status").unwrap();
+        assert!(status > block);
+        assert!(json[status..].contains("ignore-previous-rules"));
     }
 
     #[test]

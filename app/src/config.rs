@@ -11,14 +11,20 @@
 //! shield = on
 //! # uBlock Origin's lists as well as EasyList's (on, default) or not (off)
 //! ublock = on
-//! # the column as frosted glass the compositor blurs (on, default) or solid
-//! glass = on
+//! # the column as frosted glass the compositor blurs
+//! glass = off
 //! # darken pages that have no dark look, in the dark theme (off, default)
 //! dusk = off
 //! # sites' icons on tabs (on, default) or their letters
 //! icons = on
 //! # the new tab shows the sites of the bookmark folder "Home" (off, default)
 //! home_grid = off
+//! # Space and arrow keys on a video with the browser's controls (off, default)
+//! video_keys = off
+//! # Shift+click a link: its page in a panel over this one (on, default)
+//! peek = on
+//! # what plays in another tab, at the foot of the column (off, default)
+//! player = off
 //! # minutes a tab sits unseen before it sleeps (default 30)
 //! sleep = 30
 //! # keep history (on, default) or not (off); bookmarks are kept either way
@@ -60,6 +66,9 @@ pub struct Config {
     pub dusk: bool,
     pub icons: bool,
     pub home_grid: bool,
+    pub video_keys: bool,
+    pub peek: bool,
+    pub player: bool,
     pub sleep_after: Duration,
     pub history: bool,
     pub theme: Theme,
@@ -88,10 +97,13 @@ impl Default for Config {
             search: address::DEFAULT_SEARCH.to_string(),
             shield: true,
             ublock: true,
-            glass: true,
+            glass: false,
             dusk: false,
             icons: true,
             home_grid: false,
+            video_keys: false,
+            peek: true,
+            player: false,
             sleep_after: Duration::from_secs(30 * 60),
             history: true,
             theme: Theme::System,
@@ -131,6 +143,9 @@ impl Config {
             "dusk" => self.dusk = on(value).ok_or_else(bad)?,
             "icons" => self.icons = on(value).ok_or_else(bad)?,
             "home_grid" => self.home_grid = on(value).ok_or_else(bad)?,
+            "video_keys" => self.video_keys = on(value).ok_or_else(bad)?,
+            "peek" => self.peek = on(value).ok_or_else(bad)?,
+            "player" => self.player = on(value).ok_or_else(bad)?,
             "history" => self.history = on(value).ok_or_else(bad)?,
             "https_only" => self.https_only = on(value).ok_or_else(bad)?,
             "gpc" => self.gpc = on(value).ok_or_else(bad)?,
@@ -205,6 +220,9 @@ impl Config {
             choice("glass", "Glass column (the compositor blurs behind it)", onoff(self.glass), &["on", "off"], ""),
             choice("dusk", "Darken pages that have no dark look", onoff(self.dusk), &["on", "off"], "In the dark theme"),
             choice("icons", "Sites' icons on tabs", onoff(self.icons), &["on", "off"], "Off: their letters"),
+            choice("peek", "Shift+click a link to peek at it", onoff(self.peek), &["on", "off"], "Esc puts it away; Ctrl+Return keeps it as a tab"),
+            choice("player", "What plays in another tab, at the foot of the column", onoff(self.player), &["on", "off"], "With its pause"),
+            choice("video_keys", "Space and ← → control videos", onoff(self.video_keys), &["on", "off"], "Videos with the browser's own controls, once clicked"),
             choice("home_grid", "New tab: the sites in the bookmark folder Home", onoff(self.home_grid), &["on", "off"], "Four to a row, sixteen at most"),
             choice("history", "Keep history", onoff(self.history), &["on", "off"], ""),
             choice(

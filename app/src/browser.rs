@@ -61,7 +61,7 @@ pub struct Browser {
     pub(crate) field: gtk::Entry,
     pub(crate) list: gtk::ListBox,
     /// Pinned tabs, as letter squares above the list.
-    pub(crate) pins: gtk::FlowBox,
+    pub(crate) pins: gtk::Grid,
     pub(crate) new_tab: gtk::Button,
     pub(crate) settings_button: gtk::Button,
     /// One button per space, at the column's foot (spaces.rs).
@@ -87,6 +87,21 @@ pub struct Browser {
     pub(crate) home: gtk::Box,
     pub(crate) home_grid: gtk::FlowBox,
     pub(crate) home_mode: Cell<bool>,
+    /// Scripts switched by settings: YouTube's ads, video keys (pagescripts.rs).
+    pub(crate) page_scripts: RefCell<Vec<webkit6::UserScript>>,
+    /// Peek: the layer over the page, the panel's frame, its buttons, and
+    /// what is in it (peek.rs).
+    pub(crate) peek_dim: gtk::Box,
+    pub(crate) peek_frame: gtk::Box,
+    pub(crate) peek_close: gtk::Button,
+    pub(crate) peek_keep: gtk::Button,
+    pub(crate) peeking: RefCell<Option<crate::peek::Peeking>>,
+    /// The player at the column's foot (player.rs): tabs by when their
+    /// sound started, the ones it paused, and the one it shows.
+    pub(crate) player_row: gtk::Box,
+    pub(crate) sounding: RefCell<Vec<TabId>>,
+    pub(crate) stilled: RefCell<HashSet<TabId>>,
+    pub(crate) player_for: RefCell<Option<TabId>>,
     // Find in page (find.rs).
     pub(crate) find_bar: gtk::Box,
     pub(crate) find_entry: gtk::Entry,
@@ -162,14 +177,9 @@ impl Browser {
         list.add_css_class("tabs");
         // The column draws it: pinned squares, the tabs, a quiet
         // "New tab" row, all in one scrolling area (look.rs).
-        let pins = gtk::FlowBox::builder()
-            .selection_mode(gtk::SelectionMode::None)
-            .max_children_per_line(6)
-            .min_children_per_line(1)
-            .column_spacing(4)
-            .row_spacing(4)
-            .homogeneous(true)
-            .build();
+        // Six to a row. A FlowBox here was given no height inside the
+        // scrolling column, and cut its pins in half.
+        let pins = gtk::Grid::builder().column_spacing(4).row_spacing(4).column_homogeneous(true).build();
         pins.add_css_class("pins");
         let new_tab = Browser::new_tab_row();
         let rows = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -199,6 +209,9 @@ impl Browser {
         column.append(&suggest_area);
         column.append(&tabs_area);
         column.append(&downloads.area);
+        let player_row = gtk::Box::builder().visible(false).build();
+        player_row.add_css_class("player");
+        column.append(&player_row);
         let foot = Browser::column_foot();
         column.append(&foot.0);
 
@@ -242,6 +255,8 @@ impl Browser {
         overlay.add_overlay(&save_bar);
         let (popup_bar, popup_label, popup_open, popup_always, popup_dismiss) = Browser::popup_bar();
         overlay.add_overlay(&popup_bar);
+        let (peek_dim, peek_frame, peek_close, peek_keep) = Browser::peek_layer();
+        overlay.add_overlay(&peek_dim);
         let accounts_list = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
         accounts_list.add_css_class("accounts");
         let accounts_popover = gtk::Popover::builder().child(&accounts_list).build();
@@ -326,6 +341,16 @@ impl Browser {
             home,
             home_grid,
             home_mode: Cell::new(false),
+            page_scripts: RefCell::new(Vec::new()),
+            peek_dim,
+            peek_frame,
+            peek_close,
+            peek_keep,
+            peeking: RefCell::new(None),
+            player_row,
+            sounding: RefCell::new(Vec::new()),
+            stilled: RefCell::new(HashSet::new()),
+            player_for: RefCell::new(None),
             find_bar,
             find_entry,
             find_count,
@@ -392,6 +417,9 @@ impl Browser {
         browser.wire_actions(app);
         browser.wire_window();
         browser.wire_home();
+        browser.install_page_scripts();
+        browser.wire_peek();
+        browser.wire_player();
         browser.watch();
         browser.window.present();
         // Pages load once Shield's filters are in place (a second at most),
@@ -648,7 +676,7 @@ impl Browser {
     // ---- a view's signals ---------------------------------------------
 
     /// Puts `view` on the stage as `id`'s and listens to it.
-    fn adopt(&self, id: TabId, view: &WebView) {
+    pub(crate) fn adopt(&self, id: TabId, view: &WebView) {
         self.stage.add_named(view, Some(&format!("tab-{id}")));
         self.views.borrow_mut().insert(id, view.clone());
 
@@ -778,6 +806,18 @@ impl Browser {
         let weak = self.weak();
         view.connect_decide_policy(move |v, decision, kind| {
             let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) else { return false };
+            // Shift+click on a link: a peek, not a navigation or a window.
+            if matches!(kind, webkit6::PolicyDecisionType::NavigationAction | webkit6::PolicyDecisionType::NewWindowAction)
+                && let Some(action) =
+                    decision.downcast_ref::<webkit6::NavigationPolicyDecision>().and_then(|d| d.navigation_action())
+                && b.is_peek_click(&action)
+                && let Some(url) = action.request().and_then(|r| r.uri()).filter(|u| u.starts_with("http"))
+            {
+                decision.ignore();
+                let url = url.to_string();
+                glib::idle_add_local_once(move || b.peek(&url, id));
+                return true;
+            }
             if kind != webkit6::PolicyDecisionType::NavigationAction {
                 return false;
             }
@@ -843,6 +883,7 @@ impl Browser {
             if let Some(tab) = b.tabs.borrow_mut().get_mut(id) {
                 tab.playing_audio = v.is_playing_audio();
             }
+            b.heard(id, v.is_playing_audio());
             b.render();
         });
 
@@ -1028,6 +1069,7 @@ impl Browser {
                 }
                 ("toggle", host) if !host.is_empty() => {
                     self.shield.toggle(host.trim(), |_| {});
+                    self.install_page_scripts();
                     "ok: recompiling".into()
                 }
                 _ => "error: shield [update | toggle <host>]".into(),
@@ -1228,6 +1270,31 @@ impl Browser {
                     child = w.next_sibling();
                 }
                 out.join("\n")
+            }
+            "pins" => {
+                let b = |w: &gtk::Widget| w.compute_bounds(&self.window).map(|r| format!("{}x{}", r.width(), r.height())).unwrap_or_default();
+                let first = self.pins.first_child();
+                format!("pins {} | first pin {}", b(self.pins.upcast_ref()), first.map(|p| b(&p)).unwrap_or_default())
+            }
+            "peek" => match self.front() {
+                Some(id) => {
+                    self.peek(rest, id);
+                    "ok".into()
+                }
+                None => "error: no tab".into(),
+            },
+            "player" => match *self.player_for.borrow() {
+                Some(id) if self.player_row.is_visible() => {
+                    if rest == "toggle" {
+                        self.player_toggle(id);
+                    }
+                    format!("tab {id} stilled={}", self.stilled.borrow().contains(&id))
+                }
+                _ => "none".into(),
+            },
+            "archive" => {
+                self.save_archive();
+                "ok".into()
             }
             "capture" => {
                 self.capture();
@@ -1508,6 +1575,7 @@ impl Browser {
         });
         self.action(app, "print", &["<Ctrl>p"], |b| b.print());
         self.action(app, "capture", &["<Ctrl><Shift>s"], |b| b.capture());
+        self.action(app, "save-archive", &["<Ctrl><Alt>a"], |b| b.save_archive());
         self.action(app, "copy-address", &["<Ctrl><Shift>c"], |b| b.copy_address());
         self.action(app, "paste-go", &["<Ctrl><Shift>v"], |b| b.paste_and_go());
         // Ctrl+K: the field, where typing finds open tabs.

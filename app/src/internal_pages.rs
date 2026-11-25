@@ -169,6 +169,7 @@ impl Browser {
             ("settings", "shield-on") => {
                 if self.shield.is_allowed(arg) {
                     self.shield.toggle(arg, |_| {});
+                    self.install_page_scripts();
                 }
                 Ok(String::new())
             }
@@ -194,6 +195,8 @@ impl Browser {
             "theme" | "glass" => self.apply_look(),
             "icons" => self.render(),
             "home_grid" => self.fill_home_grid(),
+            "video_keys" => self.install_page_scripts(),
+            "player" => self.render_player(),
             "gpc" | "https_only" => self.engine.send_settings(config.gpc, config.https_only),
             "shield" | "ublock" => return Ok("Saved. Blocking changes after rippl restarts.".into()),
             _ => {}
