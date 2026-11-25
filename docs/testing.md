@@ -47,7 +47,21 @@ scripts/ctl.sh permissions          # saved answers and questions waiting
 scripts/ctl.sh permissions answer allow|deny
 scripts/ctl.sh permissions forget [host]
 scripts/ctl.sh download <url>       # `downloads` lists them
+scripts/ctl.sh pin                  # pin/unpin the front tab
+scripts/ctl.sh reader               # reading mode on/off
+scripts/ctl.sh pick                 # start the hide picker
+scripts/ctl.sh hide <selector>      # hide on the front site, as the picker would; `hidden` lists
+scripts/ctl.sh unhide               # as Ctrl+Shift+U
+scripts/ctl.sh sources              # other browsers' profiles found; `import <n>` imports one
+scripts/ctl.sh js <code>            # run script in the front page, answer as JSON
 ```
+
+`js` is how tests read a page, for example
+`scripts/ctl.sh js 'getComputedStyle(document.querySelector("#x")).display'`.
+
+To test the importer without touching real browsers, start rippl with `HOME` pointing to a
+scratch folder that contains fake profiles (`.config/google-chrome/Default/Bookmarks`,
+`.mozilla/firefox/x.default/places.sqlite`). The tests in `rippl_core::import` show the formats.
 
 To keep downloads out of your real `~/Downloads`, put
 `XDG_DOWNLOAD_DIR="/some/scratch/dir"` in `$XDG_CONFIG_HOME/user-dirs.dirs` of the scratch profile.

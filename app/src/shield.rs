@@ -174,7 +174,7 @@ impl Shield {
         }
     }
 
-    fn allowed_list(&self) -> Vec<String> {
+    pub(crate) fn allowed_list(&self) -> Vec<String> {
         self.allowed.borrow().iter().cloned().collect()
     }
 

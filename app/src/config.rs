@@ -38,6 +38,22 @@ pub struct Config {
 }
 
 impl Config {
+    /// The settings as rippl://settings shows them.
+    pub fn describe(&self) -> Vec<(String, String)> {
+        let search = address::ENGINES
+            .iter()
+            .find(|(_, t)| *t == self.search)
+            .map_or(self.search.clone(), |(name, _)| name.to_string());
+        let onoff = |b: bool| if b { "on" } else { "off" }.to_string();
+        vec![
+            ("Search engine (search)".into(), search),
+            ("Ad and tracker blocking (shield)".into(), onoff(self.shield)),
+            ("Tabs sleep after, minutes (sleep)".into(), (self.sleep_after.as_secs() / 60).to_string()),
+            ("History (history)".into(), onoff(self.history)),
+            ("Theme (theme)".into(), format!("{:?}", self.theme).to_lowercase()),
+        ]
+    }
+
     pub fn load() -> Config {
         let path = glib::user_config_dir().join("rippl").join("config");
         let text = std::fs::read_to_string(path).unwrap_or_default();

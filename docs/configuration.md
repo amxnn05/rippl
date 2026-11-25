@@ -56,7 +56,14 @@ is on the list, the address field shows a warning icon.
 | `Ctrl+R`, `F5` / `Ctrl+Shift+R` | Reload / reload without the cache |
 | `Ctrl+Shift+B` | Shield off (or on) for this site |
 | `Ctrl+D`, click the ☆ in the field | Bookmark the page, or remove the bookmark |
-| `Ctrl+H`, `Ctrl+Shift+O` | Field with nothing typed: bookmarks, then recent pages |
+| Focus the field with nothing typed | Bookmarks, then recent pages |
+| `Ctrl+H` | `rippl://history`: search, forget, clear |
+| `Ctrl+Shift+O` | `rippl://bookmarks`: remove, import from another browser |
+| `Ctrl+,` | `rippl://settings`: permissions, Shield exceptions, hidden elements, configuration |
+| `Ctrl+Shift+P` | Pin or unpin the tab |
+| `F9`, `Ctrl+Alt+R` | Reading mode on/off |
+| `Ctrl+Shift+H` | Hide something on this site (click it; `Esc` cancels) |
+| `Ctrl+Shift+U` | Show everything hidden on this site again |
 | `↓` `↑` `Return` in the field | Move through what the field offers, open it |
 | `Ctrl+F` | Find in page (`Return`/`Shift+Return` next/previous, `Esc` closes) |
 | `Ctrl+G` / `Ctrl+Shift+G`, `F3` / `Shift+F3` | Next / previous match |

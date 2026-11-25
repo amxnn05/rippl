@@ -93,6 +93,9 @@ impl Places {
              CREATE INDEX IF NOT EXISTS history_last ON history(last);
              CREATE TABLE IF NOT EXISTS bookmarks (
                  url TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT '', added INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS hidden (
+                 host TEXT NOT NULL, selector TEXT NOT NULL, added INTEGER NOT NULL,
+                 PRIMARY KEY (host, selector));
              CREATE TABLE IF NOT EXISTS permissions (
                  host TEXT NOT NULL, kind TEXT NOT NULL, allow INTEGER NOT NULL,
                  PRIMARY KEY (host, kind));",
@@ -192,7 +195,35 @@ impl Places {
         rows.collect()
     }
 
+    /// Forgets one page from history.
+    pub fn forget(&self, url: &str) -> Result<usize, Error> {
+        self.db.execute("DELETE FROM history WHERE url = ?1", [url])
+    }
+
     // ---- bookmarks -----------------------------------------------------
+
+    pub fn remove_bookmark(&self, url: &str) -> Result<usize, Error> {
+        self.db.execute("DELETE FROM bookmarks WHERE url = ?1", [url])
+    }
+
+    /// Adds bookmarks brought over from another browser, skipping ones
+    /// already kept and anything that isn't http(s). Returns how many were
+    /// new.
+    pub fn import_bookmarks(&self, list: &[(String, String)]) -> Result<usize, Error> {
+        let tx = self.db.unchecked_transaction()?;
+        let mut added = 0;
+        {
+            let mut stmt = tx.prepare("INSERT OR IGNORE INTO bookmarks (url, title, added) VALUES (?1, ?2, ?3)")?;
+            let t = now();
+            for (url, title) in list {
+                if url.starts_with("https://") || url.starts_with("http://") {
+                    added += stmt.execute(params![url, title, t])?;
+                }
+            }
+        }
+        tx.commit()?;
+        Ok(added)
+    }
 
     pub fn is_bookmarked(&self, url: &str) -> Result<bool, Error> {
         Ok(self.db.query_row("SELECT 1 FROM bookmarks WHERE url = ?1", [url], |_| Ok(())).optional()?.is_some())
@@ -215,6 +246,40 @@ impl Places {
             Ok(Place { url: r.get(0)?, title: r.get(1)?, visits: 0, last: r.get(2)?, bookmarked: true })
         })?;
         rows.collect()
+    }
+
+    // ---- hidden elements -------------------------------------------------
+
+    /// Keeps `selector` hidden on `host` from now on.
+    pub fn hide(&self, host: &str, selector: &str) -> Result<(), Error> {
+        self.db.execute(
+            "INSERT OR IGNORE INTO hidden (host, selector, added) VALUES (?1, ?2, ?3)",
+            params![host, selector, now()],
+        )?;
+        Ok(())
+    }
+
+    /// Shows everything again on `host` (or on every site).
+    pub fn unhide(&self, host: Option<&str>) -> Result<usize, Error> {
+        match host {
+            Some(h) => self.db.execute("DELETE FROM hidden WHERE host = ?1", [h]),
+            None => self.db.execute("DELETE FROM hidden", []),
+        }
+    }
+
+    /// Every site with something hidden, and its selectors.
+    pub fn hidden(&self) -> Result<Vec<(String, Vec<String>)>, Error> {
+        let mut stmt = self.db.prepare_cached("SELECT host, selector FROM hidden ORDER BY host, rowid")?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+        let mut out: Vec<(String, Vec<String>)> = Vec::new();
+        for row in rows {
+            let (host, selector) = row?;
+            match out.last_mut() {
+                Some((h, list)) if *h == host => list.push(selector),
+                _ => out.push((host, vec![selector])),
+            }
+        }
+        Ok(out)
     }
 
     // ---- permissions ---------------------------------------------------
@@ -304,6 +369,45 @@ mod tests {
         assert_eq!(p.permission("ads.example", Permission::Notifications).unwrap(), Some(false));
         p.forget_permissions(Some("meet.example")).unwrap();
         assert_eq!(p.permission("meet.example", Permission::Camera).unwrap(), None);
+    }
+
+    #[test]
+    fn hidden_by_host() {
+        let p = Places::open(None).unwrap();
+        p.hide("news.com", ".promo").unwrap();
+        p.hide("news.com", "#popup").unwrap();
+        p.hide("news.com", ".promo").unwrap();
+        p.hide("blog.org", "aside").unwrap();
+        let all = p.hidden().unwrap();
+        assert_eq!(all, vec![
+            ("blog.org".to_string(), vec!["aside".to_string()]),
+            ("news.com".to_string(), vec![".promo".to_string(), "#popup".to_string()]),
+        ]);
+        p.unhide(Some("news.com")).unwrap();
+        assert_eq!(p.hidden().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn import_skips_duplicates_and_odd_schemes() {
+        let p = Places::open(None).unwrap();
+        p.toggle_bookmark("https://a.com/", "A").unwrap();
+        let list = vec![
+            ("https://a.com/".to_string(), "A again".to_string()),
+            ("https://b.com/".to_string(), "B".to_string()),
+            ("javascript:alert(1)".to_string(), "bookmarklet".to_string()),
+            ("place:sort=8".to_string(), "Firefox query".to_string()),
+        ];
+        assert_eq!(p.import_bookmarks(&list).unwrap(), 1);
+        assert_eq!(p.bookmarks().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn forget_one_page() {
+        let p = Places::open(None).unwrap();
+        p.visit("https://a.com/", "", false).unwrap();
+        p.visit("https://b.com/", "", false).unwrap();
+        p.forget("https://a.com/").unwrap();
+        assert_eq!(p.recent(5).unwrap().len(), 1);
     }
 
     #[test]

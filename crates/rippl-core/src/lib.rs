@@ -4,6 +4,8 @@
 
 pub mod address;
 pub mod downloads;
+pub mod import;
+pub mod pages;
 pub mod places;
 pub mod session;
 pub mod shield;

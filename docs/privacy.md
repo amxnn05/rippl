@@ -55,12 +55,15 @@ models do not depend on profiling you. If you want certainty, host SearXNG yours
 | **Permissions asked, per site** | Camera, microphone, screen, location, notifications, clipboard reading, DRM and storage access are all asked for; nothing is granted silently. Answers are kept per site, never for private tabs | `permissions.rs` |
 | **History stays local and optional** | Kept in `places.sqlite` on your machine; never recorded from private tabs; `history = off` stops it | `rippl_core::places` |
 | **Address suggestions are local** | Offers come from your own history, bookmarks and tabs; nothing typed is sent anywhere before Return | `omnibox.rs` |
+| **rippl:// pages unreachable from the web** | The scheme is local and display-isolated; buttons need a per-launch random token, so neither a website nor a downloaded HTML file can clear history or change permissions | `internal_pages.rs` |
+| **Scripts pages can't see** | Reading mode and the hide picker run in an isolated script world; the reading-mode page runs no script at all | `reader.rs`, `curtain.rs` |
+| **Import only reads** | Other browsers' bookmark files are read (Firefox's from a temporary copy) and never written; nothing is sent anywhere | `rippl_core::import` |
 | **Safe download names** | A site can't choose a path, a hidden file, or overwrite an existing file | `rippl_core::downloads` |
 | **Clipboard** | Pages can't read the clipboard on their own | `engine.rs` |
 | **Private tabs** (`Ctrl+Shift+N`) | Each has its own throwaway cookie jar and storage, and is never written to the session | `engine.rs` `view(private)` |
 | **Sandboxed pages** | WebKitGTK runs every web process in a `bwrap` sandbox | WebKit |
 | **Local data only** | History, session, cookies and settings live in your home folder (see [architecture.md](architecture.md#files-on-disk)) | — |
-| **Control socket off** | Only with `RIPPL_CONTROL=1`; mode `0600` in your private runtime folder | `control.rs` |
+| **Control socket off** | Only with `RIPPL_CONTROL=1`; mode `0600` in your private runtime folder. It can run script in open pages (`js`), so only turn it on for testing | `control.rs` |
 
 ## Not done yet (known gaps)
 

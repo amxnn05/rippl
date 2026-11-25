@@ -135,8 +135,11 @@ impl Tabs {
     pub fn open(&mut self, url: impl Into<String>) -> TabId {
         self.next += 1;
         let tab = Tab::new(self.next, url);
-        let at = self.front.and_then(|f| self.index(f)).map_or(self.list.len(), |i| i + 1);
-        self.list.insert(at, tab);
+        let after_front = self.front.and_then(|f| self.index(f)).map_or(self.list.len(), |i| i + 1);
+        // Never inside the pinned group: opened from a pin, it goes first
+        // among the ordinary tabs.
+        let pins = self.list.iter().filter(|t| t.pinned).count();
+        self.list.insert(after_front.max(pins), tab);
         self.next
     }
 
@@ -186,6 +189,17 @@ impl Tabs {
             self.select(n);
         }
         next
+    }
+
+    /// Pins or unpins `id`. Pinned tabs sit together at the top of the
+    /// list, in the order they were pinned; an unpinned tab goes just
+    /// below them.
+    pub fn set_pinned(&mut self, id: TabId, pinned: bool) {
+        let Some(i) = self.index(id) else { return };
+        let mut tab = self.list.remove(i);
+        tab.pinned = pinned;
+        let pins = self.list.iter().filter(|t| t.pinned).count();
+        self.list.insert(pins, tab);
     }
 
     /// The tab `step` places from the front, wrapping round.
@@ -252,6 +266,25 @@ mod tests {
         assert_eq!(tabs.close(b), Some(c));
         assert_eq!(tabs.close(c), None);
         assert_eq!(tabs.front, None);
+    }
+
+    #[test]
+    fn pins_gather_at_the_top() {
+        let mut tabs = Tabs::new();
+        let a = tabs.open("a.com");
+        let b = tabs.open("b.com");
+        let c = tabs.open("c.com");
+        tabs.set_pinned(c, true);
+        tabs.set_pinned(a, true);
+        let order = |t: &Tabs| t.list.iter().map(|t| t.id).collect::<Vec<_>>();
+        assert_eq!(order(&tabs), vec![c, a, b]);
+        tabs.set_pinned(c, false);
+        assert_eq!(order(&tabs), vec![a, c, b]);
+        // Opened from a pin: below the pins.
+        tabs.select(a);
+        let d = tabs.open("d.com");
+        assert_eq!(order(&tabs), vec![a, d, c, b]);
+        assert!(tabs.get(a).unwrap().pinned && !tabs.get(c).unwrap().pinned);
     }
 
     #[test]

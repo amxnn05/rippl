@@ -73,6 +73,13 @@ pub struct Browser {
     pub(crate) ask_allow: gtk::Button,
     pub(crate) ask_deny: gtk::Button,
     pub(crate) asking: Asking,
+    /// Tabs in reading mode, and the page each is reading (reader.rs).
+    pub(crate) reading: RefCell<HashMap<TabId, String>>,
+    /// A short message over the bottom of the page.
+    pub(crate) toast: gtk::Label,
+    pub(crate) toast_gen: Cell<u32>,
+    /// This launch's secret for rippl:// page buttons (internal_pages.rs).
+    pub(crate) token: String,
     pub(crate) dirty: Cell<bool>,
     me: RefCell<Weak<Browser>>,
 }
@@ -130,6 +137,14 @@ impl Browser {
         let overlay = gtk::Overlay::builder().child(&stage).hexpand(true).vexpand(true).build();
         overlay.add_overlay(&find_bar);
         overlay.add_overlay(&ask_bar);
+        let toast = gtk::Label::builder()
+            .halign(gtk::Align::Center)
+            .valign(gtk::Align::End)
+            .margin_bottom(24)
+            .visible(false)
+            .build();
+        toast.add_css_class("toast");
+        overlay.add_overlay(&toast);
 
         let body = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         body.append(&column);
@@ -198,6 +213,10 @@ impl Browser {
             ask_allow,
             ask_deny,
             asking: Asking::default(),
+            reading: RefCell::new(HashMap::new()),
+            toast,
+            toast_gen: Cell::new(0),
+            token: crate::internal_pages::new_token(),
             dirty: Cell::new(false),
             me: RefCell::new(Weak::new()),
         });
@@ -207,6 +226,8 @@ impl Browser {
         browser.wire_omnibox();
         browser.wire_find();
         browser.wire_permission_bar();
+        browser.wire_internal_pages();
+        browser.wire_curtain();
         let weak = Rc::downgrade(&browser);
         browser.field.connect_icon_press(move |_, position| {
             if let (Some(b), gtk::EntryIconPosition::Primary) = (weak.upgrade(), position) {
@@ -449,6 +470,7 @@ impl Browser {
             if let Some(tab) = b.tabs.borrow_mut().get_mut(id) {
                 tab.url = uri.to_string();
             }
+            b.reader_followed(id, v);
             b.dirty.set(true);
             if b.front() == Some(id) {
                 b.show_front();
@@ -481,8 +503,13 @@ impl Browser {
             if b.front() == Some(id) {
                 b.field.set_progress_fraction(0.0);
             }
+            // Reading mode starts at the top, not where the page was scrolled.
+            if b.reading.borrow().contains_key(&id) {
+                v.evaluate_javascript("scrollTo(0, 0)", None, None, None::<&gio::Cancellable>, |_| {});
+            }
             // History: kept pages only, never a private tab's.
-            let private = b.tabs.borrow().get(id).is_none_or(|t| t.private);
+            // A reading-mode view of the page is not another visit.
+            let private = b.tabs.borrow().get(id).is_none_or(|t| t.private) || b.reading.borrow().contains_key(&id);
             let typed = b.typed_next.borrow_mut().remove(&id);
             if !private && b.config.history
                 && let Some(uri) = v.uri() {
@@ -604,6 +631,11 @@ impl Browser {
                 (_, true) => "◐ ",
                 _ => "",
             };
+            if tab.pinned {
+                let pin = gtk::Image::from_icon_name("view-pin-symbolic");
+                pin.add_css_class("pin");
+                line.append(&pin);
+            }
             let label = gtk::Label::builder()
                 .label(format!("{mark}{}", tab.title))
                 .xalign(0.0)
@@ -621,6 +653,14 @@ impl Browser {
             row.set_tooltip_text(Some(&tab.url));
             if Some(tab.id) == tabs.front {
                 row.add_css_class("front");
+            }
+            if tab.pinned {
+                row.add_css_class("pinned");
+                // A line under the last pin, between pins and tabs.
+                let next_pinned = tabs.list.get(tabs.index(tab.id).unwrap_or(0) + 1).is_some_and(|t| t.pinned);
+                if !next_pinned {
+                    row.add_css_class("last-pin");
+                }
             }
             if tab.life != Life::Awake {
                 row.add_css_class("asleep");
@@ -804,12 +844,108 @@ impl Browser {
                 _ => "error: permissions [forget [host] | answer allow|deny]".into(),
             },
             "downloads" => self.downloads.status(),
+            "pin" => {
+                self.toggle_pin();
+                "ok".into()
+            }
+            "reader" => {
+                self.toggle_reader();
+                "ok".into()
+            }
+            "pick" => {
+                self.pick_to_hide();
+                "ok".into()
+            }
+            "hide" => {
+                let url = self.front().and_then(|f| self.tabs.borrow().get(f).map(|t| t.url.clone()));
+                match url.as_deref().and_then(shield::host_of) {
+                    Some(host) => {
+                        self.keep_hidden(&host, rest.trim());
+                        "ok".into()
+                    }
+                    None => "error: no site in front".into(),
+                }
+            }
+            "unhide" => {
+                self.unhide_here();
+                "ok".into()
+            }
+            "hidden" => {
+                let all = self.places.hidden().unwrap_or_default();
+                all.iter().map(|(h, s)| format!("{h}\t{}", s.join(" | "))).collect::<Vec<_>>().join("\n")
+            }
+            "sources" => {
+                let found = rippl_core::import::sources(&glib::home_dir());
+                found.iter().enumerate().map(|(i, s)| format!("{i}\t{}\t{}", s.browser, s.profile)).collect::<Vec<_>>().join("\n")
+            }
+            "import" => match self.import_from(rest.trim().parse().unwrap_or(usize::MAX)) {
+                Ok(note) => note,
+                Err(e) => format!("error: {e}"),
+            },
             "download" => match self.engine.session.download_uri(rest.trim()) {
                 Some(_) => "ok".into(),
                 None => "error: could not start".into(),
             },
             _ => format!("error: unknown command {verb:?}"),
         }
+    }
+
+    /// A control-socket command whose answer may come later: `js <code>`
+    /// runs script in the front page and answers with its result as JSON.
+    pub fn command_with(&self, line: &str, reply: Box<dyn FnOnce(String)>) {
+        let Some(code) = line.strip_prefix("js ") else { return reply(self.command(line)) };
+        let Some(view) = self.front_view() else { return reply("error: no page".into()) };
+        view.evaluate_javascript(code, None, None, None::<&gio::Cancellable>, move |result| {
+            reply(match result {
+                Ok(v) => v.to_json(0).map(|j| j.to_string()).unwrap_or_else(|| "undefined".into()),
+                Err(e) => format!("error: {e}"),
+            })
+        });
+    }
+
+    /// Goes to rippl://`page`: the tab already showing it, or a new one.
+    pub(crate) fn open_internal(&self, page: &str) {
+        let url = format!("rippl://{page}");
+        let existing = self.tabs.borrow().list.iter().find(|t| t.url.starts_with(&url)).map(|t| t.id);
+        match existing {
+            Some(id) => {
+                self.select(id);
+                if let Some(v) = self.front_view() {
+                    v.reload();
+                }
+            }
+            None => {
+                self.open(&url, false, true);
+            }
+        }
+    }
+
+    /// Ctrl+Shift+P: pin the tab in front, or unpin it.
+    pub(crate) fn toggle_pin(&self) {
+        let Some(id) = self.front() else { return };
+        {
+            let mut tabs = self.tabs.borrow_mut();
+            let pinned = tabs.get(id).is_some_and(|t| t.pinned);
+            tabs.set_pinned(id, !pinned);
+        }
+        self.dirty.set(true);
+        self.render();
+    }
+
+    /// A short message over the page, gone after three seconds.
+    pub(crate) fn notice(&self, text: &str) {
+        self.toast.set_label(text);
+        self.toast.set_visible(true);
+        let generation = self.toast_gen.get().wrapping_add(1);
+        self.toast_gen.set(generation);
+        let weak = self.weak();
+        glib::timeout_add_local_once(Duration::from_secs(3), move || {
+            if let Some(b) = weak.upgrade()
+                && b.toast_gen.get() == generation
+            {
+                b.toast.set_visible(false);
+            }
+        });
     }
 
     fn wire_actions(&self, app: &gtk::Application) {
@@ -898,11 +1034,13 @@ impl Browser {
             }
         });
         self.action(app, "bookmark", &["<Ctrl>d"], |b| b.toggle_bookmark());
-        // History and bookmarks are what the empty field offers.
-        self.action(app, "history", &["<Ctrl>h", "<Ctrl><Shift>o"], |b| {
-            b.field.grab_focus();
-            b.field.set_text("");
-        });
+        self.action(app, "history", &["<Ctrl>h"], |b| b.open_internal("history"));
+        self.action(app, "bookmarks", &["<Ctrl><Shift>o"], |b| b.open_internal("bookmarks"));
+        self.action(app, "settings", &["<Ctrl>comma"], |b| b.open_internal("settings"));
+        self.action(app, "pin", &["<Ctrl><Shift>p"], |b| b.toggle_pin());
+        self.action(app, "reader", &["F9", "<Ctrl><Alt>r"], |b| b.toggle_reader());
+        self.action(app, "hide-element", &["<Ctrl><Shift>h"], |b| b.pick_to_hide());
+        self.action(app, "unhide", &["<Ctrl><Shift>u"], |b| b.unhide_here());
         self.action(app, "toggle-column", &["<Ctrl>s"], |b| {
             b.column.set_visible(!b.column.is_visible());
         });
@@ -1074,6 +1212,11 @@ impl Browser {
             .download { padding: 4px 2px; }
             .download button.close { min-height: 20px; min-width: 20px; padding: 0; opacity: 0.7; }
             /* Over the page, whatever the page or the theme: dark, opaque, white text. */
+            .tabs row.pinned label { font-weight: 600; }
+            .tabs row.last-pin { margin-bottom: 8px; box-shadow: 0 5px 0 -4px alpha(currentColor, 0.15); }
+            .tabs .pin { opacity: 0.6; -gtk-icon-size: 12px; }
+            .toast { background: rgba(28, 28, 30, 0.96); color: white; border-radius: 18px; padding: 8px 16px;
+                     box-shadow: 0 2px 10px alpha(black, 0.35); }
             .find, .ask { background: rgba(28, 28, 30, 0.96); color: white;
                           border-radius: 10px; padding: 6px 8px; box-shadow: 0 2px 10px alpha(black, 0.35); }
             .ask label { color: white; }

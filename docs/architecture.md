@@ -32,6 +32,8 @@ crates/rippl-core/        no GTK, no WebKit: everything here runs under `cargo t
   src/places.rs           places.sqlite: history, bookmarks, permission answers
   src/suggest.rs          ranking what the field offers; inline completion
   src/downloads.rs        safe, never-overwriting download file names
+  src/pages.rs            rippl:// pages and the reader page, as escaped HTML
+  src/import.rs           bookmarks from Chromium- and Firefox-family browsers
   examples/shield_convert.rs   runs the converter on a list file, for inspection
 
 app/src/
@@ -46,6 +48,9 @@ app/src/
   find.rs                 find-in-page bar (Ctrl+F)
   permissions.rs          the permission question bar and its rules
   downloads.rs            the downloads list at the foot of the column
+  reader.rs               reading mode: extractor (isolated world) + reader page
+  curtain.rs              hide elements: picker, per-site user style sheets
+  internal_pages.rs       serves rippl://history|bookmarks|settings, token-checked buttons
   pressure.rs             Linux PSI reading; malloc_trim
   control.rs              Unix socket for tests and measurement (opt-in)
 
@@ -94,6 +99,19 @@ its `close` signal. Two rules keep that safe:
 2. Every per-view signal handler first checks `Browser::ours(id, view)`. A view rippl is already
    taking away can no longer change its tab. Without this, sleeping a tab used to *delete* it.
 
+## Isolated script world
+
+rippl's own scripts (the reading-mode extractor, the hide picker) run in a separate JavaScript
+world named `rippl`. They see the same page, but the page can't see their variables, call their
+functions or post to their message handler (`ripplHide` is registered only in that world). This
+is the same idea `WKContentWorld "Search"`.
+
+## rippl:// pages
+
+`WebContext::register_uri_scheme("rippl")` serves pages built by `rippl_core::pages`. The scheme is
+local + display-isolated + secure, so the web can't reach it. Buttons carry a per-launch random
+token (see [phase 5](phases/phase-5-extras.md#rippls-own-pages-ripplhistory-ripplbookmarks-ripplsettings)).
+
 ## Shield (content blocking)
 
 ```
@@ -111,7 +129,8 @@ in pages. Details: [phases/phase-3-shield.md](phases/phase-3-shield.md).
 | Path | What |
 |---|---|
 | `~/.local/share/rippl/session` | open tabs (not private ones), plain text |
-| `~/.local/share/rippl/places.sqlite` | history, bookmarks, site permission answers |
+| `~/.local/share/rippl/places.sqlite` | history, bookmarks, site permission answers, hidden elements |
+| `~/.cache/rippl/import/` | a moment's copy of a Firefox database while importing, deleted after |
 | `~/.local/share/rippl/web/cookies.sqlite` | cookies (sign-ins) |
 | `~/Downloads` (XDG download dir) | downloaded files |
 | `~/.local/share/rippl/web/storage/`, `itp/` | site storage, WebKit's tracking-prevention data |

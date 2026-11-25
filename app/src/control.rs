@@ -11,7 +11,11 @@
 //! select <index>      1-based, as Ctrl+1..9
 //! close <index>
 //! sleep               puts every tab that may sleep to sleep now
+//! js <code>           runs <code> in the front page, answers with JSON
 //! ```
+//!
+//! (and the rest in docs/testing.md). `js` can read any open page, which
+//! is why the socket is off by default and only this user can reach it.
 //!
 //! `scripts/ctl.sh` speaks it from the shell.
 
@@ -61,11 +65,14 @@ pub fn start(browser: &Rc<Browser>) {
             let (tx, rx) = mpsc::channel();
             let command = line.trim().to_string();
             glib::MainContext::default().invoke(move || {
-                let reply = BROWSER.with(|b| match b.borrow().upgrade() {
-                    Some(browser) => browser.command(&command),
-                    None => "error: no browser".into(),
+                BROWSER.with(|b| match b.borrow().upgrade() {
+                    Some(browser) => browser.command_with(&command, Box::new(move |reply| {
+                        let _ = tx.send(reply);
+                    })),
+                    None => {
+                        let _ = tx.send("error: no browser".into());
+                    }
                 });
-                let _ = tx.send(reply);
             });
             let reply = rx.recv().unwrap_or_else(|_| "error: no reply".into());
             let mut stream = stream;

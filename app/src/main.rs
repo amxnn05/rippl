@@ -3,12 +3,15 @@
 mod browser;
 mod config;
 mod control;
+mod curtain;
 mod downloads;
 mod engine;
 mod find;
+mod internal_pages;
 mod omnibox;
 mod permissions;
 mod pressure;
+mod reader;
 mod shield;
 
 use std::cell::RefCell;

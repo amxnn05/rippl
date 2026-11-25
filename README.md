@@ -24,7 +24,9 @@ it can:
 The field offers your open tabs, bookmarks and history as you type, ranked by how you use them, and
 completes addresses you've visited (`you` → `youtube.com`). Downloads go to `~/Downloads`, never
 overwriting a file, and are listed at the foot of the column. Find in page, permission prompts that
-remember your answer per site, and light/dark mode.
+remember your answer per site, and light/dark mode. Pinned tabs, a reading mode that runs no script,
+anything on a page hidden for good with one click, and history, bookmarks and settings as pages of
+their own. Bookmarks come over from Chrome, Brave, Edge, Vivaldi, Firefox, LibreWolf or Zen.
 
 ## Private by default
 
@@ -42,6 +44,7 @@ cargo build --release
 
 `Ctrl+L` address · `Ctrl+T` new tab · `Ctrl+W` close · `Ctrl+Shift+N` private tab · `Ctrl+Tab` next ·
 `Ctrl+1`–`9` jump · `Alt+←/→` back/forward · `Ctrl+F` find · `Ctrl+D` bookmark · `Ctrl+H` history ·
+`Ctrl+Shift+P` pin · `F9` reading mode · `Ctrl+Shift+H` hide something · `Ctrl+,` settings ·
 `Ctrl+Shift+B` Shield off for this site · `Ctrl+S` hide tabs.
 All keys and settings: [docs/configuration.md](docs/configuration.md).
 
