@@ -15,7 +15,7 @@
 //!   lists and clears them too.
 
 use webkit6::prelude::*;
-use webkit6::{gio, UserContentInjectedFrames, UserStyleLevel, UserStyleSheet};
+use webkit6::gio;
 
 use crate::browser::Browser;
 use crate::shield::host_of;
@@ -142,19 +142,8 @@ impl Browser {
         }
     }
 
-    /// One style sheet per site, limited to that site's pages.
+    /// Hidden elements live with the rest of the sites' styles (pagelook.rs).
     pub(crate) fn apply_hidden(&self) {
-        let content = &self.engine.content;
-        content.remove_all_style_sheets();
-        for (host, selectors) in self.places.hidden().unwrap_or_default() {
-            // One rule per selector: an invalid one only loses itself.
-            let css: String =
-                selectors.iter().map(|s| format!("{s} {{ display: none !important; }}\n")).collect();
-            let allow = [format!("*://{host}/*"), format!("*://*.{host}/*")];
-            let allow: Vec<&str> = allow.iter().map(String::as_str).collect();
-            let sheet =
-                UserStyleSheet::new(&css, UserContentInjectedFrames::TopFrame, UserStyleLevel::User, &allow, &[]);
-            content.add_style_sheet(&sheet);
-        }
+        self.apply_site_styles();
     }
 }

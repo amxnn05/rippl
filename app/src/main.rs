@@ -12,6 +12,7 @@ mod internal_pages;
 mod keyring;
 mod look;
 mod omnibox;
+mod pagelook;
 mod permissions;
 mod pressure;
 mod reader;

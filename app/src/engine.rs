@@ -68,6 +68,10 @@ const GPC_SCRIPT: &str = "Object.defineProperty(Navigator.prototype, 'globalPriv
 
 /// What every network session gets, kept or private.
 fn harden(session: &NetworkSession) {
+    // Site icons for the tabs (pagelook.rs): kept with the session's data.
+    if let Some(manager) = session.website_data_manager() {
+        manager.set_favicons_enabled(true);
+    }
     // Intelligent Tracking Prevention: WebKit's own classifier that
     // partitions and purges the storage of sites that track across
     // sites, as Safari has it on.

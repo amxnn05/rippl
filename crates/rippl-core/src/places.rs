@@ -98,6 +98,7 @@ impl Places {
              CREATE TABLE IF NOT EXISTS hidden (
                  host TEXT NOT NULL, selector TEXT NOT NULL, added INTEGER NOT NULL,
                  PRIMARY KEY (host, selector));
+             CREATE TABLE IF NOT EXISTS site_css (host TEXT PRIMARY KEY, css TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS site_flags (host TEXT NOT NULL, flag TEXT NOT NULL, PRIMARY KEY (host, flag));
              CREATE TABLE IF NOT EXISTS never_save (origin TEXT PRIMARY KEY, added INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS permissions (
@@ -335,6 +336,31 @@ impl Places {
         rows.collect()
     }
 
+    // ---- your own style for a site -----------------------
+
+    pub fn site_css(&self, host: &str) -> Result<Option<String>, Error> {
+        self.db.query_row("SELECT css FROM site_css WHERE host = ?1", [host], |r| r.get(0)).optional()
+    }
+
+    /// Sets `host`'s CSS; empty removes it.
+    pub fn set_site_css(&self, host: &str, css: &str) -> Result<(), Error> {
+        if css.trim().is_empty() {
+            self.db.execute("DELETE FROM site_css WHERE host = ?1", [host])?;
+        } else {
+            self.db.execute(
+                "INSERT INTO site_css (host, css) VALUES (?1, ?2) ON CONFLICT(host) DO UPDATE SET css = ?2",
+                params![host, css],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn all_site_css(&self) -> Result<Vec<(String, String)>, Error> {
+        let mut stmt = self.db.prepare_cached("SELECT host, css FROM site_css ORDER BY host")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        rows.collect()
+    }
+
     // ---- passwords: sites never to offer saving on ----------------------
 
     pub fn never_save(&self, origin: &str) -> Result<bool, Error> {
@@ -482,6 +508,17 @@ mod tests {
         p.visit("https://b.com/", "", false).unwrap();
         p.forget("https://a.com/").unwrap();
         assert_eq!(p.recent(5).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn site_css_set_and_cleared() {
+        let p = Places::open(None).unwrap();
+        p.set_site_css("news.com", "body { font-size: 20px }").unwrap();
+        assert_eq!(p.site_css("news.com").unwrap().as_deref(), Some("body { font-size: 20px }"));
+        p.set_site_css("news.com", "body { color: red }").unwrap();
+        assert_eq!(p.all_site_css().unwrap().len(), 1);
+        p.set_site_css("news.com", "  ").unwrap();
+        assert_eq!(p.site_css("news.com").unwrap(), None);
     }
 
     #[test]

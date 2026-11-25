@@ -15,7 +15,7 @@ use rippl_core::places::Places;
 use rippl_core::session::Session;
 use rippl_core::tabs::{self, Life, Pressure, TabId, Tabs};
 use webkit6::prelude::*;
-use webkit6::{gio, glib, gtk, LoadEvent, MediaCaptureState, WebProcessTerminationReason, WebView};
+use webkit6::{gdk, gio, glib, gtk, LoadEvent, MediaCaptureState, WebProcessTerminationReason, WebView};
 
 use crate::config::Config;
 use crate::downloads::Downloads;
@@ -131,6 +131,9 @@ pub struct Browser {
     pub(crate) desktop_theme: std::cell::OnceCell<Option<String>>,
     /// Tabs closed lately (closed.rs).
     pub(crate) closed: RefCell<Vec<crate::closed::Closed>>,
+    /// Site icons known by address, and addresses already asked for (pagelook.rs).
+    pub(crate) icons: RefCell<HashMap<String, gdk::Texture>>,
+    pub(crate) icons_asked: RefCell<HashSet<String>>,
     me: RefCell<Weak<Browser>>,
 }
 
@@ -248,7 +251,7 @@ impl Browser {
         window.set_child(Some(&body));
 
         let config = Config::load();
-        let shield = Shield::new(config.shield);
+        let shield = Shield::new(config.shield, config.ublock);
         let _ = std::fs::create_dir_all(engine::data_dir());
         let places = Places::open(Some(&engine::data_dir().join("places.sqlite"))).unwrap_or_else(|e| {
             eprintln!("rippl: history and bookmarks unavailable ({e}); keeping them in memory this time");
@@ -336,6 +339,8 @@ impl Browser {
             dirty: Cell::new(false),
             desktop_theme: std::cell::OnceCell::new(),
             closed: RefCell::new(Vec::new()),
+            icons: RefCell::new(HashMap::new()),
+            icons_asked: RefCell::new(HashSet::new()),
             me: RefCell::new(Weak::new()),
         });
         *browser.me.borrow_mut() = Rc::downgrade(&browser);
@@ -705,6 +710,7 @@ impl Browser {
                 b.field.set_progress_fraction(0.0);
             }
             b.signin_page_loaded(id, v);
+            b.dusk(id, v);
             // Reading mode starts at the top, not where the page was scrolled.
             if b.reading.borrow().contains_key(&id) {
                 v.evaluate_javascript("scrollTo(0, 0)", None, None, None::<&gio::Cancellable>, |_| {});
@@ -784,6 +790,14 @@ impl Browser {
             b.permission_asked(id, v, request)
         });
         self.wire_find_for(id, view);
+
+        // The site's icon, when the page gives one.
+        let weak = self.weak();
+        view.connect_favicon_notify(move |v| {
+            if let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) {
+                b.render();
+            }
+        });
 
         // Where a link goes, while the pointer is on it.
         let weak = self.weak();
@@ -1189,6 +1203,33 @@ impl Browser {
                 }
                 out.join("\n")
             }
+            "capture" => {
+                self.capture();
+                "ok".into()
+            }
+            "dusk" => match self.front_view() {
+                Some(v) => {
+                    let id = self.front().unwrap_or(0);
+                    self.dusk(id, &v);
+                    "ok".into()
+                }
+                None => "error: no page".into(),
+            },
+            "sitecss" => {
+                let url = self.front().and_then(|f| self.tabs.borrow().get(f).map(|t| t.url.clone()));
+                match url.as_deref().and_then(shield::host_of) {
+                    Some(host) => {
+                        let _ = self.places.set_site_css(&host, rest);
+                        self.apply_site_styles();
+                        "ok".into()
+                    }
+                    None => "error: no site".into(),
+                }
+            }
+            "icon" => {
+                let (id, url) = self.front().and_then(|f| self.tabs.borrow().get(f).map(|t| (t.id, t.url.clone()))).unwrap_or_default();
+                self.icon_for(id, &url).map_or("none".into(), |t| format!("{}x{}", t.width(), t.height()))
+            }
             "reopen" => {
                 self.reopen_closed();
                 "ok".into()
@@ -1440,6 +1481,7 @@ impl Browser {
             }
         });
         self.action(app, "print", &["<Ctrl>p"], |b| b.print());
+        self.action(app, "capture", &["<Ctrl><Shift>s"], |b| b.capture());
         self.action(app, "copy-address", &["<Ctrl><Shift>c"], |b| b.copy_address());
         self.action(app, "paste-go", &["<Ctrl><Shift>v"], |b| b.paste_and_go());
         // Ctrl+K: the field, where typing finds open tabs.

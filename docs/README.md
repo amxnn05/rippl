@@ -30,7 +30,8 @@ development phase did.
 | 8. Shared processes for same-site tabs, the look, first features | done | [phase-8-look.md](phases/phase-8-look.md) |
 | Feature batch 1: site card, keep awake, pop-ups, duplicate, typos, site search, print | done | [batch-1.md](phases/batch-1.md) |
 | Feature batch 2: spaces, profiles, tab groups (and dark mode fixed) | done | [batch-2.md](phases/batch-2.md) |
-| Feature batch 3: dark pages, site CSS, capture, site icons, peek | next | [features.md](features.md) |
+| Feature batch 3 (part 1): uBlock's lists, glass blur, dark pages, site CSS, capture, icons | done | [batch-3.md](phases/batch-3.md) |
+| Batch 3 (part 2): peek, YouTube ads, unread counts, video keys, player | next | [features.md](features.md) |
 | 9. Ship: desktop entry, default browser, packages | planned | [roadmap.md](roadmap.md) |
 
 ## Keeping these docs current

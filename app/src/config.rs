@@ -9,6 +9,14 @@
 //! search = duckduckgo
 //! # on (default) or off
 //! shield = on
+//! # uBlock Origin's lists as well as EasyList's (on, default) or not (off)
+//! ublock = on
+//! # the column as frosted glass the compositor blurs (on, default) or solid
+//! glass = on
+//! # darken pages that have no dark look, in the dark theme (off, default)
+//! dusk = off
+//! # sites' icons on tabs (on, default) or their letters
+//! icons = on
 //! # minutes a tab sits unseen before it sleeps (default 30)
 //! sleep = 30
 //! # keep history (on, default) or not (off); bookmarks are kept either way
@@ -45,6 +53,10 @@ pub struct Config {
     /// The search template, `{}` where the words go.
     pub search: String,
     pub shield: bool,
+    pub ublock: bool,
+    pub glass: bool,
+    pub dusk: bool,
+    pub icons: bool,
     pub sleep_after: Duration,
     pub history: bool,
     pub theme: Theme,
@@ -72,6 +84,10 @@ impl Default for Config {
         Config {
             search: address::DEFAULT_SEARCH.to_string(),
             shield: true,
+            ublock: true,
+            glass: true,
+            dusk: false,
+            icons: true,
             sleep_after: Duration::from_secs(30 * 60),
             history: true,
             theme: Theme::System,
@@ -106,6 +122,10 @@ impl Config {
         match key {
             "search" => self.search = address::engine(value).ok_or_else(bad)?,
             "shield" => self.shield = on(value).ok_or_else(bad)?,
+            "ublock" => self.ublock = on(value).ok_or_else(bad)?,
+            "glass" => self.glass = on(value).ok_or_else(bad)?,
+            "dusk" => self.dusk = on(value).ok_or_else(bad)?,
+            "icons" => self.icons = on(value).ok_or_else(bad)?,
             "history" => self.history = on(value).ok_or_else(bad)?,
             "https_only" => self.https_only = on(value).ok_or_else(bad)?,
             "gpc" => self.gpc = on(value).ok_or_else(bad)?,
@@ -170,6 +190,16 @@ impl Config {
             choice("https_only", "HTTPS-only", onoff(self.https_only), &["on", "off"], "For new pages"),
             choice("gpc", "Global Privacy Control", onoff(self.gpc), &["on", "off"], "For new pages"),
             choice("shield", "Ad and tracker blocking", onoff(self.shield), &["on", "off"], "Applies after a restart"),
+            choice(
+                "ublock",
+                "uBlock Origin's filter lists too",
+                onoff(self.ublock),
+                &["on", "off"],
+                "Applies after a restart",
+            ),
+            choice("glass", "Glass column (the compositor blurs behind it)", onoff(self.glass), &["on", "off"], ""),
+            choice("dusk", "Darken pages that have no dark look", onoff(self.dusk), &["on", "off"], "In the dark theme"),
+            choice("icons", "Sites' icons on tabs", onoff(self.icons), &["on", "off"], "Off: their letters"),
             choice("history", "Keep history", onoff(self.history), &["on", "off"], ""),
             choice(
                 "suggestions",

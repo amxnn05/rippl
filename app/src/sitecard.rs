@@ -155,6 +155,34 @@ impl Browser {
                     }
                 }));
             }
+            // Darkening this site (only offered while it's on).
+            if self.config.borrow().dusk {
+                let darkened = !self.places.site_flag(&host, crate::pagelook::NO_DUSK).unwrap_or(false);
+                let weak = self.weak();
+                let h = host.clone();
+                card.append(&self.switch_line("Darken this site", darkened, move |on| {
+                    if let Some(b) = weak.upgrade() {
+                        let _ = b.places.set_site_flag(&h, crate::pagelook::NO_DUSK, !on);
+                        if let Some(v) = b.front_view() {
+                            v.reload();
+                        }
+                    }
+                }));
+            }
+            let style = gtk::Button::with_label(if self.places.site_css(&host).ok().flatten().is_some() {
+                "Your style for this site (on)…"
+            } else {
+                "Your style for this site…"
+            });
+            style.add_css_class("flat");
+            let weak = self.weak();
+            let h = host.clone();
+            style.connect_clicked(move |_| {
+                if let Some(b) = weak.upgrade() {
+                    b.edit_site_css(&h);
+                }
+            });
+            card.append(&style);
             // What the site may use, and what is hidden on it.
             let permissions: Vec<(String, String, bool)> =
                 self.places.permissions().unwrap_or_default().into_iter().filter(|(h, _, _)| *h == host).collect();

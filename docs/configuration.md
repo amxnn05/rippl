@@ -30,6 +30,18 @@ https_only = on
 # Send Global Privacy Control, "do not sell or share my data" (on, default)
 gpc = on
 
+# uBlock Origin's filter lists as well as EasyList's (on, default)
+ublock = on
+
+# The column as frosted glass the compositor blurs (on, default); off: solid
+glass = on
+
+# Darken pages that have no dark look of their own, in the dark theme (off, default)
+dusk = off
+
+# Sites' icons on tabs (on, default); off: their letters
+icons = on
+
 # Suggestions from the search engine while you type (off, default).
 # On, each keystroke is sent to the engine (DuckDuckGo and Brave offer them).
 suggestions = off
@@ -49,6 +61,14 @@ See [privacy.md](privacy.md) for how to choose a search engine.
 Sites Shield is turned off for, one host per line (subdomains included). `Ctrl+Shift+B` adds or
 removes the site in front, recompiles the filters (about 6 s) and reloads the page. While a site
 is on the list, the address field shows a warning icon.
+
+## Glass and Hyprland
+
+With `glass = on`, rippl asks the compositor to blur behind its column (GTK 4.24's
+`backdrop-filter`, sent as `ext-background-effect-v1`). Hyprland's own blur settings decide how it
+looks. Omarchy also makes every window 95% opaque, which shows the desktop faintly through the page
+too; a window rule giving `dev.rippl.Rippl` opacity 1 keeps the page solid while the column stays
+frosted.
 
 ## Profiles
 
@@ -99,6 +119,7 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 | Right-click a tab | Duplicate, Pin, Put beside this tab, Copy address, Reload, Close, Close other tabs |
 | `Ctrl+Shift+D` | Duplicate the tab, with its history and scroll |
 | `Ctrl+P` | Print |
+| `Ctrl+Shift+S` | Capture the whole page: PNG in ~/Pictures/rippl, and on the clipboard |
 | `Alt+1`–`Alt+9` | Go to that space |
 | `Ctrl+Alt+T`, **+** at the column's foot | New space (its own tabs and sign-ins) |
 | Right-click a space's button | Rename it, or delete it with its tabs and sign-ins |

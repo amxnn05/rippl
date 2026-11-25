@@ -24,7 +24,8 @@ it can:
   position, so it comes back where you left it.
 - **Memory pressure.** rippl reads Linux PSI. When memory is tight, idle tabs sleep sooner, and at once
   when it is critical.
-- **Shield.** EasyList and EasyPrivacy (~116k rules) are compiled into WebKit's own content filters.
+- **Shield.** EasyList, EasyPrivacy and uBlock Origin's lists (~130k rules) are compiled into WebKit's
+  own content filters, with no script in pages.
   On an ad-heavy page that saved **20–47% of memory**, and the page loads less.
 - **Per-process limits** and heap trimming.
 

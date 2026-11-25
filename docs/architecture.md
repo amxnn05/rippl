@@ -67,6 +67,7 @@ app/src/
   closed.rs               reopen closed tabs, copy clean address, paste and go
   sitecard.rs             site card, tab menu, duplicate, print, blocked pop-ups
   spaces.rs               spaces: switch, new, rename, delete, move tabs; the foot's buttons
+  pagelook.rs             dark pages, your CSS per site, capture, site icons
   pressure.rs             Linux PSI reading; malloc_trim
   control.rs              Unix socket for tests and measurement (opt-in)
 
@@ -133,10 +134,12 @@ token (see [phase 5](phases/phase-5-extras.md#rippls-own-pages-ripplhistory-ripp
 ## Shield (content blocking)
 
 ```
-easylist.txt ─┐                         ┌─ UserContentFilterStore.save ─▶ compiled filter (on disk)
-easyprivacy ──┼─ rippl_core::shield ─▶ JSON ┘                                   │ load at launch (5 ms)
-seed (built in)┘   convert (~60 ms, off the main thread)                        ▼
-                                              UserContentManager (shared by every view)
+EasyList + uBlock filters + Quick fixes + Unbreak ─┐                ┌─ "ads" filter ─────┐
+EasyPrivacy + uBlock Privacy + Badware + Unbreak ──┼─ convert ─▶ JSON ┤                    ├─ UserContentManager
+seed (built in, first launch only) ────────────────┘  (~100 ms)       └─ "privacy" filter ─┘   (shared by every view)
+
+A bundle is compiled as one filter because an exception only cancels rules of its own filter.
+The last compiled filters load at launch in ~10 ms and block while a newer one is built.
 ```
 
 Filters are enforced by WebKit itself in the network process and style engine, with no JavaScript

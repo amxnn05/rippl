@@ -28,7 +28,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Bump when the conversion changes, so compiled filters are rebuilt.
-pub const CONVERTER_VERSION: u32 = 1;
+pub const CONVERTER_VERSION: u32 = 2;
 
 /// Generic hiding selectors per rule. One rule per selector would multiply
 /// the rule count; one huge rule makes one bad selector hide nothing.
@@ -270,9 +270,20 @@ fn network(line: &str) -> Option<Rule> {
                 rule.case_sensitive = true;
                 &[]
             }
-            "important" => &[],
-            o if o.starts_with("domain=") => {
-                let (yes, no) = domains(&o[7..], '|')?;
+            "important" | "all" => &[],
+            "strict3p" => {
+                rule.load_type = Some("third-party");
+                restricted = true;
+                &[]
+            }
+            "strict1p" => {
+                rule.load_type = Some("first-party");
+                restricted = true;
+                &[]
+            }
+            o if o.starts_with("domain=") || o.starts_with("from=") => {
+                let list = o.split_once('=').map_or("", |(_, l)| l);
+                let (yes, no) = domains(list, '|')?;
                 rule.if_domain.extend(yes);
                 rule.unless_domain = no;
                 restricted = true;
@@ -304,9 +315,61 @@ fn plain_css(selector: &str) -> bool {
     const EXTENDED: &[&str] = &[
         ":-abp-", ":has-text", ":contains", ":matches-css", ":xpath", ":upward", ":remove", ":style",
         ":min-text-length", ":watch-attr", ":matches-path", ":matches-attr", ":matches-prop", ":others",
-        ":if(", ":if-not", ":nth-ancestor", ":-ext-", "+js(",
+        ":if(", ":if-not", ":nth-ancestor", ":-ext-", "+js(", ":matches-media", ":spath",
     ];
-    !selector.is_empty() && !EXTENDED.iter().any(|e| selector.contains(e))
+    // `^…` is uBlock's HTML filtering, not CSS.
+    !selector.is_empty() && !selector.starts_with('^') && !EXTENDED.iter().any(|e| selector.contains(e))
+}
+
+/// uBlock's preprocessor: `!#if <cond>` … `!#else` … `!#endif`. rippl
+/// is none of the environments uBlock knows (not Chromium, Firefox, Safari,
+/// mobile, nor uBlock itself), so every `env_*`, `ext_*` and `cap_*` token
+/// is false except `cap_user_stylesheet` (rippl hides elements with user
+/// style sheets). `!`, `&&`, `||` and nesting are understood; lines in a
+/// false branch are dropped.
+pub fn preprocess(text: &str) -> String {
+    fn token(t: &str) -> bool {
+        let t = t.trim();
+        if let Some(rest) = t.strip_prefix('!') {
+            return !token(rest);
+        }
+        t == "cap_user_stylesheet"
+    }
+    fn cond(c: &str) -> bool {
+        c.split("||").any(|and| and.split("&&").all(token))
+    }
+    let mut out = String::with_capacity(text.len());
+    // Each open `!#if`: (whether its branch is taken, whether the
+    // enclosing block was).
+    let mut stack: Vec<(bool, bool)> = Vec::new();
+    let live = |stack: &Vec<(bool, bool)>| stack.iter().all(|(taken, _)| *taken);
+    for line in text.lines() {
+        let l = line.trim();
+        if let Some(c) = l.strip_prefix("!#if ") {
+            let outer = live(&stack);
+            stack.push((cond(c), outer));
+        } else if l == "!#else" {
+            if let Some(top) = stack.last_mut() {
+                top.0 = !top.0;
+            }
+        } else if l == "!#endif" {
+            stack.pop();
+        } else if live(&stack) {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    out
+}
+
+/// The files a uBlock list pulls in with `!#include <name>`.
+pub fn includes(text: &str) -> Vec<String> {
+    text.lines()
+        .filter_map(|l| l.trim().strip_prefix("!#include "))
+        .map(|n| n.trim().to_string())
+        // Only a plain name beside the list: never another site.
+        .filter(|n| !n.is_empty() && !n.contains("://") && !n.contains("..") && !n.starts_with('/'))
+        .collect()
 }
 
 /// The rules from ABP filter lists (`lists`), followed by an exception for
@@ -322,6 +385,7 @@ pub fn convert(lists: &[&str], allowed: &[String]) -> (String, Stats) {
     // `site#@#.ad`: generic `.ad` must not apply on those sites.
     let mut unhide: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
 
+    let lists: Vec<String> = lists.iter().map(|l| preprocess(l)).collect();
     for line in lists.iter().flat_map(|l| l.lines()) {
         let line = line.trim();
         if line.is_empty() || line.starts_with('!') || line.starts_with('[') {
@@ -510,6 +574,26 @@ mod tests {
         assert!(!plain_css("div:-abp-has(.ad)"));
         assert!(!plain_css("a:has-text(Sponsored)"));
         assert!(plain_css("div[id^=\"ad-\"] > .x"));
+    }
+
+    #[test]
+    fn ublock_preprocessor() {
+        let text = "a\n!#if env_firefox\nfirefox-only\n!#else\nnot-firefox\n!#endif\n!#if !env_mobile\ndesktop\n!#if ext_ubol\nubol\n!#endif\n!#endif\n!#if cap_user_stylesheet || env_safari\ncss\n!#endif\nz\n";
+        assert_eq!(preprocess(text), "a\nnot-firefox\ndesktop\ncss\nz\n");
+    }
+
+    #[test]
+    fn ublock_includes_stay_beside_the_list() {
+        let text = "!#include filters-2024.txt\n!#include https://evil.example/x.txt\n!#include ../up.txt\n";
+        assert_eq!(includes(text), vec!["filters-2024.txt"]);
+    }
+
+    #[test]
+    fn ublock_options() {
+        assert!(one("||ads.com^$from=a.com|b.com").unwrap().contains(r#""if-domain":["*a.com","*b.com"]"#));
+        assert!(one("||ads.com^$all").is_some());
+        assert!(one("||ads.com^$strict3p").unwrap().contains("third-party"));
+        assert!(!plain_css("^script:has-text(ad)"), "HTML filtering");
     }
 
     #[test]

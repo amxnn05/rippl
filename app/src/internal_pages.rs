@@ -191,9 +191,10 @@ impl Browser {
         self.config.borrow_mut().set(key, value)?;
         let config = self.config.borrow().clone();
         match key {
-            "theme" => self.apply_look(),
+            "theme" | "glass" => self.apply_look(),
+            "icons" => self.render(),
             "gpc" | "https_only" => self.engine.send_settings(config.gpc, config.https_only),
-            "shield" => return Ok("Saved. Blocking changes after rippl restarts.".into()),
+            "shield" | "ublock" => return Ok("Saved. Blocking changes after rippl restarts.".into()),
             _ => {}
         }
         Ok("Saved.".into())

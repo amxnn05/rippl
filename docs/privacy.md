@@ -10,7 +10,8 @@ you is collected, because there is nowhere for it to go.
 | The pages you open, and what they load | When you open them | Those sites, minus what Shield blocks |
 | Your search | Only when you press Return, unless you turn on `suggestions`: then what you type goes to the engine as you type, to suggest searches (never for an address) | Your search engine (DuckDuckGo by default) |
 | Files you download | When you download them | Saved in your Downloads folder; the request goes to the site |
-| Two filter-list downloads | First launch, then when older than 4 days (checked every 6 hours) | `easylist.to`: a plain GET with user agent `rippl`, no cookies |
+| Filter-list downloads | First launch, then when older than 4 days (checked every 6 hours) | `easylist.to` (EasyList, EasyPrivacy) and `ublockorigin.github.io` (uBlock Origin's lists, with the files they include): plain GETs with user agent `rippl`, no cookies. `ublock = off` drops the second |
+| Site icons | When a page names its icon | The site itself, as part of loading it |
 | Anything else | Never | — |
 
 There is no update check, no "phone home", no favicon service and no safe-browsing lookup. If any
@@ -48,7 +49,7 @@ models do not depend on profiling you. If you want certainty, host SearXNG yours
 
 | Protection | What it does | Where |
 |---|---|---|
-| **Shield** | Blocks ads and trackers (EasyList + EasyPrivacy, ~116k rules) inside WebKit's network layer before any request is sent, and hides ad elements before the page draws | `shield.rs`, [phase 3](phases/phase-3-shield.md) |
+| **Shield** | Blocks ads and trackers (EasyList, EasyPrivacy and uBlock Origin's lists, ~130k rules) inside WebKit's network layer before any request is sent, and hides ad elements before the page draws | `shield.rs`, [phase 3](phases/phase-3-shield.md) |
 | **No third-party cookies** | A site embedded in another site's page can't set or read cookies, the classic cross-site tracking cookie. Same as Safari | `engine.rs` `harden()` |
 | **Intelligent Tracking Prevention** | WebKit classifies sites that track across sites and partitions or purges their storage | `engine.rs` `harden()` |
 | **No cross-site pings** | `<a ping>` and beacons sent to another site are blocked by Shield. (WebKitGTK 2.54 ignores its own hyperlink-auditing setting, so Shield is what stops them) | `rippl_core::shield` |

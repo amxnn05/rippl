@@ -45,6 +45,13 @@ window.rippl.dark {
   --mark: rgba(237,237,237,0.06); --accent: #ededed;
 }
 
+/* Glass: the column's ground lets the desktop
+   through, so a compositor that blurs (Hyprland) frosts it. A solid
+   background makes GTK tell the compositor the window is opaque, and then
+   nothing is blurred. The page's card stays solid. */
+window.rippl.glass { --frame: rgba(244,244,244,0.72); backdrop-filter: blur(24px); }
+window.rippl.dark.glass { --frame: rgba(19,19,19,0.70); }
+
 window.rippl { background: var(--frame); color: var(--ink);
   font-family: "Inter", "Adwaita Sans", "SF Pro Text", system-ui, sans-serif; }
 window.rippl .column { padding: 10px 6px 8px 10px; background: transparent; }
@@ -88,6 +95,8 @@ window.rippl .tabs row:hover button.close { opacity: 0.8; }
 window.rippl .mark { min-width: 15px; min-height: 15px; border-radius: 3px; background: var(--mark);
   color: var(--muted); font-size: 8.5px; font-weight: 500; }
 window.rippl .tabs row.front .mark { color: var(--ink); }
+window.rippl .tabs .icon { border-radius: 3px; }
+window.rippl .css-edit { border-radius: 8px; box-shadow: 0 0 0 1px var(--hairline); }
 
 /* New tab, and the foot. */
 window.rippl .new-tab { min-height: 28px; border-radius: 9px; padding: 0 10px; border: none; box-shadow: none;
@@ -176,6 +185,11 @@ impl Browser {
             self.window.add_css_class("dark");
         } else {
             self.window.remove_css_class("dark");
+        }
+        if self.config.borrow().glass {
+            self.window.add_css_class("glass");
+        } else {
+            self.window.remove_css_class("glass");
         }
         if let Some(settings) = gtk::Settings::default() {
             settings.set_gtk_interface_color_scheme(if dark {
@@ -328,10 +342,23 @@ impl Browser {
             let row = gtk::ListBoxRow::new();
             let line = gtk::Box::new(gtk::Orientation::Horizontal, 8);
             if !tab.url.is_empty() {
-                let mark = gtk::Label::new(Some(&if tab.private { "◐".to_string() } else { monogram(&tab.url, &tab.title) }));
-                mark.add_css_class("mark");
-                mark.set_valign(gtk::Align::Center);
-                line.append(&mark);
+                // The site's icon when known, its letter until then.
+                match self.icon_for(id, &tab.url).filter(|_| !tab.private) {
+                    Some(icon) => {
+                        let image = gtk::Image::from_paintable(Some(&icon));
+                        image.set_pixel_size(15);
+                        image.add_css_class("icon");
+                        image.set_valign(gtk::Align::Center);
+                        line.append(&image);
+                    }
+                    None => {
+                        let mark =
+                            gtk::Label::new(Some(&if tab.private { "◐".to_string() } else { monogram(&tab.url, &tab.title) }));
+                        mark.add_css_class("mark");
+                        mark.set_valign(gtk::Align::Center);
+                        line.append(&mark);
+                    }
+                }
             }
             let title = if tab.playing_audio { format!("{} ♪", tab.title) } else { tab.title.clone() };
             let label = gtk::Label::builder()

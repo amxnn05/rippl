@@ -18,14 +18,15 @@ the header of each of its source files, with rippl's status for each.
 | Palette: every colour a light/dark pair | ✅ `look.rs`: the same greys, CSS variables, `prefers-color-scheme` |
 | Page as a card beside the column (8 px gap, 10 px corners) | ✅ |
 | Column of tabs, 28 px rows, 12.5 pt titles, live tab on a grey pill | ✅ |
-| Site letter in a faint square | ✅ letters; site icons 🔨 batch 3 |
+| Site letter in a faint square, or its icon | ✅ |
 | Pinned tabs as letter squares at the top | ✅ |
 | Quiet "+ New tab" row | ✅ |
 | Settings from the column's foot | ✅ (gear) |
 | Tabs across the top instead | 🔨 batch 4 |
 | Column folds away | ✅ Ctrl+S hides it; the slide animation 🔨 |
 | Column as icons only | 🔨 batch 4 |
-| Glass window, Liquid Glass | 🍎 (Hyprland/compositor blur is the Linux route) |
+| Glass window | ✅ `glass = on`: the compositor's blur through `ext-background-effect` |
+| Liquid Glass | 🍎 |
 | Traffic lights, title bar | 🍎; rippl hides the title bar on tiling compositors |
 | Blank-tab walls, stickers, themes | 🔨 batch 4 |
 | Home grid of bookmarks on a new tab | 🔨 batch 4 |
@@ -84,11 +85,12 @@ the header of each of its source files, with rippl's status for each.
 | Feature | rippl |
 |---|---|
 | Ad blocker before the page | ✅ EasyList + EasyPrivacy |
-| YouTube ads | 🔨 batch 3 |
+| YouTube ads | 🔨 batch 3 (needs rippl's own scriptlets) |
+| uBlock Origin's lists | ✅ in Shield (lists only: the extension can't run in WebKitGTK) |
 | Off per site | ✅ Ctrl+Shift+B (6 s recompile; instant 🔨) |
 | Hide anything, for good | ✅ Ctrl+Shift+H / U |
-| Your own CSS for a site, Boosts | 🔨 batch 3 |
-| Dark pages for sites without | 🔨 batch 3 |
+| Your own CSS for a site, Boosts | ✅ site card |
+| Dark pages for sites without | ✅ `dusk = on` |
 | Click IDs off links | ✅ in every request |
 | Global Privacy Control | ✅ |
 | HTTPS first (`HTTPSFirst`) | ✅ HTTPS-only with a warning page |
@@ -117,7 +119,7 @@ the header of each of its source files, with rippl's status for each.
 | Reading mode | ✅ F9 |
 | Find on page | ✅ Ctrl+F |
 | Translate on device | 🔨 batch 6 (needs a local model) |
-| Capture part or all of a page | 🔨 batch 3 (WebView snapshot) |
+| Capture part or all of a page | ✅ whole page, Ctrl+Shift+S; a chosen part 🔨 |
 | Save page as web archive | 🔨 batch 3 (WebView save as MHTML) |
 | Print | ✅ Ctrl+P |
 | Web Inspector | ✅ Ctrl+Shift+I |
