@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/rippl-core", "app"]
+members = ["crates/rippl-core", "crates/rippl-web-extension", "app"]
 
 [workspace.package]
 version = "0.1.0"

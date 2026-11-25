@@ -6,12 +6,22 @@
 //!   profile. Firefox keeps it locked while running, so it is copied
 //!   (with its `-wal` journal) and the copy is read.
 //!
-//! Only reading: nothing in the other browser is changed. Folders are
-//! flattened for now (rippl's bookmarks are a flat list).
+//! Only reading: nothing in the other browser is changed. Folders come
+//! along as paths ("Work/Docs"); the browser's own top-level folders
+//! (bookmarks bar, other bookmarks, menu, toolbar) are left out of them.
 
 use std::path::{Path, PathBuf};
 
 use rusqlite::{Connection, OpenFlags};
+
+/// A bookmark from another browser, with its folder path ("" at the top,
+/// "Work/Docs" nested).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Bookmark {
+    pub url: String,
+    pub title: String,
+    pub folder: String,
+}
 
 /// A browser profile found on disk.
 #[derive(Debug, Clone, PartialEq)]
@@ -73,9 +83,9 @@ pub fn sources(home: &Path) -> Vec<Source> {
     found
 }
 
-/// The (url, title) pairs in `source`. `scratch` is a folder to copy a
-/// locked Firefox database into.
-pub fn read(source: &Source, scratch: &Path) -> Result<Vec<(String, String)>, String> {
+/// The bookmarks in `source`. `scratch` is a folder to copy a locked
+/// Firefox database into.
+pub fn read(source: &Source, scratch: &Path) -> Result<Vec<Bookmark>, String> {
     match source.kind {
         Kind::Chromium => {
             let text = std::fs::read_to_string(&source.path).map_err(|e| e.to_string())?;
@@ -86,21 +96,27 @@ pub fn read(source: &Source, scratch: &Path) -> Result<Vec<(String, String)>, St
 }
 
 /// Chromium's `Bookmarks` JSON.
-pub fn chromium(json: &str) -> Result<Vec<(String, String)>, String> {
+pub fn chromium(json: &str) -> Result<Vec<Bookmark>, String> {
     let root: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
     let mut out = Vec::new();
-    fn walk(node: &serde_json::Value, out: &mut Vec<(String, String)>) {
+    fn walk(node: &serde_json::Value, path: &str, out: &mut Vec<Bookmark>) {
         match node.get("type").and_then(|t| t.as_str()) {
             Some("url") => {
                 if let Some(url) = node.get("url").and_then(|u| u.as_str()) {
                     let title = node.get("name").and_then(|n| n.as_str()).unwrap_or("");
-                    out.push((url.to_string(), title.to_string()));
+                    out.push(Bookmark { url: url.into(), title: title.into(), folder: path.into() });
                 }
             }
             _ => {
                 if let Some(children) = node.get("children").and_then(|c| c.as_array()) {
                     for child in children {
-                        walk(child, out);
+                        let name = child.get("name").and_then(|n| n.as_str()).unwrap_or("").replace('/', "-");
+                        let sub = match (child.get("type").and_then(|t| t.as_str()), path.is_empty()) {
+                            (Some("folder"), true) => name,
+                            (Some("folder"), false) => format!("{path}/{name}"),
+                            _ => path.to_string(),
+                        };
+                        walk(child, &sub, out);
                     }
                 }
             }
@@ -109,14 +125,14 @@ pub fn chromium(json: &str) -> Result<Vec<(String, String)>, String> {
     let roots = root.get("roots").ok_or("not a Chromium bookmarks file")?;
     for name in ["bookmark_bar", "other", "synced"] {
         if let Some(node) = roots.get(name) {
-            walk(node, &mut out);
+            walk(node, "", &mut out);
         }
     }
     Ok(out)
 }
 
 /// Firefox's `places.sqlite`, read from a copy.
-pub fn firefox(path: &Path, scratch: &Path) -> Result<Vec<(String, String)>, String> {
+pub fn firefox(path: &Path, scratch: &Path) -> Result<Vec<Bookmark>, String> {
     std::fs::create_dir_all(scratch).map_err(|e| e.to_string())?;
     let copy = scratch.join("places-import.sqlite");
     let _ = std::fs::remove_file(copy.with_extension("sqlite-wal"));
@@ -132,19 +148,55 @@ pub fn firefox(path: &Path, scratch: &Path) -> Result<Vec<(String, String)>, Str
     result
 }
 
-fn firefox_db(path: &Path) -> Result<Vec<(String, String)>, String> {
+fn firefox_db(path: &Path) -> Result<Vec<Bookmark>, String> {
     let db = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE).map_err(|e| e.to_string())?;
+    // Folders: id → (parent, title). Firefox's own roots (root, menu,
+    // toolbar, unfiled, mobile, tags) have a guid ending in "_____" and
+    // are left out of paths.
+    let mut folders: std::collections::HashMap<i64, (i64, String, bool)> = std::collections::HashMap::new();
+    {
+        let mut stmt = db
+            .prepare("SELECT id, COALESCE(parent, 0), COALESCE(title, ''), COALESCE(guid, '') FROM moz_bookmarks WHERE type = 2")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?))
+            })
+            .map_err(|e| e.to_string())?;
+        for row in rows {
+            let (id, parent, title, guid) = row.map_err(|e| e.to_string())?;
+            folders.insert(id, (parent, title, guid.ends_with("_____") || guid.is_empty() && parent == 0));
+        }
+    }
+    let path_of = |mut id: i64| {
+        let mut parts = Vec::new();
+        for _ in 0..32 {
+            let Some((parent, title, root)) = folders.get(&id) else { break };
+            if *root {
+                break;
+            }
+            parts.push(title.replace('/', "-"));
+            id = *parent;
+        }
+        parts.reverse();
+        parts.join("/")
+    };
     // type 1 = a bookmark (2 is a folder, 3 a separator).
     let mut stmt = db
         .prepare(
-            "SELECT p.url, COALESCE(b.title, p.title, '') FROM moz_bookmarks b
+            "SELECT p.url, COALESCE(b.title, p.title, ''), COALESCE(b.parent, 0) FROM moz_bookmarks b
              JOIN moz_places p ON p.id = b.fk WHERE b.type = 1 ORDER BY b.position",
         )
         .map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, i64>(2)?)))
         .map_err(|e| e.to_string())?;
-    rows.collect::<Result<_, _>>().map_err(|e| e.to_string())
+    let mut out = Vec::new();
+    for row in rows {
+        let (url, title, parent) = row.map_err(|e| e.to_string())?;
+        out.push(Bookmark { url, title, folder: path_of(parent) });
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -161,7 +213,8 @@ mod tests {
             "synced":{"type":"folder","children":[]}},"version":1}"#;
         let got = chromium(json).unwrap();
         assert_eq!(got.len(), 3);
-        assert_eq!(got[1], ("https://docs.rs/".into(), "Docs".into()));
+        assert_eq!(got[1], Bookmark { url: "https://docs.rs/".into(), title: "Docs".into(), folder: "Work".into() });
+        assert_eq!(got[0].folder, "");
         assert!(chromium("{}").is_err());
     }
 
@@ -173,14 +226,15 @@ mod tests {
         let db = Connection::open(&path).unwrap();
         db.execute_batch(
             "CREATE TABLE moz_places (id INTEGER PRIMARY KEY, url TEXT, title TEXT);
-             CREATE TABLE moz_bookmarks (id INTEGER PRIMARY KEY, type INTEGER, fk INTEGER, title TEXT, position INTEGER);
+             CREATE TABLE moz_bookmarks (id INTEGER PRIMARY KEY, type INTEGER, fk INTEGER, title TEXT, position INTEGER, parent INTEGER, guid TEXT);
              INSERT INTO moz_places VALUES (1, 'https://mozilla.org/', 'Mozilla'), (2, 'https://visited.only/', 'V');
-             INSERT INTO moz_bookmarks VALUES (1, 2, NULL, 'Toolbar', 0), (2, 1, 1, 'Moz', 0);",
+             INSERT INTO moz_bookmarks VALUES (1, 2, NULL, 'toolbar', 0, 0, 'toolbar_____'),
+                 (3, 2, NULL, 'Work', 0, 1, 'abc'), (2, 1, 1, 'Moz', 0, 3, 'def');",
         )
         .unwrap();
         drop(db);
         let got = firefox(&path, &dir.join("scratch")).unwrap();
-        assert_eq!(got, vec![("https://mozilla.org/".to_string(), "Moz".to_string())]);
+        assert_eq!(got, vec![Bookmark { url: "https://mozilla.org/".into(), title: "Moz".into(), folder: "Work".into() }]);
         assert!(path.is_file(), "the original is left alone");
         std::fs::remove_dir_all(&dir).unwrap();
     }

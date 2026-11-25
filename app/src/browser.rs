@@ -15,7 +15,7 @@ use rippl_core::places::Places;
 use rippl_core::session::Session;
 use rippl_core::tabs::{self, Life, Pressure, TabId, Tabs};
 use webkit6::prelude::*;
-use webkit6::{gio, glib, gtk, LoadEvent, MediaCaptureState, WebProcessTerminationReason, WebView};
+use webkit6::{gdk, gio, glib, gtk, LoadEvent, MediaCaptureState, WebProcessTerminationReason, WebView};
 
 use crate::config::{Config, Theme};
 use crate::downloads::Downloads;
@@ -35,7 +35,14 @@ macro_rules! debug {
 }
 
 pub struct Browser {
-    pub(crate) config: Config,
+    /// Settings; rippl://settings changes them while rippl runs.
+    pub(crate) config: RefCell<Config>,
+    /// HTTPS-only: hosts whose https failed, offered over http on their warning page.
+    pub(crate) https_failed: RefCell<HashSet<String>>,
+    /// HTTPS-only: per tab, the https addresses of http navigations seen
+    /// lately (any frame), and the main-frame upgrade being waited for.
+    pub(crate) upgrades_seen: RefCell<HashMap<TabId, Vec<String>>>,
+    pub(crate) upgrading: RefCell<HashMap<TabId, String>>,
     pub(crate) shield: Rc<Shield>,
     pub(crate) engine: Engine,
     /// History, bookmarks, permission answers (places.sqlite).
@@ -61,6 +68,10 @@ pub struct Browser {
     pub(crate) typed: RefCell<String>,
     pub(crate) completing: Cell<bool>,
     pub(crate) stage: gtk::Stack,
+    // Split view (split.rs).
+    pub(crate) paned: gtk::Paned,
+    pub(crate) partner: RefCell<HashMap<TabId, TabId>>,
+    pub(crate) shown_split: RefCell<Option<(TabId, TabId)>>,
     pub(crate) blank: gtk::Box,
     // Find in page (find.rs).
     pub(crate) find_bar: gtk::Box,
@@ -144,6 +155,14 @@ impl Browser {
         stage.add_css_class("stage");
         let blank = gtk::Box::new(gtk::Orientation::Vertical, 0);
         stage.add_named(&blank, Some("blank"));
+        let paned = gtk::Paned::builder()
+            .orientation(gtk::Orientation::Horizontal)
+            .wide_handle(true)
+            .shrink_start_child(false)
+            .shrink_end_child(false)
+            .build();
+        paned.add_css_class("split");
+        stage.add_named(&paned, Some("split"));
 
         // The find bar and the permission question float over the page.
         let (find_bar, find_entry, find_count) = Browser::find_bar();
@@ -171,26 +190,14 @@ impl Browser {
         window.set_child(Some(&body));
 
         let config = Config::load();
-        match config.theme {
-            Theme::System => {}
-            Theme::Dark | Theme::Light => {
-                if let Some(settings) = gtk::Settings::default() {
-                    let dark = config.theme == Theme::Dark;
-                    settings.set_gtk_interface_color_scheme(if dark {
-                        gtk::InterfaceColorScheme::Dark
-                    } else {
-                        gtk::InterfaceColorScheme::Light
-                    });
-                }
-            }
-        }
+        apply_theme(config.theme);
         let shield = Shield::new(config.shield);
         let _ = std::fs::create_dir_all(engine::data_dir());
         let places = Places::open(Some(&engine::data_dir().join("places.sqlite"))).unwrap_or_else(|e| {
             eprintln!("rippl: history and bookmarks unavailable ({e}); keeping them in memory this time");
             Places::open(None).expect("in-memory SQLite")
         });
-        let engine = Engine::new(shield.content.clone());
+        let engine = Engine::new(shield.content.clone(), config.gpc, config.https_only);
         // Downloads from every session: the kept one here, private ones as
         // they are made (engine.rs).
         let hook = {
@@ -204,7 +211,10 @@ impl Browser {
         let browser = Rc::new(Browser {
             engine,
             shield,
-            config,
+            config: RefCell::new(config),
+            https_failed: RefCell::new(HashSet::new()),
+            upgrades_seen: RefCell::new(HashMap::new()),
+            upgrading: RefCell::new(HashMap::new()),
             places,
             downloads,
             tabs: RefCell::new(Tabs::new()),
@@ -222,6 +232,9 @@ impl Browser {
             typed: RefCell::new(String::new()),
             completing: Cell::new(false),
             stage,
+            paned,
+            partner: RefCell::new(HashMap::new()),
+            shown_split: RefCell::new(None),
             blank,
             find_bar,
             find_entry,
@@ -321,17 +334,7 @@ impl Browser {
         if life != Life::Awake && !url.is_empty() {
             self.wake(id);
         }
-        let view = self.views.borrow().get(&id).cloned();
-        match view {
-            Some(view) => {
-                self.stage.set_visible_child(&view);
-                view.grab_focus();
-            }
-            None => {
-                self.stage.set_visible_child(&self.blank);
-                self.field.grab_focus();
-            }
-        }
+        self.place(id);
         // Find belongs to the page it searched.
         if self.find_bar.is_visible() {
             self.find_bar.set_visible(false);
@@ -341,6 +344,11 @@ impl Browser {
         self.show_save_question();
         self.accounts_popover.popdown();
         self.render();
+    }
+
+    /// Wakes `id` to be shown beside another tab.
+    pub(crate) fn wake_for_split(&self, id: TabId) {
+        self.wake(id);
     }
 
     /// Gives `id` a view and its page back: from what it kept when it fell
@@ -379,7 +387,10 @@ impl Browser {
         debug!("sleep {id}");
         let Some(view) = self.views.borrow_mut().remove(&id) else { return };
         let memory = view.session_state().and_then(|s| s.serialize()).map(|b| b.to_vec());
-        self.stage.remove(&view);
+        if self.shown_split.borrow().is_some_and(|(l, r)| l == id || r == id) {
+            self.unsplit_layout();
+        }
+        self.detach(&view);
         self.release(id, &view);
         if let Some(tab) = self.tabs.borrow_mut().get_mut(id) {
             tab.life = Life::Asleep;
@@ -411,9 +422,10 @@ impl Browser {
     }
 
     pub fn close(&self, id: TabId) {
+        self.separate(id);
         let view = self.views.borrow_mut().remove(&id);
         if let Some(view) = view {
-            self.stage.remove(&view);
+            self.detach(&view);
             self.release(id, &view);
         }
         self.family.borrow_mut().remove(&id);
@@ -454,7 +466,8 @@ impl Browser {
 
     /// Return in the field: an address, or a search.
     pub(crate) fn go(&self, typed: &str) {
-        let Destination::Page(url) = address::resolve(typed, &self.config.search) else { return };
+        let search = self.config.borrow().search.clone();
+        let Destination::Page(url) = address::resolve(typed, &search) else { return };
         let front = self.front();
         let Some(id) = front else {
             self.open(&url, false, true);
@@ -468,9 +481,8 @@ impl Browser {
             Some(view) => view.load_uri(&url),
             None => self.select(id), // wakes it, and the wake loads `url`
         }
-        if let Some(view) = self.front_view() {
-            self.stage.set_visible_child(&view);
-            view.grab_focus();
+        if self.front_view().is_some() {
+            self.place(id);
         }
         self.dirty.set(true);
     }
@@ -482,6 +494,16 @@ impl Browser {
         self.stage.add_named(view, Some(&format!("tab-{id}")));
         self.views.borrow_mut().insert(id, view.clone());
 
+        // In split view, a click into a pane puts its tab in front.
+        let focus = gtk::EventControllerFocus::new();
+        let weak = self.weak();
+        focus.connect_enter(move |_| {
+            if let Some(b) = weak.upgrade() {
+                b.pane_focused(id);
+            }
+        });
+        view.add_controller(focus);
+
         let weak = self.weak();
         view.connect_title_notify(move |v| {
             let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) else { return };
@@ -492,7 +514,7 @@ impl Browser {
                 tab.title = title.clone().unwrap_or_else(|| address::pretty(&tab.url));
                 (tab.url.clone(), tab.private)
             };
-            if let (Some(title), false, true) = (title, private, b.config.history) {
+            if let (Some(title), false, true) = (title, private, b.config.borrow().history) {
                 let _ = b.places.retitle(&url, &title);
             }
             b.dirty.set(true);
@@ -536,8 +558,19 @@ impl Browser {
         let weak = self.weak();
         view.connect_load_changed(move |v, event| {
             let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) else { return };
-            if event != LoadEvent::Finished {
-                return;
+            match event {
+                LoadEvent::Started => {
+                    b.watch_upgrade(id, v);
+                    return;
+                }
+                LoadEvent::Committed => {
+                    b.upgrading.borrow_mut().remove(&id);
+                    return;
+                }
+                LoadEvent::Finished => {
+                    b.upgrading.borrow_mut().remove(&id);
+                }
+                _ => return,
             }
             if b.front() == Some(id) {
                 b.field.set_progress_fraction(0.0);
@@ -551,7 +584,7 @@ impl Browser {
             // A reading-mode view of the page is not another visit.
             let private = b.tabs.borrow().get(id).is_none_or(|t| t.private) || b.reading.borrow().contains_key(&id);
             let typed = b.typed_next.borrow_mut().remove(&id);
-            if !private && b.config.history
+            if !private && b.config.borrow().history
                 && let Some(uri) = v.uri() {
                     let title = v.title().map(|t| t.to_string()).unwrap_or_default();
                     if let Err(e) = b.places.visit(&uri, &title, typed) {
@@ -561,6 +594,56 @@ impl Browser {
             if b.front() == Some(id) {
                 b.show_front();
             }
+        });
+
+        // HTTPS-only: the secure address failed. Say so, and offer http as
+        // a choice rather than an error page.
+        let weak = self.weak();
+        view.connect_load_failed(move |v, _, failing, error| {
+            let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) else { return false };
+            b.upgrading.borrow_mut().remove(&id);
+            if error.matches(webkit6::NetworkError::Cancelled)
+                || error.matches(webkit6::PolicyError::FrameLoadInterruptedByPolicyChange)
+            {
+                return false;
+            }
+            b.https_fallback(v, failing, error.message())
+        });
+        let weak = self.weak();
+        view.connect_load_failed_with_tls_errors(move |v, failing, _, _| {
+            let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) else { return false };
+            b.https_fallback(v, failing, "The site's certificate isn't valid for it.")
+        });
+        // A click on that page's "continue to http" link: allowed for the host.
+        let weak = self.weak();
+        view.connect_decide_policy(move |v, decision, kind| {
+            let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) else { return false };
+            if kind != webkit6::PolicyDecisionType::NavigationAction {
+                return false;
+            }
+            let uri = decision
+                .downcast_ref::<webkit6::NavigationPolicyDecision>()
+                .and_then(|d| d.navigation_action())
+                .and_then(|a| a.request())
+                .and_then(|r| r.uri());
+            if let Some(uri) = uri.filter(|u| u.starts_with("http://"))
+                && let Some(origin) = rippl_core::passwords::origin_of(&uri)
+            {
+                let host = rippl_core::passwords::host_of_origin(&origin).to_string();
+                if b.https_failed.borrow().contains(&host) {
+                    b.engine.allow_http(&host);
+                } else if let Some(secure) = address::https_upgrade(&uri) {
+                    // The page process will ask for `secure` instead; if it is
+                    // the main frame, the load that starts will say so.
+                    let mut seen = b.upgrades_seen.borrow_mut();
+                    let list = seen.entry(id).or_default();
+                    list.push(secure);
+                    if list.len() > 8 {
+                        list.remove(0);
+                    }
+                }
+            }
+            false
         });
 
         let weak = self.weak();
@@ -658,7 +741,7 @@ impl Browser {
     // ---- the column ---------------------------------------------------
 
     /// Redraws the list of tabs. Cheap enough at browser scale to do whole.
-    fn render(&self) {
+    pub(crate) fn render(&self) {
         while let Some(row) = self.list.first_child() {
             self.list.remove(&row);
         }
@@ -694,6 +777,10 @@ impl Browser {
             if Some(tab.id) == tabs.front {
                 row.add_css_class("front");
             }
+            if self.partner.borrow().contains_key(&tab.id) {
+                row.add_css_class("split");
+                row.set_tooltip_text(Some(&format!("{} · side by side (Ctrl+Alt+S separates)", tab.url)));
+            }
             if tab.pinned {
                 row.add_css_class("pinned");
                 // A line under the last pin, between pins and tabs.
@@ -720,6 +807,11 @@ impl Browser {
                 // Deferred: the row this gesture belongs to is about to be
                 // replaced by the redraw that selecting does.
                 let button = gesture.current_button();
+                // Alt-click: put this tab beside the one in front.
+                if button == 1 && gesture.current_event_state().contains(gdk::ModifierType::ALT_MASK) {
+                    glib::idle_add_local_once(move || b.split_with(id));
+                    return;
+                }
                 glib::idle_add_local_once(move || match button {
                     2 => b.close(id),
                     _ => b.select(id),
@@ -785,12 +877,14 @@ impl Browser {
                     .enumerate()
                     .map(|(i, t)| {
                         let front = if tabs.front == Some(t.id) { "front" } else { "-" };
-                        format!("{}\t{}\t{:?}\t{front}\t{}\t{}", i + 1, t.id, t.life, t.url, t.title)
+                        // Why it can't sleep, if it can't.
+                        let why = tabs::kept_awake(t, &[]).map_or("-".to_string(), |k| format!("{k:?}"));
+                        format!("{}\t{}\t{:?}\t{front}\t{}\t{}\t{why}", i + 1, t.id, t.life, t.url, t.title)
                     })
                     .collect();
                 lines.join("\n")
             }
-            "open" => match address::resolve(rest, &self.config.search) {
+            "open" => match address::resolve(rest, &self.config.borrow().search.clone()) {
                 Destination::Page(url) => {
                     let id = self.open(&url, false, true);
                     let i = self.tabs.borrow().index(id).map_or(0, |i| i + 1);
@@ -905,6 +999,28 @@ impl Browser {
                 "ok".into()
             }
             "pending" => self.pending.borrow().len().to_string(),
+            "split" => match at(rest) {
+                Some(id) => {
+                    self.split_with(id);
+                    "ok".into()
+                }
+                None => {
+                    self.toggle_split();
+                    "ok".into()
+                }
+            },
+            "shown" => match *self.shown_split.borrow() {
+                Some((l, r)) => format!("split {l} {r} front {}", self.front().unwrap_or(0)),
+                None => format!("single {}", self.front().unwrap_or(0)),
+            },
+            "allow-http" => {
+                self.engine.allow_http(rest.trim());
+                "ok".into()
+            }
+            "pane" => {
+                self.focus_pane(rest.trim() == "right");
+                "ok".into()
+            }
             "popover" => self.accounts_popover.is_visible().to_string(),
             "pin" => {
                 self.toggle_pin();
@@ -1129,6 +1245,9 @@ impl Browser {
         self.action(app, "bookmarks", &["<Ctrl><Shift>o"], |b| b.open_internal("bookmarks"));
         self.action(app, "settings", &["<Ctrl>comma"], |b| b.open_internal("settings"));
         self.action(app, "pin", &["<Ctrl><Shift>p"], |b| b.toggle_pin());
+        self.action(app, "split", &["<Ctrl><Alt>s"], |b| b.toggle_split());
+        self.action(app, "pane-left", &["<Ctrl><Alt>Left"], |b| b.focus_pane(false));
+        self.action(app, "pane-right", &["<Ctrl><Alt>Right"], |b| b.focus_pane(true));
         self.action(app, "passwords", &["<Ctrl><Alt>p"], |b| b.open_internal("passwords"));
         self.action(app, "reader", &["F9", "<Ctrl><Alt>r"], |b| b.toggle_reader());
         self.action(app, "hide-element", &["<Ctrl><Shift>h"], |b| b.pick_to_hide());
@@ -1197,11 +1316,11 @@ impl Browser {
 
     /// The sleep timer, the memory-pressure check, and the session saver.
     fn watch(&self) {
-        let chosen = self.config.sleep_after;
-        let every = (chosen / 4).clamp(Duration::from_secs(5), Duration::from_secs(30));
+        let every = (self.config.borrow().sleep_after / 4).clamp(Duration::from_secs(5), Duration::from_secs(30));
         let weak = self.weak();
         glib::timeout_add_local(every, move || {
             let Some(b) = weak.upgrade() else { return glib::ControlFlow::Break };
+            let chosen = b.config.borrow().sleep_after;
             let pressure = pressure::read();
             b.sleep_idle(tabs::sleep_wait(chosen, pressure));
             if pressure == Pressure::Critical {
@@ -1212,6 +1331,56 @@ impl Browser {
             }
             glib::ControlFlow::Continue
         });
+    }
+
+    /// HTTPS-only: a main-frame load started. If it is an upgraded http
+    /// address and the site hasn't answered in 8 seconds, stop waiting for
+    /// the connection to time out and say why.
+    fn watch_upgrade(&self, id: TabId, view: &WebView) {
+        let Some(started) = view.uri().map(|u| u.to_string()) else { return };
+        // The view still says the http address it asked for; the page
+        // process asks for the https one.
+        let uri = address::https_upgrade(&started).unwrap_or(started);
+        let upgraded = self.upgrades_seen.borrow().get(&id).is_some_and(|l| l.contains(&uri));
+        debug!("load started {uri}: upgraded={upgraded}");
+        if !upgraded || !self.config.borrow().https_only {
+            return;
+        }
+        self.upgrading.borrow_mut().insert(id, uri.clone());
+        let weak = self.weak();
+        let view = view.clone();
+        glib::timeout_add_local_once(Duration::from_secs(8), move || {
+            let Some(b) = weak.upgrade() else { return };
+            // Still waiting: no response yet (Committed, Finished and
+            // failures all clear the entry).
+            let still = b.upgrading.borrow().get(&id) == Some(&uri) && b.ours(id, &view);
+            debug!("upgrade timer {uri}: still waiting={still}");
+            if still {
+                b.upgrading.borrow_mut().remove(&id);
+                view.stop_loading();
+                b.https_fallback(&view, &uri, "The secure version of the site didn't answer within 8 seconds.");
+            }
+        });
+    }
+
+    /// HTTPS-only: `failing` (an https address) didn't load. If it was an
+    /// upgrade of a public http address, show why and offer http.
+    pub(crate) fn https_fallback(&self, view: &WebView, failing: &str, reason: &str) -> bool {
+        if !self.config.borrow().https_only || !self.engine.extension {
+            return false;
+        }
+        let Some(rest) = failing.strip_prefix("https://") else { return false };
+        let http = format!("http://{rest}");
+        if address::https_upgrade(&http).is_none() {
+            return false; // a local address, never upgraded
+        }
+        // The host exactly as the extension compares it (www. kept).
+        let Some(origin) = rippl_core::passwords::origin_of(&http) else { return false };
+        let host = rippl_core::passwords::host_of_origin(&origin).to_string();
+        self.https_failed.borrow_mut().insert(host.clone());
+        let html = rippl_core::pages::https_failed(&host, &http, reason);
+        view.load_alternate_html(&html, failing, Some(failing));
+        true
     }
 
     /// Bookmarks the page in front, or un-bookmarks it.
@@ -1231,9 +1400,10 @@ impl Browser {
     }
 
     fn sleep_idle(&self, wait: Duration) {
+        let on_screen = self.on_screen();
         let due = {
             let tabs = self.tabs.borrow();
-            tabs::due_for_sleep(&tabs.list, tabs.front, Instant::now(), wait)
+            tabs::due_for_sleep(&tabs.list, &on_screen, Instant::now(), wait)
         };
         for id in due {
             self.sleep(id);
@@ -1268,7 +1438,7 @@ impl Browser {
             self.select(front);
         }
         for (i, a) in asked.iter().enumerate() {
-            if let Destination::Page(url) = address::resolve(a, &self.config.search) {
+            if let Destination::Page(url) = address::resolve(a, &self.config.borrow().search.clone()) {
                 self.open(&url, false, i == 0);
             }
         }
@@ -1305,6 +1475,9 @@ impl Browser {
             .download button.close { min-height: 20px; min-width: 20px; padding: 0; opacity: 0.7; }
             /* Over the page, whatever the page or the theme: dark, opaque, white text. */
             .tabs row.pinned label { font-weight: 600; }
+            .tabs row.split { box-shadow: inset 3px 0 0 alpha(@accent_bg_color, 0.85); }
+            paned.split > separator { background: alpha(currentColor, 0.15); min-width: 6px; }
+            webview.pane-front { box-shadow: inset 0 3px 0 alpha(@accent_bg_color, 0.9); }
             .tabs row.last-pin { margin-bottom: 8px; box-shadow: 0 5px 0 -4px alpha(currentColor, 0.15); }
             .tabs .pin { opacity: 0.6; -gtk-icon-size: 12px; }
             .accounts row { padding: 6px 12px; border-radius: 6px; }
@@ -1321,4 +1494,14 @@ impl Browser {
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
     }
+}
+
+/// The window's light or dark look (and with it, pages that offer both).
+pub(crate) fn apply_theme(theme: Theme) {
+    let Some(settings) = gtk::Settings::default() else { return };
+    settings.set_gtk_interface_color_scheme(match theme {
+        Theme::System => gtk::InterfaceColorScheme::Default,
+        Theme::Dark => gtk::InterfaceColorScheme::Dark,
+        Theme::Light => gtk::InterfaceColorScheme::Light,
+    });
 }

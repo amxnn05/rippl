@@ -29,7 +29,7 @@ Start rippl with `RIPPL_CONTROL=1` and drive it with `scripts/ctl.sh`. This does
 focus, so it works while you use the desktop:
 
 ```sh
-scripts/ctl.sh list                 # index, id, Lazy/Awake/Asleep, front, url, title
+scripts/ctl.sh list                 # index, id, Lazy/Awake/Asleep, front, url, title, why it can't sleep
 scripts/ctl.sh open example.com     # opens in front, replies "ok <index>"
 scripts/ctl.sh select 2
 scripts/ctl.sh close 2
@@ -60,7 +60,20 @@ scripts/ctl.sh fill <username>      # pick that account for the front page, as t
 scripts/ctl.sh passwords delete <origin> <username>
 scripts/ctl.sh pending              # sign-ins sent and waiting to be confirmed
 scripts/ctl.sh popover              # whether the account list is showing
+scripts/ctl.sh split [n]            # split the front tab with tab n (or the previous one; again to separate)
+scripts/ctl.sh shown                # "split <left> <right> front <id>" or "single <id>"
+scripts/ctl.sh pane left|right      # focus a pane
+scripts/ctl.sh allow-http <host>    # as "Continue to http" on the HTTPS warning
 ```
+
+**GPC:** serve a page with a server that logs request headers, and check `Sec-GPC: 1` on the page
+and its subresources. **HTTPS-only:** `http://example.com` should end at `https://`; a host whose
+HTTPS fails (a random `*.neverssl.com` subdomain) shows the warning page; `http://203.0.113.1/` (a
+reserved address nothing answers) tests the 8-second timeout. With `RIPPL_DEBUG=1` the extension
+logs every upgrade (`rippl extension [pid]: http://… -> https://…`).
+
+**Settings from the page:** set a `<select data-set=…>` and dispatch a `change` event with
+`scripts/ctl.sh js`; the config file in the scratch profile shows the result.
 
 **Passwords: test with `RIPPL_KEYRING=memory`.** That never touches your real keyring. To sign in
 on a test page:
@@ -91,7 +104,12 @@ now), so old `sendshortcut` commands fail.
 ```sh
 scripts/mem.sh            # rippl and every WebKit process it started
 scripts/mem.sh firefox    # any other browser, to compare
+scripts/mem.sh --pid 1234 # one process tree: a browser you started yourself
 ```
+
+To compare with another browser, start it with a throwaway profile and measure **its** process
+tree with `--pid`. Don't `pkill` it by name; that would close the user's own windows too. Numbers
+and method: [performance.md](performance.md).
 
 It reports **PSS** (proportional set size): each shared page is split between the processes that
 share it. PSS is the fair number for comparing browsers; RSS counts shared libraries several times.

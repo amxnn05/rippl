@@ -4,6 +4,7 @@
 
 use std::path::PathBuf;
 
+use webkit6::prelude::*;
 use webkit6::{
     CacheModel, CookieAcceptPolicy, CookiePersistentStorage, MemoryPressureSettings, NetworkSession, Settings,
     UserContentManager, WebContext, WebView,
@@ -21,7 +22,46 @@ pub struct Engine {
     /// Told of every download, from the kept session and from each private
     /// tab's own (see downloads.rs).
     pub on_download: std::cell::RefCell<Option<DownloadHook>>,
+    /// Whether rippl's web process extension (GPC, HTTPS-only) is loaded.
+    pub extension: bool,
+    /// What every new page process is told at start: (gpc, https_only,
+    /// hosts allowed on http this session).
+    start: std::cell::RefCell<(bool, bool, Vec<String>)>,
 }
+
+/// rippl's web process extension (crates/rippl-web-extension), from beside
+/// the binary or the system install, copied into a folder of its own:
+/// WebKit loads every library in the folder it is given, and lets that
+/// folder into the page processes' sandbox.
+fn install_extension() -> Option<PathBuf> {
+    const NAME: &str = "librippl_web_extension.so";
+    let candidates = [
+        std::env::var_os("RIPPL_EXTENSION").map(PathBuf::from),
+        std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join(NAME))),
+        Some(PathBuf::from("/usr/lib/rippl").join(NAME)),
+    ];
+    let source = candidates.into_iter().flatten().find(|p| p.is_file())?;
+    let dir = cache_dir().join("web-extension");
+    let target = dir.join(NAME);
+    let same = |a: &std::path::Path, b: &std::path::Path| -> bool {
+        match (std::fs::metadata(a), std::fs::metadata(b)) {
+            (Ok(x), Ok(y)) => x.len() == y.len() && x.modified().ok() <= y.modified().ok(),
+            _ => false,
+        }
+    };
+    if !same(&source, &target) {
+        std::fs::create_dir_all(&dir).ok()?;
+        let tmp = dir.join(format!("{NAME}.tmp"));
+        std::fs::copy(&source, &tmp).ok()?;
+        std::fs::rename(&tmp, &target).ok()?;
+    }
+    Some(dir)
+}
+
+/// `navigator.globalPrivacyControl`, for pages that check it in script
+/// (the header itself comes from the extension).
+const GPC_SCRIPT: &str = "Object.defineProperty(Navigator.prototype, 'globalPrivacyControl', \
+    { get() { return true; }, configurable: true, enumerable: true });";
 
 /// What every network session gets, kept or private.
 fn harden(session: &NetworkSession) {
@@ -56,7 +96,7 @@ fn total_ram_mb() -> Option<u32> {
 }
 
 impl Engine {
-    pub fn new(content: UserContentManager) -> Engine {
+    pub fn new(content: UserContentManager, gpc: bool, https_only: bool) -> Engine {
         // Each web process is told how much it may use before it starts
         // dropping its caches. WebKit's own default is generous (most of the
         // machine's RAM); an eighth of RAM, between 512 MB and 2 GB, keeps
@@ -74,6 +114,30 @@ impl Engine {
         // instant Back. Slower Back, less RAM. Default is a normal browser.
         let lean = std::env::var_os("RIPPL_LEAN").is_some();
         context.set_cache_model(if lean { CacheModel::DocumentBrowser } else { CacheModel::WebBrowser });
+
+        // GPC and HTTPS-only live in the page processes: before the first one starts.
+        let extension = match install_extension() {
+            Some(dir) => {
+                context.set_web_process_extensions_directory(&dir.to_string_lossy());
+                context.set_web_process_extensions_initialization_user_data(
+                    &(gpc, https_only, Vec::<String>::new()).to_variant(),
+                );
+                true
+            }
+            None => {
+                eprintln!("rippl: web extension not found: no Global Privacy Control header, no HTTPS-only");
+                false
+            }
+        };
+        if gpc {
+            content.add_script(&webkit6::UserScript::new(
+                GPC_SCRIPT,
+                webkit6::UserContentInjectedFrames::AllFrames,
+                webkit6::UserScriptInjectionTime::Start,
+                &[],
+                &[],
+            ));
+        }
 
         // The network process gets the same limits. WebKit reads them only
         // before the first network session exists, so this goes first.
@@ -93,6 +157,13 @@ impl Engine {
         settings.set_enable_developer_extras(true); // Inspect Element in the context menu
         settings.set_enable_back_forward_navigation_gestures(true);
         settings.set_enable_smooth_scrolling(true);
+        // RIPPL_NO_GPU=1: pages drawn without the GPU. Each page process
+        // then skips loading the GPU drivers (LLVM, Mesa, NVIDIA): 167 → 95
+        // MB for a light page, but only ~7% less on heavy sites, and about
+        // twice the CPU while scrolling. Off by default (docs/performance.md).
+        if std::env::var_os("RIPPL_NO_GPU").is_some() {
+            settings.set_hardware_acceleration_policy(webkit6::HardwareAccelerationPolicy::Never);
+        }
         // <a ping> (a request to a tracker on every click): WebKitGTK 2.54
         // says its setting "is deprecated and does nothing", so Shield
         // blocks third-party pings instead (rippl_core::shield). DNS
@@ -104,7 +175,53 @@ impl Engine {
         // to be Safari, which is what sites test against. Adding a name to
         // it is what made Google serve a degraded page.
 
-        Engine { context, session, settings, content, on_download: Default::default() }
+        Engine {
+            context,
+            session,
+            settings,
+            content,
+            on_download: Default::default(),
+            extension,
+            start: std::cell::RefCell::new((gpc, https_only, Vec::new())),
+        }
+    }
+
+    /// Tells every page process the two switches again (after a change in
+    /// rippl://settings).
+    pub fn send_settings(&self, gpc: bool, https_only: bool) {
+        {
+            let mut start = self.start.borrow_mut();
+            start.0 = gpc;
+            start.1 = https_only;
+        }
+        self.refresh_start();
+        let message = webkit6::UserMessage::new("rippl-settings", Some(&(gpc, https_only).to_variant()));
+        self.context.send_message_to_all_extensions(&message);
+    }
+
+    /// HTTPS-only: let `host` load over http until rippl quits: in the page
+    /// processes running now, and in every one started from now on.
+    pub fn allow_http(&self, host: &str) {
+        {
+            let mut start = self.start.borrow_mut();
+            if start.2.iter().any(|h| h == host) {
+                return;
+            }
+            start.2.push(host.to_string());
+        }
+        self.refresh_start();
+        if std::env::var_os("RIPPL_DEBUG").is_some() {
+            eprintln!("rippl: telling page processes {host} may use http");
+        }
+        let message = webkit6::UserMessage::new("rippl-allow-http", Some(&host.to_variant()));
+        self.context.send_message_to_all_extensions(&message);
+    }
+
+    fn refresh_start(&self) {
+        if self.extension {
+            let start = self.start.borrow().clone();
+            self.context.set_web_process_extensions_initialization_user_data(&start.to_variant());
+        }
     }
 
     /// A new page view. `private`: its own throwaway network session, so

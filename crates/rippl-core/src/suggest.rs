@@ -87,7 +87,7 @@ mod tests {
     use super::*;
 
     fn place(url: &str, title: &str, visits: i64, days_ago: i64) -> Place {
-        Place { url: url.into(), title: title.into(), visits, last: 1_000_000 - days_ago * 86_400, bookmarked: false }
+        Place { url: url.into(), title: title.into(), visits, last: 1_000_000 - days_ago * 86_400, ..Default::default() }
     }
 
     const NOW: i64 = 1_000_000;

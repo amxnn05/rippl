@@ -1,0 +1,15 @@
+[package]
+name = "rippl-web-extension"
+description = "Loaded by WebKit into every rippl page process: Global Privacy Control header, HTTPS-only upgrades."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+# WebKit loads every .so in the extensions directory and calls
+# webkit_web_process_extension_initialize_with_user_data.
+crate-type = ["cdylib"]
+
+[dependencies]
+rippl-core = { path = "../rippl-core" }
+webkit-web-process-extension6 = "0.6"

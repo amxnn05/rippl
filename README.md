@@ -5,6 +5,14 @@ A small, fast, private web browser for Linux, built on WebKit (WebKitGTK 6.0 + G
 A row of tabs, one field, and the page. No account, no telemetry, no server. Ads and trackers are blocked
 inside WebKit before they load, and tabs you aren't using give their memory back.
 
+## Size and speed
+
+A 1.2 MB binary on the system's WebKitGTK (about 195 MB with WebKitGTK and GTK, against 430–480 MB
+for Chromium, Chrome or Brave). Ready in ~0.35 s; a first page in ~0.5 s. With every tab awake a
+WebKit page costs more than a Chromium one; with background tabs asleep, ten heavy sites take
+~950 MB against 1,245 MB for Brave and 1,489 MB for Chromium. All the numbers, including where rippl
+loses: [docs/performance.md](docs/performance.md).
+
 ## Why it uses less memory
 
 Most of a browser's memory is its web processes, one per open page. rippl keeps as few of them alive as
@@ -34,8 +42,9 @@ exact site only), and never fills anything on its own.
 
 ## Private by default
 
-DuckDuckGo search (or Brave, Startpage, Mojeek, Qwant, or your own SearXNG). Third-party cookies are
-blocked, WebKit's tracking prevention is on, and cross-site pings are blocked. Nothing leaves your
+DuckDuckGo search (or Brave, Startpage, Mojeek, Qwant, or your own SearXNG). Every request is
+upgraded to HTTPS and carries Global Privacy Control ("do not sell or share my data"). Third-party
+cookies are blocked, WebKit's tracking prevention is on, and cross-site pings are blocked. Nothing leaves your
 machine except the pages you open and the filter-list updates. Details: [docs/privacy.md](docs/privacy.md).
 
 ## Build
@@ -46,9 +55,11 @@ cargo build --release
 ./target/release/rippl [url…]
 ```
 
+`cargo build` also builds `librippl_web_extension.so` beside the binary; rippl finds it there.
+
 `Ctrl+L` address · `Ctrl+T` new tab · `Ctrl+W` close · `Ctrl+Shift+N` private tab · `Ctrl+Tab` next ·
 `Ctrl+1`–`9` jump · `Alt+←/→` back/forward · `Ctrl+F` find · `Ctrl+D` bookmark · `Ctrl+H` history ·
-`Ctrl+Shift+P` pin · `Ctrl+Alt+P` passwords · `F9` reading mode · `Ctrl+Shift+H` hide something · `Ctrl+,` settings ·
+`Ctrl+Shift+P` pin · `Ctrl+Alt+S` split view · `Ctrl+Alt+P` passwords · `F9` reading mode · `Ctrl+Shift+H` hide something · `Ctrl+,` settings ·
 `Ctrl+Shift+B` Shield off for this site · `Ctrl+S` hide tabs.
 All keys and settings: [docs/configuration.md](docs/configuration.md).
 

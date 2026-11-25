@@ -89,9 +89,10 @@ pub fn sleep_wait(chosen: Duration, pressure: Pressure) -> Duration {
     }
 }
 
-/// Why `tab` must stay awake, or `None` if it may sleep.
-pub fn kept_awake(tab: &Tab, front: Option<TabId>) -> Option<KeptAwake> {
-    if Some(tab.id) == front {
+/// Why `tab` must stay awake, or `None` if it may sleep. `on_screen`: the
+/// tab in front, and its partner when two are shown side by side.
+pub fn kept_awake(tab: &Tab, on_screen: &[TabId]) -> Option<KeptAwake> {
+    if on_screen.contains(&tab.id) {
         Some(KeptAwake::OnScreen)
     } else if tab.pinned {
         Some(KeptAwake::Pinned)
@@ -107,12 +108,12 @@ pub fn kept_awake(tab: &Tab, front: Option<TabId>) -> Option<KeptAwake> {
 }
 
 /// The awake tabs that should sleep now, the one left alone longest first.
-pub fn due_for_sleep(tabs: &[Tab], front: Option<TabId>, now: Instant, wait: Duration) -> Vec<TabId> {
+pub fn due_for_sleep(tabs: &[Tab], on_screen: &[TabId], now: Instant, wait: Duration) -> Vec<TabId> {
     let mut due: Vec<&Tab> = tabs
         .iter()
         .filter(|t| t.life == Life::Awake)
         .filter(|t| now.saturating_duration_since(t.touched) >= wait)
-        .filter(|t| kept_awake(t, front).is_none())
+        .filter(|t| kept_awake(t, on_screen).is_none())
         .collect();
     due.sort_by_key(|t| t.touched);
     due.into_iter().map(|t| t.id).collect()
@@ -227,8 +228,11 @@ mod tests {
     #[test]
     fn oldest_idle_sleep_first_and_front_never() {
         let tabs = vec![awake(1, 4000), awake(2, 100), awake(3, 9000), awake(4, 9999)];
-        let due = due_for_sleep(&tabs, Some(4), Instant::now(), Duration::from_secs(1800));
+        let due = due_for_sleep(&tabs, &[4], Instant::now(), Duration::from_secs(1800));
         assert_eq!(due, vec![3, 1]);
+        // Side by side, both stay awake.
+        let due = due_for_sleep(&tabs, &[4, 3], Instant::now(), Duration::from_secs(1800));
+        assert_eq!(due, vec![1]);
     }
 
     #[test]
@@ -241,7 +245,7 @@ mod tests {
         c.capturing = true;
         let mut d = awake(4, 9999);
         d.life = Life::Asleep;
-        let due = due_for_sleep(&[a, b, c, d], None, Instant::now(), Duration::from_secs(60));
+        let due = due_for_sleep(&[a, b, c, d], &[], Instant::now(), Duration::from_secs(60));
         assert!(due.is_empty());
     }
 

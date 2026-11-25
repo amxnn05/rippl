@@ -93,6 +93,9 @@ h1 {{ font-size: 22px; margin: 22px 0 14px; }} h2 {{ font-size: 16px; margin: 28
 button {{ font: inherit; font-size: 13px; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; }}
 button:hover {{ border-color: var(--accent); }}
 button.danger:hover {{ border-color: #e44; color: #e44; }}
+select, input.value {{ font: inherit; font-size: 13px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: inherit; }}
+input.value {{ width: 260px; }}
+.note {{ color: var(--dim); font-size: 12px; }}
 input[type=search] {{ font: inherit; width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: inherit; }}
 .empty {{ color: var(--dim); padding: 12px 4px; }}
 .tag {{ font-size: 12px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); }}
@@ -103,13 +106,26 @@ code {{ font-size: 13px; }}
 {body}
 <script>
 const TOKEN = "{token}", PAGE = "{page}";
+const go = (act, arg) => {{
+  const q = new URLSearchParams(location.search).get("q") || "";
+  location.replace("rippl://" + PAGE + "?do=" + encodeURIComponent(act) +
+    "&arg=" + encodeURIComponent(arg) + "&token=" + TOKEN + (q ? "&q=" + encodeURIComponent(q) : ""));
+}};
 document.addEventListener("click", e => {{
   const b = e.target.closest("[data-do]");
   if (!b) return;
   if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
-  const q = new URLSearchParams(location.search).get("q") || "";
-  location.replace("rippl://" + PAGE + "?do=" + encodeURIComponent(b.dataset.do) +
-    "&arg=" + encodeURIComponent(b.dataset.arg || "") + "&token=" + TOKEN + (q ? "&q=" + encodeURIComponent(q) : ""));
+  let arg = b.dataset.arg || "";
+  if (b.dataset.prompt !== undefined) {{
+    const v = prompt(b.dataset.prompt, b.dataset.current || "");
+    if (v === null) return;
+    arg += "\n" + v;
+  }}
+  go(b.dataset.do, arg);
+}});
+document.addEventListener("change", e => {{
+  const s = e.target.closest("[data-set]");
+  if (s) go("set", s.dataset.set + "=" + s.value);
 }});
 if (new URLSearchParams(location.search).has("do")) {{
   const q = new URLSearchParams(location.search).get("q");
@@ -175,9 +191,19 @@ pub fn bookmarks(places: &[Place], sources: &[String], note: &str, now: i64, tok
     if places.is_empty() {
         body.push_str(r#"<p class="empty">No bookmarks yet. Ctrl+D keeps the page you're on.</p>"#);
     }
+    let mut folder: Option<&str> = None;
     for p in places {
-        let button = format!(r#"<button data-do="remove" data-arg="{}">Remove</button>"#, escape(&p.url));
-        body.push_str(&place_row(p, now, &button));
+        if folder != Some(p.folder.as_str()) {
+            folder = Some(&p.folder);
+            let name = if p.folder.is_empty() { "Not in a folder" } else { &p.folder };
+            body.push_str(&format!("<h2>{}</h2>", escape(name)));
+        }
+        let buttons = format!(
+            r#"<button data-do="move" data-arg="{url}" data-prompt="Folder (use / for a folder inside a folder; empty for none)" data-current="{folder}">Move…</button> <button data-do="remove" data-arg="{url}">Remove</button>"#,
+            url = escape(&p.url),
+            folder = escape(&p.folder),
+        );
+        body.push_str(&place_row(p, now, &buttons));
     }
     body.push_str("<h2>Bring bookmarks over</h2>");
     if sources.is_empty() {
@@ -226,14 +252,26 @@ pub fn passwords(accounts: &[(String, String)], never: &[String], store: &str, t
     frame("passwords", "Passwords", token, &body)
 }
 
+/// One line of configuration on the settings page.
+pub struct Setting {
+    pub key: String,
+    pub label: String,
+    pub value: String,
+    /// The values to pick from; empty for free text.
+    pub choices: Vec<String>,
+    /// Shown under it ("applies after a restart").
+    pub note: String,
+}
+
 /// What the settings page shows.
 pub struct SettingsView<'a> {
     pub permissions: &'a [(String, String, bool)],
     pub shield_off: &'a [String],
     pub hidden: &'a [(String, Vec<String>)],
-    /// (name, value) lines from the config.
-    pub config: &'a [(String, String)],
+    pub config: &'a [Setting],
     pub config_path: &'a str,
+    /// The result of the last change, if any.
+    pub note: &'a str,
 }
 
 pub fn settings(v: &SettingsView, token: &str) -> String {
@@ -271,15 +309,67 @@ pub fn settings(v: &SettingsView, token: &str) -> String {
             list = escape(&selectors.join("  ·  ")),
         ));
     }
-    body.push_str(&format!("<h2>Configuration</h2><p class=\"sub\">Edit <code>{}</code> and restart rippl.</p>", escape(v.config_path)));
-    for (name, value) in v.config {
+    body.push_str(&format!(
+        "<h2>Configuration</h2><p class=\"note\">Saved to <code>{}</code> as you change it.</p>",
+        escape(v.config_path)
+    ));
+    if !v.note.is_empty() {
+        body.push_str(&format!(r#"<p class="tag">{}</p>"#, escape(v.note)));
+    }
+    for s in v.config {
+        let control = if s.choices.is_empty() {
+            format!(r#"<input class="value" data-set="{k}" value="{v}">"#, k = escape(&s.key), v = escape(&s.value))
+        } else {
+            let mut options = String::new();
+            let mut listed = false;
+            for c in &s.choices {
+                let selected = *c == s.value;
+                listed |= selected;
+                options.push_str(&format!(
+                    r#"<option value="{c}"{sel}>{c}</option>"#,
+                    c = escape(c),
+                    sel = if selected { " selected" } else { "" }
+                ));
+            }
+            if !listed {
+                options.push_str(&format!(r#"<option value="{v}" selected>{v}</option>"#, v = escape(&s.value)));
+            }
+            format!(r#"<select data-set="{}">{options}</select>"#, escape(&s.key))
+        };
+        let note = if s.note.is_empty() { String::new() } else { format!(r#"<div class="note">{}</div>"#, escape(&s.note)) };
         body.push_str(&format!(
-            r#"<div class="row"><div class="main">{}</div><code>{}</code></div>"#,
-            escape(name),
-            escape(value)
+            r#"<div class="row"><div class="main">{label} <code class="note">{key}</code>{note}</div>{control}</div>"#,
+            label = escape(&s.label),
+            key = escape(&s.key),
         ));
     }
     frame("settings", "Settings", token, &body)
+}
+
+/// HTTPS-only: the secure address didn't work. Offers the insecure one,
+/// plainly, as a choice. No script.
+pub fn https_failed(host: &str, http_url: &str, reason: &str) -> String {
+    format!(
+        r#"<!doctype html>
+<html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<title>No secure connection</title>
+<style>
+:root {{ color-scheme: light dark; }}
+body {{ font: 16px/1.5 system-ui, sans-serif; max-width: 560px; margin: 12vh auto; padding: 0 24px; }}
+h1 {{ font-size: 22px; }} .why {{ opacity: .6; font-size: 14px; }}
+a.go {{ display: inline-block; margin-top: 16px; padding: 8px 14px; border-radius: 8px; border: 1px solid #8886; color: inherit; text-decoration: none; }}
+</style></head><body>
+<h1>{host} doesn't offer a secure connection</h1>
+<p>rippl tried <b>https://{host}</b> and it didn't work. The site may only work over plain http, where anyone on your network can see and change what you send and receive.</p>
+<p class="why">{reason}</p>
+<a class="go" href="{url}">Continue to http://{host} anyway</a>
+<p class="why">Allowed for {host} until you quit rippl. HTTPS-only can be turned off in rippl://settings.</p>
+</body></html>"#,
+        host = escape(host),
+        url = escape(http_url),
+        reason = escape(reason),
+    )
 }
 
 /// Reading mode: the article alone. `body` is the article as rebuilt by
@@ -325,7 +415,7 @@ mod tests {
     use super::*;
 
     fn place(url: &str, title: &str) -> Place {
-        Place { url: url.into(), title: title.into(), visits: 1, last: 0, bookmarked: false }
+        Place { url: url.into(), title: title.into(), visits: 1, ..Default::default() }
     }
 
     #[test]

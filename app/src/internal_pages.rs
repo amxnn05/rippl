@@ -99,8 +99,8 @@ impl Browser {
                 let permissions = self.places.permissions().unwrap_or_default();
                 let shield_off = self.shield.allowed_list();
                 let hidden = self.places.hidden().unwrap_or_default();
-                let config = self.config.describe();
-                let path = glib::user_config_dir().join("rippl").join("config");
+                let config = self.config.borrow().rows();
+                let path = crate::config::path();
                 pages::settings(
                     &SettingsView {
                         permissions: &permissions,
@@ -108,6 +108,7 @@ impl Browser {
                         hidden: &hidden,
                         config: &config,
                         config_path: &path.to_string_lossy(),
+                        note: &note,
                     },
                     &self.token,
                 )
@@ -154,6 +155,14 @@ impl Browser {
                 r
             }
             ("bookmarks", "import") => self.import_from(arg.parse().unwrap_or(usize::MAX)),
+            ("bookmarks", "move") => {
+                let (url, folder) = arg.split_once('\n').unwrap_or((arg, ""));
+                self.places.move_bookmark(url, folder).map(|_| String::new()).map_err(|e| e.to_string())
+            }
+            ("settings", "set") => {
+                let (key, value) = arg.split_once('=').unwrap_or((arg, ""));
+                self.change_setting(key, value)
+            }
             ("settings", "forget-permissions") => {
                 self.places.forget_permissions(Some(arg)).map(|_| String::new()).map_err(|e| e.to_string())
             }
@@ -174,6 +183,20 @@ impl Browser {
             eprintln!("rippl: {page} {act}: {e}");
             format!("That didn't work: {e}")
         })
+    }
+
+    /// One setting changed on rippl://settings: saved, and applied now
+    /// where it can be.
+    pub(crate) fn change_setting(&self, key: &str, value: &str) -> Result<String, String> {
+        self.config.borrow_mut().set(key, value)?;
+        let config = self.config.borrow().clone();
+        match key {
+            "theme" => crate::browser::apply_theme(config.theme),
+            "gpc" | "https_only" => self.engine.send_settings(config.gpc, config.https_only),
+            "shield" => return Ok("Saved. Blocking changes after rippl restarts.".into()),
+            _ => {}
+        }
+        Ok("Saved.".into())
     }
 
     /// Imports bookmarks from the `index`th browser found.

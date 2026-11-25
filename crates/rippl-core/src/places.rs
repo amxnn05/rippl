@@ -17,7 +17,7 @@ pub fn now() -> i64 {
 }
 
 /// A page from history or bookmarks.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Place {
     pub url: String,
     pub title: String,
@@ -25,6 +25,8 @@ pub struct Place {
     /// Unix seconds of the last visit (or when bookmarked).
     pub last: i64,
     pub bookmarked: bool,
+    /// The bookmark's folder ("" for none; "Work/Docs" for nested).
+    pub folder: String,
 }
 
 /// A site permission kind, as stored.
@@ -101,6 +103,13 @@ impl Places {
                  host TEXT NOT NULL, kind TEXT NOT NULL, allow INTEGER NOT NULL,
                  PRIMARY KEY (host, kind));",
         )?;
+        // Added in Phase 7: bookmark folders. Old databases get the column.
+        let has_folder: bool = db
+            .prepare("SELECT 1 FROM pragma_table_info('bookmarks') WHERE name = 'folder'")?
+            .exists([])?;
+        if !has_folder {
+            db.execute_batch("ALTER TABLE bookmarks ADD COLUMN folder TEXT NOT NULL DEFAULT ''")?;
+        }
         Ok(Places { db })
     }
 
@@ -163,6 +172,7 @@ impl Places {
                 visits: r.get(2)?,
                 last: r.get(3)?,
                 bookmarked: r.get::<_, i64>(4)? == 1,
+                folder: String::new(),
             })
         })?;
         // A page both visited and bookmarked: one entry, bookmarked.
@@ -191,7 +201,14 @@ impl Places {
              FROM history h LEFT JOIN bookmarks b ON b.url = h.url ORDER BY h.last DESC LIMIT ?1",
         )?;
         let rows = stmt.query_map([limit as i64], |r| {
-            Ok(Place { url: r.get(0)?, title: r.get(1)?, visits: r.get(2)?, last: r.get(3)?, bookmarked: r.get(4)? })
+            Ok(Place {
+                url: r.get(0)?,
+                title: r.get(1)?,
+                visits: r.get(2)?,
+                last: r.get(3)?,
+                bookmarked: r.get(4)?,
+                folder: String::new(),
+            })
         })?;
         rows.collect()
     }
@@ -207,18 +224,25 @@ impl Places {
         self.db.execute("DELETE FROM bookmarks WHERE url = ?1", [url])
     }
 
-    /// Adds bookmarks brought over from another browser, skipping ones
-    /// already kept and anything that isn't http(s). Returns how many were
-    /// new.
-    pub fn import_bookmarks(&self, list: &[(String, String)]) -> Result<usize, Error> {
+    /// Puts a bookmark in `folder` ("" for none).
+    pub fn move_bookmark(&self, url: &str, folder: &str) -> Result<usize, Error> {
+        let folder: String = folder.split('/').map(str::trim).filter(|p| !p.is_empty()).collect::<Vec<_>>().join("/");
+        self.db.execute("UPDATE bookmarks SET folder = ?2 WHERE url = ?1", params![url, folder])
+    }
+
+    /// Adds bookmarks brought over from another browser, with their
+    /// folders, skipping ones already kept and anything that isn't
+    /// http(s). Returns how many were new.
+    pub fn import_bookmarks(&self, list: &[crate::import::Bookmark]) -> Result<usize, Error> {
         let tx = self.db.unchecked_transaction()?;
         let mut added = 0;
         {
-            let mut stmt = tx.prepare("INSERT OR IGNORE INTO bookmarks (url, title, added) VALUES (?1, ?2, ?3)")?;
+            let mut stmt =
+                tx.prepare("INSERT OR IGNORE INTO bookmarks (url, title, added, folder) VALUES (?1, ?2, ?3, ?4)")?;
             let t = now();
-            for (url, title) in list {
-                if url.starts_with("https://") || url.starts_with("http://") {
-                    added += stmt.execute(params![url, title, t])?;
+            for b in list {
+                if b.url.starts_with("https://") || b.url.starts_with("http://") {
+                    added += stmt.execute(params![b.url, b.title, t, b.folder])?;
                 }
             }
         }
@@ -242,9 +266,10 @@ impl Places {
     }
 
     pub fn bookmarks(&self) -> Result<Vec<Place>, Error> {
-        let mut stmt = self.db.prepare_cached("SELECT url, title, added FROM bookmarks ORDER BY added DESC")?;
+        let mut stmt =
+            self.db.prepare_cached("SELECT url, title, added, folder FROM bookmarks ORDER BY folder, added DESC")?;
         let rows = stmt.query_map([], |r| {
-            Ok(Place { url: r.get(0)?, title: r.get(1)?, visits: 0, last: r.get(2)?, bookmarked: true })
+            Ok(Place { url: r.get(0)?, title: r.get(1)?, visits: 0, last: r.get(2)?, bookmarked: true, folder: r.get(3)? })
         })?;
         rows.collect()
     }
@@ -413,14 +438,14 @@ mod tests {
     fn import_skips_duplicates_and_odd_schemes() {
         let p = Places::open(None).unwrap();
         p.toggle_bookmark("https://a.com/", "A").unwrap();
-        let list = vec![
-            ("https://a.com/".to_string(), "A again".to_string()),
-            ("https://b.com/".to_string(), "B".to_string()),
-            ("javascript:alert(1)".to_string(), "bookmarklet".to_string()),
-            ("place:sort=8".to_string(), "Firefox query".to_string()),
-        ];
+        let b = |url: &str, folder: &str| crate::import::Bookmark { url: url.into(), title: "t".into(), folder: folder.into() };
+        let list = vec![b("https://a.com/", ""), b("https://b.com/", "Work/Docs"), b("javascript:alert(1)", ""), b("place:sort=8", "")];
         assert_eq!(p.import_bookmarks(&list).unwrap(), 1);
-        assert_eq!(p.bookmarks().unwrap().len(), 2);
+        let all = p.bookmarks().unwrap();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all.iter().find(|x| x.url == "https://b.com/").unwrap().folder, "Work/Docs");
+        p.move_bookmark("https://a.com/", " Reading / Later ").unwrap();
+        assert_eq!(p.bookmarks().unwrap().iter().find(|x| x.url == "https://a.com/").unwrap().folder, "Reading/Later");
     }
 
     #[test]

@@ -16,7 +16,12 @@ rippl started as a Linux port of its ideas (see the map at the bottom).
 rippl                      the UI: GTK4 window, tab model, Shield, places, timers (~120 MB)
  ├── WebKitNetworkProcess  one, shared: HTTP, cookies, cache, content filters     (~50 MB)
  └── WebKitWebProcess × N  one per *awake* tab; lazy and sleeping tabs have none  (100–700 MB each)
+       └── librippl_web_extension.so   GPC header, HTTPS-only (no measurable memory)
 ```
+
+The UI process talks to the extension with WebKit user messages (`rippl-settings`,
+`rippl-allow-http`), and gives each new page process its start-up data:
+`(gpc, https_only, allowed hosts)`.
 
 WebKitGTK runs each web process inside a `bwrap` sandbox with an `xdg-dbus-proxy`, which is why
 those also show up in `ps` and `scripts/mem.sh`.
@@ -24,6 +29,7 @@ those also show up in `ps` and `scripts/mem.sh`.
 ## Code layout
 
 ```
+crates/rippl-web-extension/   loaded into every page process: Sec-GPC header, HTTPS upgrades
 crates/rippl-core/        no GTK, no WebKit: everything here runs under `cargo test`
   src/address.rs          what was typed → URL or search; private search engines
   src/tabs.rs             Tab, Tabs, Life (Lazy/Awake/Asleep), the sleep policy
@@ -35,6 +41,7 @@ crates/rippl-core/        no GTK, no WebKit: everything here runs under `cargo t
   src/pages.rs            rippl:// pages and the reader page, as escaped HTML
   src/import.rs           bookmarks from Chromium- and Firefox-family browsers
   src/passwords.rs        origins, which pages may save, save/update/nothing
+  src/settings_file.rs    change one line of the config file, keep the rest
   examples/shield_convert.rs   runs the converter on a list file, for inspection
 
 app/src/
@@ -54,6 +61,7 @@ app/src/
   internal_pages.rs       serves rippl://history|bookmarks|passwords|settings, token-checked buttons
   keyring.rs              the Secret Service through libsecret (or memory, for tests)
   signin.rs               form watching, the save question, the account list, filling
+  split.rs                split view: place/detach views, pairs, pane focus
   pressure.rs             Linux PSI reading; malloc_trim
   control.rs              Unix socket for tests and measurement (opt-in)
 
@@ -134,6 +142,7 @@ in pages. Details: [phases/phase-3-shield.md](phases/phase-3-shield.md).
 | `~/.local/share/rippl/session` | open tabs (not private ones), plain text |
 | `~/.local/share/rippl/places.sqlite` | history, bookmarks, site permission answers, hidden elements |
 | System keyring (GNOME Keyring …) | saved passwords, items "rippl: user on site" |
+| `~/.cache/rippl/web-extension/` | the copy of the web process extension WebKit loads |
 | `~/.cache/rippl/import/` | a moment's copy of a Firefox database while importing, deleted after |
 | `~/.local/share/rippl/web/cookies.sqlite` | cookies (sign-ins) |
 | `~/Downloads` (XDG download dir) | downloaded files |

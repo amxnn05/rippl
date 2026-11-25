@@ -9,6 +9,7 @@ pub mod pages;
 pub mod passwords;
 pub mod places;
 pub mod session;
+pub mod settings_file;
 pub mod shield;
 pub mod suggest;
 pub mod tabs;

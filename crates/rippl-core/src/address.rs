@@ -98,16 +98,53 @@ pub fn url_from(typed: &str) -> Option<String> {
     }
 
     // Local servers almost never have a certificate: https there just fails.
-    let local = host == "localhost"
-        || host.ends_with(".localhost")
-        || host.ends_with(".local")
-        || host == "127.0.0.1"
-        || host == "0.0.0.0"
-        || private_range(&host);
-    let scheme = if local { "http" } else { "https" };
+    let scheme = if is_local_host(&host) { "http" } else { "https" };
     // Dev servers print 0.0.0.0; WebKit refuses to go there, so use localhost.
     let rest = if host == "0.0.0.0" { text.replacen("0.0.0.0", "localhost", 1) } else { text.to_string() };
     Some(format!("{scheme}://{rest}"))
+}
+
+/// This machine, the local network, or a name with no dot (an intranet
+/// host like `router`): places that rarely have a certificate.
+pub fn is_local_host(host: &str) -> bool {
+    let host = host.trim_start_matches('[').trim_end_matches(']').to_ascii_lowercase();
+    host == "localhost"
+        || host.ends_with(".localhost")
+        || host.ends_with(".local")
+        || host.ends_with(".internal")
+        || host.ends_with(".lan")
+        || host == "127.0.0.1"
+        || host == "0.0.0.0"
+        || host == "::1"
+        || host.contains(':') // any other IPv6 literal: leave it alone
+        || !host.contains('.')
+        || private_range(&host)
+}
+
+/// HTTPS-only: the https address to use instead of `url`, when `url` is
+/// plain http to a public host. `None`: leave it as it is.
+pub fn https_upgrade(url: &str) -> Option<String> {
+    let rest = url.strip_prefix("http://")?;
+    let authority = rest.split(['/', '?', '#']).next()?;
+    let hostport = authority.rsplit('@').next()?;
+    let host = if hostport.starts_with('[') {
+        hostport.split(']').next()?.trim_start_matches('[')
+    } else {
+        hostport.split(':').next()?
+    };
+    if host.is_empty() || is_local_host(host) {
+        return None;
+    }
+    // An explicit port other than 80 is a server of its own: http on :8080
+    // doesn't mean https on :8080.
+    if let Some((_, port)) = hostport.rsplit_once(':')
+        && !hostport.ends_with(']')
+        && port != "80"
+    {
+        return None;
+    }
+    let rest = rest.replacen(":80", "", if hostport.ends_with(":80") { 1 } else { 0 });
+    Some(format!("https://{rest}"))
 }
 
 /// An absolute or home-relative path to a file that exists.
@@ -224,6 +261,20 @@ mod tests {
         assert_eq!(go("http://x"), "http://x");
         assert_eq!(go("about:blank"), "about:blank");
         assert_eq!(url_from("javascript://alert(1)"), None);
+    }
+
+    #[test]
+    fn https_upgrades() {
+        assert_eq!(https_upgrade("http://example.com/a?b#c").as_deref(), Some("https://example.com/a?b#c"));
+        assert_eq!(https_upgrade("http://example.com:80/x").as_deref(), Some("https://example.com/x"));
+        assert_eq!(https_upgrade("https://example.com/"), None, "already https");
+        assert_eq!(https_upgrade("http://localhost:3000/"), None);
+        assert_eq!(https_upgrade("http://192.168.1.1/"), None);
+        assert_eq!(https_upgrade("http://router/"), None, "intranet name");
+        assert_eq!(https_upgrade("http://printer.local/"), None);
+        assert_eq!(https_upgrade("http://[::1]:8080/"), None);
+        assert_eq!(https_upgrade("http://example.com:8080/"), None, "its own port");
+        assert_eq!(https_upgrade("ftp://example.com/"), None);
     }
 
     #[test]

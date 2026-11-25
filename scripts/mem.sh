@@ -4,12 +4,20 @@
 # WebKit process it started, in MB. PSS is the honest number for comparing
 # browsers; RSS double-counts shared libraries.
 #
-#   scripts/mem.sh            rippl
-#   scripts/mem.sh firefox    any other browser, by process name, to compare
+#   scripts/mem.sh              rippl
+#   scripts/mem.sh firefox      any other browser, by process name, to compare
+#   scripts/mem.sh --pid 1234   one process and everything it started (use
+#                               this to measure a browser you launched
+#                               yourself next to one already running)
 set -euo pipefail
-name="${1:-rippl}"
-root=$(pgrep -x -o "$name" || true)
-[ -z "$root" ] && { echo "no $name running" >&2; exit 1; }
+if [ "${1:-}" = "--pid" ]; then
+  root="${2:?--pid needs a process id}"
+  [ -d "/proc/$root" ] || { echo "no process $root" >&2; exit 1; }
+else
+  name="${1:-rippl}"
+  root=$(pgrep -x -o "$name" || true)
+  [ -z "$root" ] && { echo "no $name running" >&2; exit 1; }
+fi
 
 # The root and all its descendants.
 pids="$root"

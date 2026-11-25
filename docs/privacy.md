@@ -59,6 +59,8 @@ models do not depend on profiling you. If you want certainty, host SearXNG yours
 | **Scripts pages can't see** | Reading mode and the hide picker run in an isolated script world; the reading-mode page runs no script at all | `reader.rs`, `curtain.rs` |
 | **Import only reads** | Other browsers' bookmark files are read (Firefox's from a temporary copy) and never written; nothing is sent anywhere | `rippl_core::import` |
 | **Passwords in the system keyring** | Kept by the Secret Service (GNOME Keyring), never in rippl's files. Saved only after a sign-in worked, only on https (or this machine), never from private tabs. Offered only on the exact origin, never filled without a click, and re-checked against the page right before filling. In-memory copies are wiped (`zeroize`) | `keyring.rs`, `signin.rs`, [phase 6](phases/phase-6-passwords.md) |
+| **Global Privacy Control** | `Sec-GPC: 1` on every request, and `navigator.globalPrivacyControl`: "do not sell or share my data", which laws like the CCPA treat as an opt-out | `crates/rippl-web-extension`, `gpc` |
+| **HTTPS-only** | Every http request to a public host becomes https before it leaves, so nothing goes out in plain text to a site that has https. If a site has none, rippl says so and lets you continue over http for that host until you quit | `crates/rippl-web-extension`, `https_only` |
 | **Safe download names** | A site can't choose a path, a hidden file, or overwrite an existing file | `rippl_core::downloads` |
 | **Clipboard** | Pages can't read the clipboard on their own | `engine.rs` |
 | **Private tabs** (`Ctrl+Shift+N`) | Each has its own throwaway cookie jar and storage, and is never written to the session | `engine.rs` `view(private)` |
@@ -68,10 +70,6 @@ models do not depend on profiling you. If you want certainty, host SearXNG yours
 
 ## Not done yet (known gaps)
 
-- **Global Privacy Control / Do Not Track headers.** WebKitGTK has no UI-process API to add a
-  header to every request. It needs a web-process extension (planned).
-- **HTTPS-only mode.** Typed addresses default to `https://`, but links to `http://` are followed as
-  they are (planned).
 - **Fingerprinting.** WebKit has some built-in defences (ITP and others). rippl adds none of its own yet.
 - **WebRTC.** WebKit uses mDNS to hide your local IP, but WebRTC itself is on, because video
   calls need it.
