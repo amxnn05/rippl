@@ -33,6 +33,44 @@ pub const ENGINES: &[(&str, &str)] = &[
     ("qwant", "https://www.qwant.com/?q={}"),
 ];
 
+/// Site keywords: "yt cats" searches YouTube for cats, whatever the
+/// default engine is. `%s` is where the words go.
+pub const KEYWORDS: &[(&str, &str)] = &[
+    ("w", "https://en.wikipedia.org/w/index.php?search=%s"),
+    ("yt", "https://www.youtube.com/results?search_query=%s"),
+    ("gh", "https://github.com/search?q=%s"),
+    ("mdn", "https://developer.mozilla.org/en-US/search?q=%s"),
+    ("osm", "https://www.openstreetmap.org/search?query=%s"),
+    ("r", "https://www.reddit.com/search/?q=%s"),
+];
+
+/// Whether `template` may be a keyword's address: https (or http), one
+/// `%s`, and not in the host, so the words decide what is looked for, never
+/// where you end up.
+pub fn keyword_template_ok(template: &str) -> bool {
+    let Some(rest) = template.strip_prefix("https://").or_else(|| template.strip_prefix("http://")) else {
+        return false;
+    };
+    let host = rest.split(['/', '?', '#']).next().unwrap_or("");
+    template.matches("%s").count() == 1 && !host.contains("%s") && !host.contains('@') && !host.is_empty()
+}
+
+/// "yt cats" → YouTube's search for cats, from `keywords` (word, template).
+pub fn keyword(typed: &str, keywords: &[(String, String)]) -> Option<String> {
+    let (word, words) = typed.trim().split_once(' ')?;
+    let words = words.trim();
+    if words.is_empty() {
+        return None;
+    }
+    let (_, template) = keywords.iter().find(|(w, t)| w.eq_ignore_ascii_case(word) && keyword_template_ok(t))?;
+    Some(template.replacen("%s", &encode_query(words), 1))
+}
+
+/// The built-in keywords, as owned pairs.
+pub fn default_keywords() -> Vec<(String, String)> {
+    KEYWORDS.iter().map(|(w, t)| (w.to_string(), t.to_string())).collect()
+}
+
 /// The template for a config value: a name from `ENGINES`, or an https
 /// address of your own with `{}` where the words go (a SearXNG, say).
 pub fn engine(value: &str) -> Option<String> {
@@ -206,6 +244,27 @@ pub fn encode_query(text: &str) -> String {
     out
 }
 
+/// The one letter that stands for a page: the site's
+/// first letter, without `www.`; for rippl's own pages, the page's; for
+/// anything without a host, the title's.
+pub fn monogram(url: &str, title: &str) -> String {
+    let from = |s: &str| s.chars().find(|c| c.is_alphanumeric()).map(|c| c.to_uppercase().collect::<String>());
+    if let Some(page) = url.strip_prefix("rippl://") {
+        return from(page).unwrap_or_else(|| "R".into());
+    }
+    let host = url.split_once("://").map(|(_, r)| r.split(['/', '?', '#', ':']).next().unwrap_or("")).unwrap_or("");
+    // The name people know the site by: "wikipedia" in en.wikipedia.org,
+    // "bbc" in www.bbc.co.uk (a short second-to-last label is a suffix).
+    let labels: Vec<&str> = host.split('.').filter(|l| !l.is_empty()).collect();
+    let name = match labels.len() {
+        0 => "",
+        1 => labels[0],
+        n if n >= 3 && labels[n - 2].len() <= 3 && labels[n - 1].len() == 2 => labels[n - 3],
+        n => labels[n - 2],
+    };
+    from(name).or_else(|| from(title)).unwrap_or_else(|| "·".into())
+}
+
 /// What a tab says before the page has a title: host and path, no `www.`.
 pub fn pretty(url: &str) -> String {
     let Some((_, rest)) = url.split_once("://") else { return url.to_string() };
@@ -278,6 +337,18 @@ mod tests {
     }
 
     #[test]
+    fn keywords() {
+        let k = default_keywords();
+        assert_eq!(keyword("yt lo-fi beats", &k).as_deref(), Some("https://www.youtube.com/results?search_query=lo-fi+beats"));
+        assert_eq!(keyword("YT cats", &k).as_deref(), Some("https://www.youtube.com/results?search_query=cats"));
+        assert_eq!(keyword("yt", &k), None, "no words");
+        assert_eq!(keyword("youtube cats", &k), None, "not a keyword");
+        assert!(!keyword_template_ok("https://%s.evil.com/"), "words in the host");
+        assert!(!keyword_template_ok("https://a.com/?q=%s&r=%s"));
+        assert!(!keyword_template_ok("javascript:%s"));
+    }
+
+    #[test]
     fn engines() {
         assert_eq!(engine("Brave").as_deref(), Some("https://search.brave.com/search?q={}"));
         assert_eq!(engine("https://searx.me/search?q={}").as_deref(), Some("https://searx.me/search?q={}"));
@@ -289,6 +360,18 @@ mod tests {
     #[test]
     fn empty_is_nothing() {
         assert_eq!(resolve("   ", DEFAULT_SEARCH), Destination::Nothing);
+    }
+
+    #[test]
+    fn monograms() {
+        assert_eq!(monogram("https://www.github.com/x", "GitHub"), "G");
+        assert_eq!(monogram("https://en.wikipedia.org/wiki/Linux", ""), "W");
+        assert_eq!(monogram("https://www.bbc.co.uk/news", ""), "B");
+        assert_eq!(monogram("http://localhost:3000/", ""), "L");
+        assert_eq!(monogram("https://are.na/", ""), "A");
+        assert_eq!(monogram("rippl://history", "History"), "H");
+        assert_eq!(monogram("about:blank", "blank page"), "B");
+        assert_eq!(monogram("https://ελ.example/", ""), "Ε");
     }
 
     #[test]

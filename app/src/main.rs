@@ -1,6 +1,7 @@
 //! rippl: a small, fast, quiet web browser for Linux, on WebKit.
 
 mod browser;
+mod closed;
 mod config;
 mod control;
 mod curtain;
@@ -9,6 +10,7 @@ mod engine;
 mod find;
 mod internal_pages;
 mod keyring;
+mod look;
 mod omnibox;
 mod permissions;
 mod pressure;

@@ -203,6 +203,16 @@ impl Tabs {
         self.list.insert(pins, tab);
     }
 
+    /// Moves `id` to `index` (clamped to the list), never into or out of
+    /// the pinned group by accident: an ordinary tab stays below the pins.
+    pub fn move_to(&mut self, id: TabId, index: usize) {
+        let Some(i) = self.index(id) else { return };
+        let tab = self.list.remove(i);
+        let pins = self.list.iter().filter(|t| t.pinned).count();
+        let at = if tab.pinned { index.min(pins) } else { index.clamp(pins, self.list.len()) };
+        self.list.insert(at, tab);
+    }
+
     /// The tab `step` places from the front, wrapping round.
     pub fn neighbour(&self, step: isize) -> Option<TabId> {
         let n = self.list.len() as isize;
@@ -289,6 +299,19 @@ mod tests {
         let d = tabs.open("d.com");
         assert_eq!(order(&tabs), vec![a, d, c, b]);
         assert!(tabs.get(a).unwrap().pinned && !tabs.get(c).unwrap().pinned);
+    }
+
+    #[test]
+    fn move_to_keeps_pins_apart() {
+        let mut tabs = Tabs::new();
+        let a = tabs.open("a.com");
+        let b = tabs.open("b.com");
+        let c = tabs.open("c.com");
+        tabs.set_pinned(a, true);
+        tabs.move_to(c, 0);
+        assert_eq!(tabs.list.iter().map(|t| t.id).collect::<Vec<_>>(), vec![a, c, b]);
+        tabs.move_to(c, 99);
+        assert_eq!(tabs.list.iter().map(|t| t.id).collect::<Vec<_>>(), vec![a, b, c]);
     }
 
     #[test]

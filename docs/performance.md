@@ -100,10 +100,18 @@ To compare with another browser **without touching your own**, start it with a t
 `scripts/mem.sh --pid $!`, and stop only that process tree. Never use `pkill chromium`, which
 would also close your own windows.
 
+### Same-site tabs share a page process (Phase 8)
+
+| 5 Wikipedia tabs | Total | Page processes |
+|---|---|---|
+| A process each (`RIPPL_NO_SHARE=1`) | 897 MB | 5 |
+| **Shared** (default) | **630 MB (−30%)** | 1 |
+
+The 10-site test above uses 10 *different* sites, so sharing doesn't change it; it helps whenever
+you have several tabs of one site (docs, mail, a wiki, a shop).
+
 ## What would make it lighter (ideas, measured before adopting)
 
-- **Share a page process between tabs of the same site.** WebKit can, through related views; that
-  saves ~160 MB per extra tab of a site, at the cost of isolation between those tabs.
 - **Sleep sooner when memory is tight.** This already happens through PSI; a "save memory" setting
   could make 10 minutes the default wait.
 - **WPE WebKit** instead of WebKitGTK, for a lighter UI process (see the roadmap).

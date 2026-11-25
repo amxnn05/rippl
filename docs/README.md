@@ -11,6 +11,7 @@ development phase did.
 | [configuration.md](configuration.md) | The config file, the Shield allow list, environment knobs, keys |
 | [testing.md](testing.md) | Unit tests, the control socket, measuring memory, testing on Hyprland |
 | [performance.md](performance.md) | Size, startup time, memory against Chromium and Brave, and what costs what |
+| [features.md](features.md) | Every features, with rippl's status and the batch it's planned in |
 | [roadmap.md](roadmap.md) | Every phase, done and planned |
 | [phases/](phases/) | One page per finished phase: what was built, decisions, bugs, measurements |
 
@@ -26,7 +27,9 @@ development phase did.
 | 5. Extras: pins, reading mode, hide elements, rippl:// pages, bookmark import | done | [phase-5-extras.md](phases/phase-5-extras.md) |
 | 6. Passwords in the system keyring | done | [phase-6-passwords.md](phases/phase-6-passwords.md) |
 | 7. Split view, bookmark folders, settings editing, HTTPS-only, Global Privacy Control | done | [phase-7-more.md](phases/phase-7-more.md) |
-| 8. Ship: desktop entry, default browser, packages | next | [roadmap.md](roadmap.md) |
+| 8. Shared processes for same-site tabs, the look, first features | done | [phase-8-look.md](phases/phase-8-look.md) |
+| Feature batch 1 (site card, duplicate, pop-ups, …) | next | [features.md](features.md) |
+| 9. Ship: desktop entry, default browser, packages | planned | [roadmap.md](roadmap.md) |
 
 ## Keeping these docs current
 

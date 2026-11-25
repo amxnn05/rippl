@@ -15,7 +15,7 @@ use rippl_core::places::Places;
 use rippl_core::session::Session;
 use rippl_core::tabs::{self, Life, Pressure, TabId, Tabs};
 use webkit6::prelude::*;
-use webkit6::{gdk, gio, glib, gtk, LoadEvent, MediaCaptureState, WebProcessTerminationReason, WebView};
+use webkit6::{gio, glib, gtk, LoadEvent, MediaCaptureState, WebProcessTerminationReason, WebView};
 
 use crate::config::{Config, Theme};
 use crate::downloads::Downloads;
@@ -60,6 +60,10 @@ pub struct Browser {
     pub(crate) column: gtk::Box,
     pub(crate) field: gtk::Entry,
     pub(crate) list: gtk::ListBox,
+    /// Pinned tabs, as letter squares above the list.
+    pub(crate) pins: gtk::FlowBox,
+    pub(crate) new_tab: gtk::Button,
+    pub(crate) settings_button: gtk::Button,
     pub(crate) tabs_area: gtk::ScrolledWindow,
     // The field's offers (omnibox.rs).
     pub(crate) suggest_area: gtk::ScrolledWindow,
@@ -77,6 +81,8 @@ pub struct Browser {
     pub(crate) find_bar: gtk::Box,
     pub(crate) find_entry: gtk::Entry,
     pub(crate) find_count: gtk::Label,
+    /// Where the link under the pointer goes, at the foot of the page.
+    pub(crate) status: gtk::Label,
     pub(crate) found: Cell<u32>,
     // Permission questions (permissions.rs).
     pub(crate) ask_bar: gtk::Box,
@@ -106,6 +112,8 @@ pub struct Browser {
     /// The page and what floats over it.
     pub(crate) page_area: gtk::Overlay,
     pub(crate) dirty: Cell<bool>,
+    /// Tabs closed lately (closed.rs).
+    pub(crate) closed: RefCell<Vec<crate::closed::Closed>>,
     me: RefCell<Weak<Browser>>,
 }
 
@@ -128,10 +136,26 @@ impl Browser {
         field.add_css_class("field");
         let list = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
         list.add_css_class("tabs");
+        // The column draws it: pinned squares, the tabs, a quiet
+        // "New tab" row, all in one scrolling area (look.rs).
+        let pins = gtk::FlowBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .max_children_per_line(6)
+            .min_children_per_line(1)
+            .column_spacing(4)
+            .row_spacing(4)
+            .homogeneous(true)
+            .build();
+        pins.add_css_class("pins");
+        let new_tab = Browser::new_tab_row();
+        let rows = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        rows.append(&pins);
+        rows.append(&list);
+        rows.append(&new_tab);
         let tabs_area = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             .vexpand(true)
-            .child(&list)
+            .child(&rows)
             .build();
         let suggest_list = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::Single).build();
         suggest_list.add_css_class("offers");
@@ -145,11 +169,13 @@ impl Browser {
         let downloads = Downloads::new();
         let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
         column.add_css_class("column");
-        column.set_size_request(230, -1);
+        column.set_size_request(232, -1);
         column.append(&field);
         column.append(&suggest_area);
         column.append(&tabs_area);
         column.append(&downloads.area);
+        let foot = Browser::column_foot();
+        column.append(&foot.0);
 
         let stage = gtk::Stack::builder().hexpand(true).vexpand(true).build();
         stage.add_css_class("stage");
@@ -183,6 +209,18 @@ impl Browser {
             .build();
         toast.add_css_class("toast");
         overlay.add_overlay(&toast);
+        let status = gtk::Label::builder()
+            .halign(gtk::Align::Start)
+            .valign(gtk::Align::End)
+            .margin_start(12)
+            .margin_bottom(12)
+            .ellipsize(gtk::pango::EllipsizeMode::Middle)
+            .max_width_chars(80)
+            .visible(false)
+            .build();
+        status.add_css_class("status");
+        status.set_can_target(false);
+        overlay.add_overlay(&status);
 
         let body = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         body.append(&column);
@@ -225,6 +263,9 @@ impl Browser {
             column,
             field,
             list,
+            pins,
+            new_tab,
+            settings_button: foot.1,
             tabs_area,
             suggest_area,
             suggest_list,
@@ -239,6 +280,7 @@ impl Browser {
             find_bar,
             find_entry,
             find_count,
+            status,
             found: Cell::new(0),
             ask_bar,
             ask_label,
@@ -262,11 +304,13 @@ impl Browser {
             offered: RefCell::new(Vec::new()),
             page_area: overlay.clone(),
             dirty: Cell::new(false),
+            closed: RefCell::new(Vec::new()),
             me: RefCell::new(Weak::new()),
         });
         *browser.me.borrow_mut() = Rc::downgrade(&browser);
 
         browser.style();
+        browser.wire_look();
         browser.wire_omnibox();
         browser.wire_find();
         browser.wire_permission_bar();
@@ -361,7 +405,19 @@ impl Browser {
             tab.life = Life::Awake;
             (tab.url.clone(), tab.private, tab.memory.take())
         };
-        let view = self.engine.view(private);
+        // Another awake tab of the same site: share its page process (each
+        // process costs ~160 MB before any page content). Same site only,
+        // same kind of session: a private tab never shares with a kept one.
+        let sibling = self.sibling_of(id, &url, private);
+        let view = match &sibling {
+            Some((other, opener)) => {
+                let family = self.family.borrow().get(other).copied().unwrap_or(*other);
+                self.family.borrow_mut().insert(id, family);
+                debug!("wake {id}: sharing tab {other}'s page process");
+                self.engine.related_view(opener)
+            }
+            None => self.engine.view(private),
+        };
         self.adopt(id, &view);
         debug!("wake {id}: kept state = {:?} bytes", memory.as_ref().map(Vec::len));
         let restored = memory.is_some_and(|bytes| {
@@ -379,6 +435,22 @@ impl Browser {
         if !restored && !url.is_empty() {
             view.load_uri(&url);
         }
+    }
+
+    /// An awake tab on the same site as `url` (same host, www aside), with
+    /// the same privacy, whose process a new view of `id` can share.
+    fn sibling_of(&self, id: TabId, url: &str, private: bool) -> Option<(TabId, WebView)> {
+        if std::env::var_os("RIPPL_NO_SHARE").is_some() {
+            return None;
+        }
+        let host = shield::host_of(url)?;
+        let tabs = self.tabs.borrow();
+        let views = self.views.borrow();
+        tabs.list
+            .iter()
+            .filter(|t| t.id != id && t.private == private && t.life == Life::Awake)
+            .find(|t| shield::host_of(&t.url).as_deref() == Some(host.as_str()))
+            .and_then(|t| views.get(&t.id).map(|v| (t.id, v.clone())))
     }
 
     /// Takes `id`'s view away, keeping what it needs to come back. Its web
@@ -422,6 +494,7 @@ impl Browser {
     }
 
     pub fn close(&self, id: TabId) {
+        self.remember_closed(id);
         self.separate(id);
         let view = self.views.borrow_mut().remove(&id);
         if let Some(view) = view {
@@ -467,7 +540,14 @@ impl Browser {
     /// Return in the field: an address, or a search.
     pub(crate) fn go(&self, typed: &str) {
         let search = self.config.borrow().search.clone();
-        let Destination::Page(url) = address::resolve(typed, &search) else { return };
+        // "yt cats": a site keyword first, then an address or a search.
+        let url = match address::keyword(typed, &address::default_keywords()) {
+            Some(url) => url,
+            None => match address::resolve(typed, &search) {
+                Destination::Page(url) => url,
+                Destination::Nothing => return,
+            },
+        };
         let front = self.front();
         let Some(id) = front else {
             self.open(&url, false, true);
@@ -656,6 +736,19 @@ impl Browser {
         });
         self.wire_find_for(id, view);
 
+        // Where a link goes, while the pointer is on it.
+        let weak = self.weak();
+        view.connect_mouse_target_changed(move |v, hit, _| {
+            let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) else { return };
+            match hit.link_uri().filter(|_| hit.context_is_link()) {
+                Some(uri) => {
+                    b.status.set_label(rippl_core::suggest::bare(&uri).trim_end_matches('/'));
+                    b.status.set_visible(true);
+                }
+                None => b.status.set_visible(false),
+            }
+        });
+
         let weak = self.weak();
         view.connect_is_playing_audio_notify(move |v| {
             let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) else { return };
@@ -739,88 +832,6 @@ impl Browser {
     }
 
     // ---- the column ---------------------------------------------------
-
-    /// Redraws the list of tabs. Cheap enough at browser scale to do whole.
-    pub(crate) fn render(&self) {
-        while let Some(row) = self.list.first_child() {
-            self.list.remove(&row);
-        }
-        let tabs = self.tabs.borrow();
-        for tab in &tabs.list {
-            let row = gtk::ListBoxRow::new();
-            let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-            let mark = match (tab.playing_audio, tab.private) {
-                (true, _) => "♪ ",
-                (_, true) => "◐ ",
-                _ => "",
-            };
-            if tab.pinned {
-                let pin = gtk::Image::from_icon_name("view-pin-symbolic");
-                pin.add_css_class("pin");
-                line.append(&pin);
-            }
-            let label = gtk::Label::builder()
-                .label(format!("{mark}{}", tab.title))
-                .xalign(0.0)
-                .hexpand(true)
-                .ellipsize(gtk::pango::EllipsizeMode::End)
-                .max_width_chars(1)
-                .build();
-            let close = gtk::Button::from_icon_name("window-close-symbolic");
-            close.add_css_class("flat");
-            close.add_css_class("close");
-            close.set_tooltip_text(Some("Close tab"));
-            line.append(&label);
-            line.append(&close);
-            row.set_child(Some(&line));
-            row.set_tooltip_text(Some(&tab.url));
-            if Some(tab.id) == tabs.front {
-                row.add_css_class("front");
-            }
-            if self.partner.borrow().contains_key(&tab.id) {
-                row.add_css_class("split");
-                row.set_tooltip_text(Some(&format!("{} · side by side (Ctrl+Alt+S separates)", tab.url)));
-            }
-            if tab.pinned {
-                row.add_css_class("pinned");
-                // A line under the last pin, between pins and tabs.
-                let next_pinned = tabs.list.get(tabs.index(tab.id).unwrap_or(0) + 1).is_some_and(|t| t.pinned);
-                if !next_pinned {
-                    row.add_css_class("last-pin");
-                }
-            }
-            if tab.life != Life::Awake {
-                row.add_css_class("asleep");
-            }
-
-            let id = tab.id;
-            let weak = self.weak();
-            close.connect_clicked(move |_| {
-                if let Some(b) = weak.upgrade() {
-                    b.close(id);
-                }
-            });
-            let click = gtk::GestureClick::builder().button(0).build();
-            let weak = self.weak();
-            click.connect_released(move |gesture, _, _, _| {
-                let Some(b) = weak.upgrade() else { return };
-                // Deferred: the row this gesture belongs to is about to be
-                // replaced by the redraw that selecting does.
-                let button = gesture.current_button();
-                // Alt-click: put this tab beside the one in front.
-                if button == 1 && gesture.current_event_state().contains(gdk::ModifierType::ALT_MASK) {
-                    glib::idle_add_local_once(move || b.split_with(id));
-                    return;
-                }
-                glib::idle_add_local_once(move || match button {
-                    2 => b.close(id),
-                    _ => b.select(id),
-                });
-            });
-            row.add_controller(click);
-            self.list.append(&row);
-        }
-    }
 
     /// The field and the window title follow the tab in front.
     pub(crate) fn show_front(&self) {
@@ -999,6 +1010,10 @@ impl Browser {
                 "ok".into()
             }
             "pending" => self.pending.borrow().len().to_string(),
+            "reopen" => {
+                self.reopen_closed();
+                "ok".into()
+            }
             "split" => match at(rest) {
                 Some(id) => {
                     self.split_with(id);
@@ -1246,6 +1261,14 @@ impl Browser {
         self.action(app, "settings", &["<Ctrl>comma"], |b| b.open_internal("settings"));
         self.action(app, "pin", &["<Ctrl><Shift>p"], |b| b.toggle_pin());
         self.action(app, "split", &["<Ctrl><Alt>s"], |b| b.toggle_split());
+        self.action(app, "reopen", &["<Ctrl><Shift>t"], |b| b.reopen_closed());
+        self.action(app, "copy-address", &["<Ctrl><Shift>c"], |b| b.copy_address());
+        self.action(app, "paste-go", &["<Ctrl><Shift>v"], |b| b.paste_and_go());
+        // Ctrl+K: the field, where typing finds open tabs.
+        self.action(app, "switch-tab", &["<Ctrl>k"], |b| {
+            b.field.grab_focus();
+            b.field.set_text("");
+        });
         self.action(app, "pane-left", &["<Ctrl><Alt>Left"], |b| b.focus_pane(false));
         self.action(app, "pane-right", &["<Ctrl><Alt>Right"], |b| b.focus_pane(true));
         self.action(app, "passwords", &["<Ctrl><Alt>p"], |b| b.open_internal("passwords"));
@@ -1448,52 +1471,6 @@ impl Browser {
         self.render();
     }
 
-    // ---- look ---------------------------------------------------------
-
-    fn style(&self) {
-        let css = gtk::CssProvider::new();
-        css.load_from_string(
-            "
-            .column { padding: 8px 6px 8px 8px; }
-            .field { border-radius: 8px; min-height: 32px; }
-            .tabs, .tabs row { background: transparent; }
-            .tabs row { border-radius: 8px; padding: 4px 4px 4px 10px; margin: 1px 0; min-height: 30px; }
-            .tabs row:hover { background: alpha(currentColor, 0.06); }
-            .tabs row.front { background: alpha(currentColor, 0.12); }
-            .tabs row.asleep label { opacity: 0.6; }
-            .tabs row button.close { opacity: 0; min-height: 20px; min-width: 20px; padding: 0; }
-            .tabs row:hover button.close, .tabs row.front button.close { opacity: 0.7; }
-            .stage { border-radius: 10px; margin: 8px 8px 8px 0; }
-            .offers, .offers row { background: transparent; }
-            .offers row { border-radius: 8px; padding: 5px 8px; margin: 1px 0; }
-            .offers row:hover { background: alpha(currentColor, 0.06); }
-            .offers row:selected { background: alpha(@accent_bg_color, 0.35); color: inherit; }
-            .dim { opacity: 0.6; font-size: 0.9em; }
-            .downloads { padding: 6px 4px 0 6px; border-top: 1px solid alpha(currentColor, 0.1); }
-            .downloads .heading { font-weight: bold; opacity: 0.7; font-size: 0.9em; }
-            .download { padding: 4px 2px; }
-            .download button.close { min-height: 20px; min-width: 20px; padding: 0; opacity: 0.7; }
-            /* Over the page, whatever the page or the theme: dark, opaque, white text. */
-            .tabs row.pinned label { font-weight: 600; }
-            .tabs row.split { box-shadow: inset 3px 0 0 alpha(@accent_bg_color, 0.85); }
-            paned.split > separator { background: alpha(currentColor, 0.15); min-width: 6px; }
-            webview.pane-front { box-shadow: inset 0 3px 0 alpha(@accent_bg_color, 0.9); }
-            .tabs row.last-pin { margin-bottom: 8px; box-shadow: 0 5px 0 -4px alpha(currentColor, 0.15); }
-            .tabs .pin { opacity: 0.6; -gtk-icon-size: 12px; }
-            .accounts row { padding: 6px 12px; border-radius: 6px; }
-            .toast { background: rgba(28, 28, 30, 0.96); color: white; border-radius: 18px; padding: 8px 16px;
-                     box-shadow: 0 2px 10px alpha(black, 0.35); }
-            .find, .ask { background: rgba(28, 28, 30, 0.96); color: white;
-                          border-radius: 10px; padding: 6px 8px; box-shadow: 0 2px 10px alpha(black, 0.35); }
-            .ask label { color: white; }
-            ",
-        );
-        gtk::style_context_add_provider_for_display(
-            &gtk::prelude::WidgetExt::display(&self.window),
-            &css,
-            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
-        );
-    }
 }
 
 /// The window's light or dark look (and with it, pages that offer both).

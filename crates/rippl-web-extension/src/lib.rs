@@ -4,6 +4,8 @@
 //! - **Global Privacy Control**: adds `Sec-GPC: 1` to every request, the
 //!   header that tells sites (and, under laws like the CCPA and GDPR, obliges
 //!   many of them) not to sell or share your data.
+//! - **Click IDs**: `fbclid`, `gclid` and the like, taken off every address
+//!   (`rippl_core::clean`).
 //! - **HTTPS-only**: rewrites a request for `http://` to a public host into
 //!   `https://` before it leaves (`rippl_core::address::https_upgrade`).
 //!   Pages, frames, images and scripts alike: nothing goes out in plain text
@@ -40,6 +42,15 @@ struct State {
 
 impl State {
     fn on_request(&self, request: &URIRequest) {
+        // Click IDs (fbclid, gclid, …) off every address, always.
+        if let Some(uri) = request.uri()
+            && let Some(clean) = rippl_core::clean::strip_click_ids(&uri)
+        {
+            if self.debug.get() {
+                eprintln!("rippl extension [{}]: {uri} -> {clean} (click IDs removed)", std::process::id());
+            }
+            request.set_uri(&clean);
+        }
         if self.https_only.get()
             && let Some(uri) = request.uri()
             && let Some(secure) = rippl_core::address::https_upgrade(&uri)

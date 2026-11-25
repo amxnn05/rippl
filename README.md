@@ -2,7 +2,8 @@
 
 A small, fast, private web browser for Linux, built on WebKit (WebKitGTK 6.0 + GTK4) and written in Rust.
 
-A row of tabs, one field, and the page. No account, no telemetry, no server. Ads and trackers are blocked
+A column of tabs, one field, and the page as a card: the look of another browser,
+the macOS browser it's modelled on. No account, no telemetry, no server. Ads and trackers are blocked
 inside WebKit before they load, and tabs you aren't using give their memory back.
 
 ## Size and speed
@@ -69,4 +70,5 @@ Everything is in [docs/](docs/README.md): [architecture](docs/architecture.md), 
 [configuration](docs/configuration.md), [testing](docs/testing.md), the [roadmap](docs/roadmap.md), and
 one page per finished phase in [docs/phases/](docs/phases/).
 
-Inspired by another browser, a WebKit browser for the Mac.
+Inspired by another browser, a WebKit browser for the Mac: its look, and its
+features as far as Linux allows ([docs/features.md](docs/features.md)).

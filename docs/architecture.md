@@ -42,6 +42,7 @@ crates/rippl-core/        no GTK, no WebKit: everything here runs under `cargo t
   src/import.rs           bookmarks from Chromium- and Firefox-family browsers
   src/passwords.rs        origins, which pages may save, save/update/nothing
   src/settings_file.rs    change one line of the config file, keep the rest
+  src/clean.rs            click IDs and campaign tags off addresses
   examples/shield_convert.rs   runs the converter on a list file, for inspection
 
 app/src/
@@ -62,6 +63,8 @@ app/src/
   keyring.rs              the Secret Service through libsecret (or memory, for tests)
   signin.rs               form watching, the save question, the account list, filling
   split.rs                split view: place/detach views, pairs, pane focus
+  look.rs                 the design: palette, column rows, letters, pins, CSS
+  closed.rs               reopen closed tabs, copy clean address, paste and go
   pressure.rs             Linux PSI reading; malloc_trim
   control.rs              Unix socket for tests and measurement (opt-in)
 
@@ -98,8 +101,10 @@ Rule: anything that can be decided without a window or an engine goes in `rippl-
 or screen, and tabs still loading. The policy is `rippl_core::tabs::due_for_sleep`.
 
 **Families:** a page that opens a window (`window.open`, `target=_blank`) gets a new tab whose view
-is *related* to the opener. WebKit requires this, and the two share one web process. Each tab
-records its family, and a process is only ended when no awake tab of the family is left.
+is *related* to the opener. WebKit requires this, and the two share one web process. Since Phase 8
+a tab that wakes on the same site as an awake tab is made related to it too, sharing its process
+(~160 MB saved per extra tab of a site). Each tab records its family, and a process is only ended
+when no awake tab of the family is left.
 
 ## Signal safety
 

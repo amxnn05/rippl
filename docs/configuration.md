@@ -48,6 +48,7 @@ is on the list, the address field shows a warning icon.
 |---|---|
 | `RIPPL_SLEEP_AFTER=<seconds>` | Overrides `sleep`, in seconds (for measuring) |
 | `RIPPL_LEAN=1` | WebKit's smaller cache model: less RAM, slower Back |
+| `RIPPL_NO_SHARE=1` | Every tab in a page process of its own, even on the same site |
 | `RIPPL_NO_GPU=1` | Pages drawn without the GPU: 167 → 95 MB per light page, but about twice the CPU while scrolling ([performance.md](performance.md)) |
 | `RIPPL_CONTROL=1` | Opens the control socket ([testing.md](testing.md)) |
 | `RIPPL_DEBUG=1` | Logs tab life and Shield activity to stderr |
@@ -79,6 +80,11 @@ is on the list, the address field shows a warning icon.
 | `Ctrl+Shift+H` | Hide something on this site (click it; `Esc` cancels) |
 | `Ctrl+Shift+U` | Show everything hidden on this site again |
 | `Ctrl+Alt+S` | Split view: this tab beside the previous one, or separate them |
+| `Ctrl+Shift+T` | Reopen the last closed tab, with its history and scroll |
+| `Ctrl+Shift+C` | Copy the address, without tracking parameters |
+| `Ctrl+Shift+V` | Paste and go: open what's on the clipboard |
+| `Ctrl+K` | Switch to a tab: the field, empty; type to find open tabs |
+| `w` `yt` `gh` `mdn` `osm` `r` + words in the field | Search that site: Wikipedia, YouTube, GitHub, MDN, OpenStreetMap, Reddit |
 | Alt-click a tab | Put it beside the tab in front |
 | `Ctrl+Alt+←` / `Ctrl+Alt+→` | Left / right pane |
 | `↓` `↑` `Return` in the field | Move through what the field offers, open it |
