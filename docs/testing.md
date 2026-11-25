@@ -64,6 +64,12 @@ scripts/ctl.sh split [n]            # split the front tab with tab n (or the pre
 scripts/ctl.sh shown                # "split <left> <right> front <id>" or "single <id>"
 scripts/ctl.sh pane left|right      # focus a pane
 scripts/ctl.sh allow-http <host>    # as "Continue to http" on the HTTPS warning
+scripts/ctl.sh card                 # open the site card ("shown=true")
+scripts/ctl.sh dup                  # duplicate the front tab
+scripts/ctl.sh awake on|off         # keep the front tab's site awake
+scripts/ctl.sh popups               # pop-ups refused in the front tab, and whether the bar shows
+scripts/ctl.sh popup-open           # the bar's Open
+scripts/ctl.sh offers               # what the field offers now (engine suggestions arrive later)
 ```
 
 **GPC:** serve a page with a server that logs request headers, and check `Sec-GPC: 1` on the page

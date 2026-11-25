@@ -44,6 +44,27 @@ pub const KEYWORDS: &[(&str, &str)] = &[
     ("r", "https://www.reddit.com/search/?q=%s"),
 ];
 
+/// Sites whose search the field offers by name ("red" → Search Reddit),
+/// through their keyword.
+pub const SITE_NAMES: &[(&str, &str)] = &[
+    ("Wikipedia", "w"),
+    ("YouTube", "yt"),
+    ("GitHub", "gh"),
+    ("MDN", "mdn"),
+    ("OpenStreetMap", "osm"),
+    ("Reddit", "r"),
+];
+
+/// The sites whose name starts with what was typed (two letters at least,
+/// no space): offered as "Search <site>".
+pub fn site_search(typed: &str) -> Vec<(&'static str, &'static str)> {
+    let t = typed.trim().to_lowercase();
+    if t.chars().count() < 2 || t.contains(' ') {
+        return Vec::new();
+    }
+    SITE_NAMES.iter().filter(|(name, _)| name.to_lowercase().starts_with(&t)).copied().collect()
+}
+
 /// Whether `template` may be a keyword's address: https (or http), one
 /// `%s`, and not in the host, so the words decide what is looked for, never
 /// where you end up.
@@ -64,6 +85,29 @@ pub fn keyword(typed: &str, keywords: &[(String, String)]) -> Option<String> {
     }
     let (_, template) = keywords.iter().find(|(w, t)| w.eq_ignore_ascii_case(word) && keyword_template_ok(t))?;
     Some(template.replacen("%s", &encode_query(words), 1))
+}
+
+/// Where the search engine answers "what might I be typing?", for the
+/// engines that offer it (OpenSearch suggestions). Only used when
+/// `suggestions = on`: it sends each keystroke to the engine.
+pub fn suggest_endpoint(search_template: &str) -> Option<String> {
+    if search_template.starts_with("https://duckduckgo.com/") {
+        Some("https://duckduckgo.com/ac/?type=list&q={}".into())
+    } else if search_template.starts_with("https://search.brave.com/") {
+        Some("https://search.brave.com/api/suggest?q={}".into())
+    } else {
+        None
+    }
+}
+
+/// An OpenSearch suggestions answer, `["typed", ["one", "two", …]]`.
+pub fn parse_suggestions(json: &str) -> Vec<String> {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else { return Vec::new() };
+    value
+        .get(1)
+        .and_then(|v| v.as_array())
+        .map(|list| list.iter().filter_map(|s| s.as_str().map(str::to_string)).take(5).collect())
+        .unwrap_or_default()
 }
 
 /// The built-in keywords, as owned pairs.
@@ -346,6 +390,22 @@ mod tests {
         assert!(!keyword_template_ok("https://%s.evil.com/"), "words in the host");
         assert!(!keyword_template_ok("https://a.com/?q=%s&r=%s"));
         assert!(!keyword_template_ok("javascript:%s"));
+    }
+
+    #[test]
+    fn suggestions() {
+        assert!(suggest_endpoint(DEFAULT_SEARCH).is_some());
+        assert!(suggest_endpoint("https://www.mojeek.com/search?q={}").is_none());
+        assert_eq!(parse_suggestions(r#"["rus",["rust","rust lang"]]"#), vec!["rust", "rust lang"]);
+        assert!(parse_suggestions("<html>").is_empty());
+    }
+
+    #[test]
+    fn site_search_offers() {
+        assert_eq!(site_search("red"), vec![("Reddit", "r")]);
+        assert_eq!(site_search("YOU"), vec![("YouTube", "yt")]);
+        assert!(site_search("r").is_empty(), "one letter is too little");
+        assert!(site_search("red dit").is_empty());
     }
 
     #[test]

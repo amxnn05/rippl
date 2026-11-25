@@ -71,6 +71,10 @@ pub struct Browser {
     pub(crate) offers: RefCell<Vec<Offer>>,
     pub(crate) typed: RefCell<String>,
     pub(crate) completing: Cell<bool>,
+    /// Engine suggestions: (what they were for, the suggestions), and a
+    /// counter that drops answers to older keystrokes.
+    pub(crate) engine_says: RefCell<(String, Vec<String>)>,
+    pub(crate) typing_gen: Cell<u32>,
     pub(crate) stage: gtk::Stack,
     // Split view (split.rs).
     pub(crate) paned: gtk::Paned,
@@ -109,6 +113,15 @@ pub struct Browser {
     pub(crate) accounts_popover: gtk::Popover,
     pub(crate) accounts_list: gtk::ListBox,
     pub(crate) offered: RefCell<Vec<crate::keyring::Account>>,
+    // Site card, tab menu, blocked pop-ups (sitecard.rs).
+    pub(crate) card: gtk::Popover,
+    pub(crate) tab_menu: gtk::Popover,
+    pub(crate) blocked_popups: RefCell<HashMap<TabId, Vec<String>>>,
+    pub(crate) popup_bar: gtk::Box,
+    pub(crate) popup_label: gtk::Label,
+    pub(crate) popup_open: gtk::Button,
+    pub(crate) popup_always: gtk::Button,
+    pub(crate) popup_dismiss: gtk::Button,
     /// The page and what floats over it.
     pub(crate) page_area: gtk::Overlay,
     pub(crate) dirty: Cell<bool>,
@@ -198,6 +211,8 @@ impl Browser {
         overlay.add_overlay(&ask_bar);
         let (save_bar, save_label, save_never, save_later, save_yes) = Browser::save_bar();
         overlay.add_overlay(&save_bar);
+        let (popup_bar, popup_label, popup_open, popup_always, popup_dismiss) = Browser::popup_bar();
+        overlay.add_overlay(&popup_bar);
         let accounts_list = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
         accounts_list.add_css_class("accounts");
         let accounts_popover = gtk::Popover::builder().child(&accounts_list).build();
@@ -272,6 +287,8 @@ impl Browser {
             offers: RefCell::new(Vec::new()),
             typed: RefCell::new(String::new()),
             completing: Cell::new(false),
+            engine_says: RefCell::new((String::new(), Vec::new())),
+            typing_gen: Cell::new(0),
             stage,
             paned,
             partner: RefCell::new(HashMap::new()),
@@ -303,6 +320,14 @@ impl Browser {
             accounts_list,
             offered: RefCell::new(Vec::new()),
             page_area: overlay.clone(),
+            card: Browser::card_popover(),
+            tab_menu: gtk::Popover::builder().has_arrow(false).build(),
+            blocked_popups: RefCell::new(HashMap::new()),
+            popup_bar,
+            popup_label,
+            popup_open,
+            popup_always,
+            popup_dismiss,
             dirty: Cell::new(false),
             closed: RefCell::new(Vec::new()),
             me: RefCell::new(Weak::new()),
@@ -317,6 +342,10 @@ impl Browser {
         browser.wire_internal_pages();
         browser.wire_curtain();
         browser.wire_signin();
+        browser.wire_popup_bar();
+        browser.card.set_parent(&browser.field);
+        browser.tab_menu.set_parent(&browser.tabs_area);
+        browser.tab_menu.add_css_class("tab-menu");
         let weak = Rc::downgrade(&browser);
         browser.field.connect_icon_press(move |_, position| {
             if let (Some(b), gtk::EntryIconPosition::Primary) = (weak.upgrade(), position) {
@@ -386,7 +415,9 @@ impl Browser {
         self.show_front();
         self.show_question();
         self.show_save_question();
+        self.show_popup_bar();
         self.accounts_popover.popdown();
+        self.card.popdown();
         self.render();
     }
 
@@ -505,6 +536,7 @@ impl Browser {
         self.typed_next.borrow_mut().remove(&id);
         self.drop_questions(id);
         self.pending.borrow_mut().remove(&id);
+        self.blocked_popups.borrow_mut().remove(&id);
         if self.save_question.borrow().as_ref().is_some_and(|q| q.tab == id) {
             self.save_question.borrow_mut().take();
             self.save_bar.set_visible(false);
@@ -541,7 +573,8 @@ impl Browser {
     pub(crate) fn go(&self, typed: &str) {
         let search = self.config.borrow().search.clone();
         // "yt cats": a site keyword first, then an address or a search.
-        let url = match address::keyword(typed, &address::default_keywords()) {
+        let keywords = self.config.borrow().keywords.clone();
+        let url = match address::keyword(typed, &keywords) {
             Some(url) => url,
             None => match address::resolve(typed, &search) {
                 Destination::Page(url) => url,
@@ -612,6 +645,7 @@ impl Browser {
                 tab.url = uri.to_string();
             }
             b.reader_followed(id, v);
+            b.apply_keep_awake();
             b.dirty.set(true);
             if b.front() == Some(id) {
                 b.show_front();
@@ -780,6 +814,16 @@ impl Browser {
         view.connect_create(move |opener, action| {
             let b = weak.upgrade()?;
             let url = action.request().and_then(|r| r.uri()).map(|u| u.to_string()).unwrap_or_default();
+            // A window without a click or key just before: refused, and said
+            // so, unless the site may open pop-ups.
+            if !action.is_user_gesture() {
+                let site = opener.uri().and_then(|u| shield::host_of(&u));
+                let allowed = site.is_some_and(|h| b.places.site_flag(&h, crate::sitecard::POPUPS).unwrap_or(false));
+                if !allowed {
+                    b.popup_blocked(id, url);
+                    return None;
+                }
+            }
             let behind = action.mouse_button() == 2;
             let private = b.tabs.borrow().get(id).is_some_and(|t| t.private);
             let view = b.engine.related_view(opener);
@@ -937,6 +981,7 @@ impl Browser {
                 self.type_text(rest);
                 self.offers_text()
             }
+            "offers" => self.offers_text(),
             "enter" => {
                 self.field.emit_activate();
                 "ok".into()
@@ -1010,6 +1055,34 @@ impl Browser {
                 "ok".into()
             }
             "pending" => self.pending.borrow().len().to_string(),
+            "card" => {
+                self.open_site_card();
+                format!("shown={}", self.card.is_visible())
+            }
+            "dup" => {
+                if let Some(id) = self.front() {
+                    self.duplicate(id);
+                }
+                "ok".into()
+            }
+            "popups" => {
+                let blocked = self.blocked_popups.borrow();
+                let front = self.front().and_then(|f| blocked.get(&f).cloned()).unwrap_or_default();
+                format!("blocked here: {front:?} | bar shown: {}", self.popup_bar.is_visible())
+            }
+            "popup-open" => {
+                self.popup_open.emit_clicked();
+                "ok".into()
+            }
+            "awake" => match self.front().and_then(|f| self.tabs.borrow().get(f).map(|t| t.url.clone())).and_then(|u| shield::host_of(&u)) {
+                Some(host) => {
+                    let on = rest.trim() != "off";
+                    let _ = self.places.set_site_flag(&host, crate::sitecard::AWAKE, on);
+                    self.apply_keep_awake();
+                    format!("{host} kept awake: {on}")
+                }
+                None => "error: no site".into(),
+            },
             "reopen" => {
                 self.reopen_closed();
                 "ok".into()
@@ -1234,15 +1307,7 @@ impl Browser {
         self.action(app, "shield-toggle", &["<Ctrl><Shift>b"], |b| {
             let url = b.front().and_then(|f| b.tabs.borrow().get(f).map(|t| t.url.clone()));
             let Some(host) = url.as_deref().and_then(shield::host_of) else { return };
-            let weak = b.weak();
-            b.shield.toggle(&host, move |_| {
-                if let Some(b) = weak.upgrade() {
-                    b.show_front();
-                    if let Some(v) = b.front_view() {
-                        v.reload();
-                    }
-                }
-            });
+            b.toggle_shield_for(&host);
         });
         self.action(app, "find", &["<Ctrl>f"], |b| b.open_find());
         self.action(app, "find-next", &["<Ctrl>g", "F3"], |b| {
@@ -1262,6 +1327,13 @@ impl Browser {
         self.action(app, "pin", &["<Ctrl><Shift>p"], |b| b.toggle_pin());
         self.action(app, "split", &["<Ctrl><Alt>s"], |b| b.toggle_split());
         self.action(app, "reopen", &["<Ctrl><Shift>t"], |b| b.reopen_closed());
+        self.action(app, "site-card", &["<Ctrl>i"], |b| b.open_site_card());
+        self.action(app, "duplicate", &["<Ctrl><Shift>d"], |b| {
+            if let Some(id) = b.front() {
+                b.duplicate(id);
+            }
+        });
+        self.action(app, "print", &["<Ctrl>p"], |b| b.print());
         self.action(app, "copy-address", &["<Ctrl><Shift>c"], |b| b.copy_address());
         self.action(app, "paste-go", &["<Ctrl><Shift>v"], |b| b.paste_and_go());
         // Ctrl+K: the field, where typing finds open tabs.
@@ -1468,6 +1540,7 @@ impl Browser {
         if self.tabs.borrow().list.is_empty() {
             self.open("", false, true);
         }
+        self.apply_keep_awake();
         self.render();
     }
 

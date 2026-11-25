@@ -8,7 +8,7 @@ you is collected, because there is nowhere for it to go.
 | What | When | To whom |
 |---|---|---|
 | The pages you open, and what they load | When you open them | Those sites, minus what Shield blocks |
-| Your search | Only when you press Return. rippl sends no suggestions while you type | Your search engine (DuckDuckGo by default) |
+| Your search | Only when you press Return, unless you turn on `suggestions`: then what you type goes to the engine as you type, to suggest searches (never for an address) | Your search engine (DuckDuckGo by default) |
 | Files you download | When you download them | Saved in your Downloads folder; the request goes to the site |
 | Two filter-list downloads | First launch, then when older than 4 days (checked every 6 hours) | `easylist.to`: a plain GET with user agent `rippl`, no cookies |
 | Anything else | Never | — |
@@ -62,6 +62,7 @@ models do not depend on profiling you. If you want certainty, host SearXNG yours
 | **Global Privacy Control** | `Sec-GPC: 1` on every request, and `navigator.globalPrivacyControl`: "do not sell or share my data", which laws like the CCPA treat as an opt-out | `crates/rippl-web-extension`, `gpc` |
 | **Click IDs removed** | `fbclid`, `gclid`, `msclkid` and 20 others are taken off every address before the request leaves. Copying an address also drops `utm_*` tags | `rippl_core::clean`, the web extension |
 | **HTTPS-only** | Every http request to a public host becomes https before it leaves, so nothing goes out in plain text to a site that has https. If a site has none, rippl says so and lets you continue over http for that host until you quit | `crates/rippl-web-extension`, `https_only` |
+| **Pop-ups need a click** | A window a page opens without a click or key just before is refused and offered in a bar; nothing opens by itself | `sitecard.rs` |
 | **Safe download names** | A site can't choose a path, a hidden file, or overwrite an existing file | `rippl_core::downloads` |
 | **Clipboard** | Pages can't read the clipboard on their own | `engine.rs` |
 | **Private tabs** (`Ctrl+Shift+N`) | Each has its own throwaway cookie jar and storage, and is never written to the session | `engine.rs` `view(private)` |

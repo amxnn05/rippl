@@ -29,6 +29,8 @@ pub enum Life {
 pub enum KeptAwake {
     OnScreen,
     Pinned,
+    /// "Keep this site awake", chosen in the site card.
+    Chosen,
     PlayingAudio,
     Capturing,
     Loading,
@@ -47,6 +49,8 @@ pub struct Tab {
     pub loading: bool,
     /// Its own throwaway cookie jar; never saved to the session.
     pub private: bool,
+    /// Its site is kept awake (the site card's switch).
+    pub keep_awake: bool,
     /// Last time it was on screen.
     pub touched: Instant,
     /// WebKit's serialized session state, kept while asleep.
@@ -66,6 +70,7 @@ impl Tab {
             capturing: false,
             loading: false,
             private: false,
+            keep_awake: false,
             touched: Instant::now(),
             memory: None,
         }
@@ -96,6 +101,8 @@ pub fn kept_awake(tab: &Tab, on_screen: &[TabId]) -> Option<KeptAwake> {
         Some(KeptAwake::OnScreen)
     } else if tab.pinned {
         Some(KeptAwake::Pinned)
+    } else if tab.keep_awake {
+        Some(KeptAwake::Chosen)
     } else if tab.playing_audio {
         Some(KeptAwake::PlayingAudio)
     } else if tab.capturing {
@@ -255,7 +262,9 @@ mod tests {
         c.capturing = true;
         let mut d = awake(4, 9999);
         d.life = Life::Asleep;
-        let due = due_for_sleep(&[a, b, c, d], &[], Instant::now(), Duration::from_secs(60));
+        let mut e = awake(5, 9999);
+        e.keep_awake = true;
+        let due = due_for_sleep(&[a, b, c, d, e], &[], Instant::now(), Duration::from_secs(60));
         assert!(due.is_empty());
     }
 

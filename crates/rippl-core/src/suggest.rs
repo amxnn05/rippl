@@ -48,6 +48,68 @@ pub fn score(typed: &str, place: &Place, now: i64) -> f64 {
     s / (1.0 + url.len() as f64 / 200.0)
 }
 
+/// Whether `a` is `b` with one typo: a letter wrong, missing, extra, or
+/// two neighbours swapped. Only for words of four
+/// letters or more, where one typo still leaves the word recognisable.
+pub fn near(a: &str, b: &str) -> bool {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    if a.len() < 4 || b.len() < 4 || a == b {
+        return a == b;
+    }
+    let (la, lb) = (a.len(), b.len());
+    if la.abs_diff(lb) > 1 {
+        return false;
+    }
+    let mut i = 0;
+    while i < la.min(lb) && a[i] == b[i] {
+        i += 1;
+    }
+    match la.cmp(&lb) {
+        // Same length: one letter wrong, or two neighbours swapped.
+        std::cmp::Ordering::Equal => {
+            a[i + 1..] == b[i + 1..]
+                || (i + 1 < la && a[i] == b[i + 1] && a[i + 1] == b[i] && a[i + 2..] == b[i + 2..])
+        }
+        // One letter more or less.
+        std::cmp::Ordering::Greater => a[i + 1..] == b[i..],
+        std::cmp::Ordering::Less => a[i..] == b[i + 1..],
+    }
+}
+
+/// The words of a place: its host's labels, its path, and its title.
+fn words_of(place: &Place) -> Vec<String> {
+    let url = bare(&place.url).to_lowercase();
+    let title = place.title.to_lowercase();
+    url.split(|c: char| !c.is_alphanumeric())
+        .chain(title.split(|c: char| !c.is_alphanumeric()))
+        .filter(|w| w.len() >= 3)
+        .map(str::to_string)
+        .collect()
+}
+
+/// Places that match `typed` only with a typo, ranked below every exact
+/// match (a third of the score an exact match would have).
+pub fn rank_fuzzy(typed: &str, places: Vec<Place>, now: i64, limit: usize) -> Vec<Place> {
+    let typed_words: Vec<String> = typed.split_whitespace().map(str::to_lowercase).collect();
+    if typed_words.is_empty() || typed_words.iter().all(|w| w.chars().count() < 4) {
+        return Vec::new();
+    }
+    let mut scored: Vec<(f64, Place)> = places
+        .into_iter()
+        .filter_map(|p| {
+            let words = words_of(&p);
+            let all = typed_words.iter().all(|t| words.iter().any(|w| w.contains(t.as_str()) || near(t, w)));
+            if !all {
+                return None;
+            }
+            let days = ((now - p.last).max(0) as f64) / 86_400.0;
+            Some(((p.visits.max(1) as f64) / (1.0 + days / 7.0) / 3.0, p))
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.total_cmp(&a.0));
+    scored.into_iter().take(limit).map(|(_, p)| p).collect()
+}
+
 /// `places` ranked for `typed`, best first, at most `limit`.
 pub fn rank(typed: &str, places: Vec<Place>, now: i64, limit: usize) -> Vec<Place> {
     let mut scored: Vec<(f64, Place)> =
@@ -112,6 +174,20 @@ mod tests {
     fn no_match_no_row() {
         let list = vec![place("https://a.com/", "Alpha", 1, 0)];
         assert!(rank("zzz", list, NOW, 10).is_empty());
+    }
+
+    #[test]
+    fn typos() {
+        assert!(near("githbu", "github"), "swap");
+        assert!(near("gitub", "github"), "missing");
+        assert!(near("githuub", "github"), "extra");
+        assert!(near("gitxub", "github"), "wrong");
+        assert!(!near("gxtxub", "github"), "two typos");
+        assert!(!near("gub", "gab"), "too short to guess");
+        let list = vec![place("https://github.com/", "GitHub", 5, 0), place("https://gitlab.com/", "GitLab", 5, 0)];
+        let found = rank_fuzzy("githbu", list, NOW, 5);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].url, "https://github.com/");
     }
 
     #[test]

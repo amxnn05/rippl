@@ -28,6 +28,13 @@ https_only = on
 
 # Send Global Privacy Control, "do not sell or share my data" (on, default)
 gpc = on
+
+# Suggestions from the search engine while you type (off, default).
+# On, each keystroke is sent to the engine (DuckDuckGo and Brave offer them).
+suggestions = off
+
+# Your own site keywords: "npm left-pad" searches npm. One %s, https.
+keyword.npm = https://www.npmjs.com/search?q=%s
 ```
 
 All of these can also be changed on `rippl://settings` (`Ctrl+,`). Changes are checked, written
@@ -81,6 +88,10 @@ is on the list, the address field shows a warning icon.
 | `Ctrl+Shift+U` | Show everything hidden on this site again |
 | `Ctrl+Alt+S` | Split view: this tab beside the previous one, or separate them |
 | `Ctrl+Shift+T` | Reopen the last closed tab, with its history and scroll |
+| Click the tab you're on, `Ctrl+I` | Site card: connection, copy, print, zoom, ad blocking, keep awake, pop-ups, permissions |
+| Right-click a tab | Duplicate, Pin, Put beside this tab, Copy address, Reload, Close, Close other tabs |
+| `Ctrl+Shift+D` | Duplicate the tab, with its history and scroll |
+| `Ctrl+P` | Print |
 | `Ctrl+Shift+C` | Copy the address, without tracking parameters |
 | `Ctrl+Shift+V` | Paste and go: open what's on the clipboard |
 | `Ctrl+K` | Switch to a tab: the field, empty; type to find open tabs |

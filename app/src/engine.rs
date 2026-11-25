@@ -169,6 +169,9 @@ impl Engine {
         // blocks third-party pings instead (rippl_core::shield). DNS
         // prefetching, which tells the DNS server every link on a page, is
         // off by default.
+        // A page may ask for windows; rippl decides (sitecard.rs): one right
+        // after a click or key opens, one on its own is stopped and offered.
+        settings.set_javascript_can_open_windows_automatically(true);
         // Pages may not read the clipboard without a paste.
         settings.set_javascript_can_access_clipboard(false);
         // The user agent is left as WebKitGTK writes it: it already claims

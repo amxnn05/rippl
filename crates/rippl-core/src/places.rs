@@ -98,6 +98,7 @@ impl Places {
              CREATE TABLE IF NOT EXISTS hidden (
                  host TEXT NOT NULL, selector TEXT NOT NULL, added INTEGER NOT NULL,
                  PRIMARY KEY (host, selector));
+             CREATE TABLE IF NOT EXISTS site_flags (host TEXT NOT NULL, flag TEXT NOT NULL, PRIMARY KEY (host, flag));
              CREATE TABLE IF NOT EXISTS never_save (origin TEXT PRIMARY KEY, added INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS permissions (
                  host TEXT NOT NULL, kind TEXT NOT NULL, allow INTEGER NOT NULL,
@@ -308,6 +309,32 @@ impl Places {
         Ok(out)
     }
 
+    // ---- per-site switches: keep awake, pop-ups allowed -------------------
+
+    pub fn site_flag(&self, host: &str, flag: &str) -> Result<bool, Error> {
+        Ok(self
+            .db
+            .query_row("SELECT 1 FROM site_flags WHERE host = ?1 AND flag = ?2", params![host, flag], |_| Ok(()))
+            .optional()?
+            .is_some())
+    }
+
+    pub fn set_site_flag(&self, host: &str, flag: &str, on: bool) -> Result<(), Error> {
+        if on {
+            self.db.execute("INSERT OR IGNORE INTO site_flags (host, flag) VALUES (?1, ?2)", params![host, flag])?;
+        } else {
+            self.db.execute("DELETE FROM site_flags WHERE host = ?1 AND flag = ?2", params![host, flag])?;
+        }
+        Ok(())
+    }
+
+    /// Every (host, flag) set, for rippl://settings.
+    pub fn site_flags(&self) -> Result<Vec<(String, String)>, Error> {
+        let mut stmt = self.db.prepare_cached("SELECT host, flag FROM site_flags ORDER BY host, flag")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        rows.collect()
+    }
+
     // ---- passwords: sites never to offer saving on ----------------------
 
     pub fn never_save(&self, origin: &str) -> Result<bool, Error> {
@@ -455,6 +482,17 @@ mod tests {
         p.visit("https://b.com/", "", false).unwrap();
         p.forget("https://a.com/").unwrap();
         assert_eq!(p.recent(5).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn site_flags_by_host() {
+        let p = Places::open(None).unwrap();
+        p.set_site_flag("docs.example", "awake", true).unwrap();
+        p.set_site_flag("hark.com", "popups", true).unwrap();
+        assert!(p.site_flag("docs.example", "awake").unwrap());
+        assert!(!p.site_flag("docs.example", "popups").unwrap());
+        p.set_site_flag("docs.example", "awake", false).unwrap();
+        assert_eq!(p.site_flags().unwrap(), vec![("hark.com".to_string(), "popups".to_string())]);
     }
 
     #[test]

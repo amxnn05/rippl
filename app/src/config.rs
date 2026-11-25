@@ -19,6 +19,11 @@
 //! https_only = on
 //! # send Global Privacy Control, "do not sell or share" (on, default)
 //! gpc = on
+//! # suggestions from the search engine while typing (off, default: it
+//! # sends each keystroke to the engine)
+//! suggestions = off
+//! # your own site keywords: "keyword.<word> = <address with %s>"
+//! keyword.npm = https://www.npmjs.com/search?q=%s
 //! ```
 
 use std::path::PathBuf;
@@ -45,6 +50,9 @@ pub struct Config {
     pub theme: Theme,
     pub https_only: bool,
     pub gpc: bool,
+    pub suggestions: bool,
+    /// Site keywords: the built-in ones, then yours (which win).
+    pub keywords: Vec<(String, String)>,
 }
 
 pub fn path() -> PathBuf {
@@ -69,6 +77,8 @@ impl Default for Config {
             theme: Theme::System,
             https_only: true,
             gpc: true,
+            suggestions: false,
+            keywords: address::default_keywords(),
         }
     }
 }
@@ -99,6 +109,15 @@ impl Config {
             "history" => self.history = on(value).ok_or_else(bad)?,
             "https_only" => self.https_only = on(value).ok_or_else(bad)?,
             "gpc" => self.gpc = on(value).ok_or_else(bad)?,
+            "suggestions" => self.suggestions = on(value).ok_or_else(bad)?,
+            k if k.starts_with("keyword.") => {
+                let word = k["keyword.".len()..].trim().to_lowercase();
+                if word.is_empty() || word.contains(char::is_whitespace) || !address::keyword_template_ok(value) {
+                    return Err(bad());
+                }
+                self.keywords.retain(|(w, _)| *w != word);
+                self.keywords.insert(0, (word, value.to_string()));
+            }
             "sleep" => {
                 let minutes: u64 = value.parse().ok().filter(|m| (1..=24 * 60).contains(m)).ok_or_else(bad)?;
                 self.sleep_after = Duration::from_secs(minutes * 60);
@@ -152,6 +171,13 @@ impl Config {
             choice("gpc", "Global Privacy Control", onoff(self.gpc), &["on", "off"], "For new pages"),
             choice("shield", "Ad and tracker blocking", onoff(self.shield), &["on", "off"], "Applies after a restart"),
             choice("history", "Keep history", onoff(self.history), &["on", "off"], ""),
+            choice(
+                "suggestions",
+                "Search engine suggestions while typing",
+                onoff(self.suggestions),
+                &["on", "off"],
+                "Sends what you type to the engine, letter by letter",
+            ),
             choice("theme", "Theme", format!("{:?}", self.theme).to_lowercase(), &["system", "light", "dark"], ""),
             choice("sleep", "Tabs sleep after (minutes)", (self.sleep_after.as_secs() / 60).to_string(), &[], ""),
         ]
@@ -173,5 +199,8 @@ mod tests {
         assert_eq!(c.sleep_after, Duration::from_secs(900));
         assert!(c.apply("nonsense", "1").is_err());
         assert!(c.apply("https_only", "off").is_ok() && !c.https_only);
+        assert!(c.apply("keyword.npm", "https://www.npmjs.com/search?q=%s").is_ok());
+        assert_eq!(c.keywords[0].0, "npm");
+        assert!(c.apply("keyword.evil", "https://%s.evil.com/").is_err());
     }
 }

@@ -26,7 +26,16 @@ use crate::browser::Browser;
 pub enum Offer {
     Tab(TabId),
     Page(String),
+    /// Put this in the field and keep typing ("r " for Search Reddit).
+    Prefix(String),
+    /// Search for this (an engine suggestion).
+    Search(String),
 }
+
+/// rippl's own pages, offered by name (the address bar commands, but
+/// only ever as rows under what was typed: Return still does what it did).
+const PAGES: &[(&str, &str)] =
+    &[("history", "History"), ("bookmarks", "Bookmarks"), ("passwords", "Passwords"), ("settings", "Settings")];
 
 const SHOWN: usize = 8;
 
@@ -111,11 +120,20 @@ impl Browser {
         } && self.field.position() as usize == text.chars().count();
         *self.typed.borrow_mut() = text.to_string();
 
-        let places = if text.trim().is_empty() {
+        let mut places = if text.trim().is_empty() {
             Vec::new()
         } else {
             self.places.search(text, SHOWN).unwrap_or_default()
         };
+        // A typo still finds the page, ranked below every exact match.
+        if !text.trim().is_empty() && places.len() < SHOWN {
+            let recent = self.places.recent(2000).unwrap_or_default();
+            for p in suggest::rank_fuzzy(text, recent, rippl_core::places::now(), SHOWN) {
+                if places.len() < SHOWN && !places.iter().any(|q| q.url == p.url) {
+                    places.push(p);
+                }
+            }
+        }
         // Completing only while typing forward: never after Backspace.
         if grew
             && let Some(full) = suggest::complete(text, &places) {
@@ -125,6 +143,42 @@ impl Browser {
                 self.completing.set(false);
             }
         self.offer(&places, text);
+        self.ask_engine(text);
+    }
+
+    /// Suggestions from the search engine, only with `suggestions = on`:
+    /// a moment after the typing stops, from a session of their own (no
+    /// cookies), never for something that looks like an address.
+    fn ask_engine(&self, text: &str) {
+        let text = text.trim().to_string();
+        let config = self.config.borrow();
+        let Some(endpoint) = rippl_core::address::suggest_endpoint(&config.search).filter(|_| config.suggestions) else {
+            return;
+        };
+        drop(config);
+        if text.is_empty() || rippl_core::address::url_from(&text).is_some() || text.len() > 200 {
+            return;
+        }
+        let generation = self.typing_gen.get().wrapping_add(1);
+        self.typing_gen.set(generation);
+        let weak = self.weak();
+        glib::timeout_add_local_once(std::time::Duration::from_millis(180), move || {
+            let Some(b) = weak.upgrade() else { return };
+            if b.typing_gen.get() != generation {
+                return; // more was typed since
+            }
+            let url = endpoint.replacen("{}", &rippl_core::address::encode_query(&text), 1);
+            glib::MainContext::default().spawn_local(async move {
+                let Ok(json) = crate::shield::fetch_text(&url).await else { return };
+                let list = rippl_core::address::parse_suggestions(&json);
+                if b.typing_gen.get() != generation || *b.typed.borrow() != text {
+                    return;
+                }
+                *b.engine_says.borrow_mut() = (text.clone(), list);
+                let places = b.places.search(&text, SHOWN).unwrap_or_default();
+                b.offer(&places, &text);
+            });
+        });
     }
 
     /// Fills the list under the field. Nothing typed: bookmarks, then
@@ -168,6 +222,29 @@ impl Browser {
                 rows.push((title_of(p), suggest::bare(&p.url).to_string(), kind));
                 offers.push(Offer::Page(p.url.clone()));
             }
+            // "red" → Search Reddit.
+            for (name, word) in rippl_core::address::site_search(typed) {
+                rows.push((format!("Search {name}"), format!("or type \"{word} \" and your words"), "site"));
+                offers.push(Offer::Prefix(format!("{word} ")));
+            }
+            // rippl's own pages by name.
+            let t = typed.trim().to_lowercase();
+            if t.chars().count() >= 3 {
+                for (page, name) in PAGES {
+                    if page.starts_with(&t) {
+                        rows.push((format!("Open {name}"), format!("rippl://{page}"), "command"));
+                        offers.push(Offer::Page(format!("rippl://{page}")));
+                    }
+                }
+            }
+            // The engine's suggestions, when asked for and still current.
+            let said = self.engine_says.borrow();
+            if said.0 == typed.trim() {
+                for q in &said.1 {
+                    rows.push((q.clone(), "Search".into(), "suggest"));
+                    offers.push(Offer::Search(q.clone()));
+                }
+            }
         }
 
         while let Some(child) = self.suggest_list.first_child() {
@@ -180,7 +257,12 @@ impl Browser {
             row.set_focusable(false);
             let lines = gtk::Box::new(gtk::Orientation::Vertical, 0);
             let first = gtk::Label::builder()
-                .label(if *kind == "bookmark" { format!("★ {title}") } else { title.clone() })
+                .label(match *kind {
+                    "bookmark" => format!("★ {title}"),
+                    "suggest" => format!("⌕ {title}"),
+                    "site" | "command" => format!("→ {title}"),
+                    _ => title.clone(),
+                })
                 .xalign(0.0)
                 .ellipsize(gtk::pango::EllipsizeMode::End)
                 .max_width_chars(1)
@@ -233,6 +315,17 @@ impl Browser {
         match offer {
             Offer::Tab(id) => self.select(id),
             Offer::Page(url) => self.go(&url),
+            Offer::Search(words) => {
+                let search = self.config.borrow().search.clone();
+                self.go(&search.replacen("{}", &rippl_core::address::encode_query(&words), 1));
+            }
+            Offer::Prefix(text) => {
+                // Keep typing after it: the field keeps the keys.
+                self.field.grab_focus();
+                self.field.set_text(&text);
+                self.field.set_position(-1);
+                self.typed_changed(&text);
+            }
         }
     }
 
@@ -244,6 +337,8 @@ impl Browser {
             out.push(match offer {
                 Offer::Tab(id) => format!("tab\t{id}"),
                 Offer::Page(url) => format!("page\t{url}"),
+                Offer::Prefix(t) => format!("prefix\t{t}"),
+                Offer::Search(q) => format!("search\t{q}"),
             });
         }
         out.join("\n")

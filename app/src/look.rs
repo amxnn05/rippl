@@ -111,6 +111,19 @@ window.rippl .status { background: var(--ground); color: var(--muted); border-ra
   font-size: 11.5px; box-shadow: 0 0 0 1px var(--hairline); }
 window.rippl .ask label, window.rippl .find label { color: white; }
 window.rippl .accounts row { padding: 6px 12px; border-radius: 6px; }
+
+/* The site card and the tab menu. */
+window.rippl popover.card > contents, window.rippl popover.tab-menu > contents { background: var(--ground);
+  color: var(--ink); border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,0.18), 0 0 0 1px var(--hairline); }
+window.rippl .card-title { font-weight: 600; font-size: 14px; }
+window.rippl .safe { color: #15803d; font-size: 12px; }
+window.rippl .unsafe { color: #b45309; font-size: 12px; }
+@media (prefers-color-scheme: dark) {
+  window.rippl .safe { color: #4ade80; }
+  window.rippl .unsafe { color: #fbbf24; }
+}
+window.rippl popover.card button { font-size: 12.5px; padding: 3px 10px; }
+window.rippl .menu-item { font-size: 13px; padding: 5px 14px; min-width: 180px; }
 "#;
 
 impl Browser {
@@ -132,7 +145,9 @@ impl Browser {
         let label = gtk::Label::builder().label("New tab").xalign(0.0).build();
         line.append(&plus);
         line.append(&label);
-        let button = gtk::Button::builder().child(&line).build();
+        // The column's buttons never take the keyboard: a key
+        // pressed while one had the focus used to press it.
+        let button = gtk::Button::builder().child(&line).focusable(false).build();
         button.add_css_class("new-tab");
         button
     }
@@ -143,6 +158,7 @@ impl Browser {
         foot.add_css_class("foot");
         let settings = gtk::Button::from_icon_name("emblem-system-symbolic");
         settings.set_tooltip_text(Some("Settings (Ctrl+,)"));
+        settings.set_focusable(false);
         foot.append(&settings);
         (foot, settings)
     }
@@ -181,6 +197,7 @@ impl Browser {
                 any_pin = true;
                 let pin = gtk::Button::with_label(&monogram(&tab.url, &tab.title));
                 pin.add_css_class("pin");
+                pin.set_focusable(false);
                 pin.set_tooltip_text(Some(&tab.title));
                 if live {
                     pin.add_css_class("front");
@@ -212,6 +229,7 @@ impl Browser {
             close.add_css_class("flat");
             close.add_css_class("close");
             close.set_tooltip_text(Some("Close tab"));
+            close.set_focusable(false);
             line.append(&label);
             line.append(&close);
             row.set_child(Some(&line));
@@ -248,9 +266,18 @@ impl Browser {
             let alt = gesture.current_event_state().contains(gdk::ModifierType::ALT_MASK);
             // Deferred: the widget this gesture belongs to is about to be
             // replaced by the redraw that selecting does.
+            let front = b.front() == Some(id);
+            let anchor = gesture.widget();
             glib::idle_add_local_once(move || match (button, alt) {
                 (2, _) => b.close(id),
+                (3, _) => {
+                    if let Some(w) = anchor {
+                        b.tab_menu(id, &w);
+                    }
+                }
                 (1, true) => b.split_with(id),
+                // A click on the tab you're on: its site card.
+                (1, false) if front => b.open_site_card(),
                 _ => b.select(id),
             });
         });

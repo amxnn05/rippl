@@ -17,6 +17,7 @@ mod pressure;
 mod reader;
 mod shield;
 mod signin;
+mod sitecard;
 mod split;
 
 use std::cell::RefCell;

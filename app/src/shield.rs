@@ -292,6 +292,20 @@ impl Shield {
     }
 }
 
+/// GETs `url` as text, for anything that isn't a filter list (engine
+/// suggestions): the same private session rules.
+pub async fn fetch_text(url: &str) -> Result<String, String> {
+    let session = soup::Session::new();
+    session.set_user_agent("rippl");
+    session.set_timeout(5);
+    let message = soup::Message::new("GET", url).map_err(|e| e.to_string())?;
+    let bytes = session.send_and_read_future(&message, glib::Priority::DEFAULT).await.map_err(|e| e.to_string())?;
+    if message.status() != soup::Status::Ok {
+        return Err(format!("HTTP {:?}", message.status()));
+    }
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
 /// GETs `url` as text. A session of its own: no cookies, no cache shared
 /// with pages, a generic user agent, a 60 s timeout.
 async fn fetch(url: &str) -> Result<String, String> {

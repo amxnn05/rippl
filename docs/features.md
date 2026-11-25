@@ -37,7 +37,7 @@ the header of each of its source files, with rippl's status for each.
 | One web view per tab, instant switching | ✅ |
 | Lazy restore of last session | ✅ |
 | Tabs sleep and give memory back | ✅ plus Linux PSI pressure |
-| Keep a site awake (site card) | 🔨 batch 1 |
+| Keep a site awake (site card) | ✅ |
 | Reopen closed tab with history and scroll (⇧⌘T) | ✅ Ctrl+Shift+T |
 | Pinned tabs | ✅ Ctrl+Shift+P |
 | Pin folders, live folders from feeds | 🔨 batch 2 |
@@ -51,7 +51,8 @@ the header of each of its source files, with rippl's status for each.
 | ⌘K switch to a tab | ✅ Ctrl+K: the field finds open tabs |
 | ⌘1–⌘9 | ✅ Ctrl+1–9 |
 | Tabs close themselves; archive of closed tabs | 🔨 batch 4 |
-| Duplicate tab (⌘D) | 🔨 batch 1 |
+| Duplicate tab (⌘D) | ✅ Ctrl+Shift+D, tab menu |
+| Tab menu (right-click a tab) | ✅ |
 | Peek at a link in a panel | 🔨 batch 3 |
 | Little window for links from other apps | 🔨 with Phase 9 (default browser) |
 | Choose the space a link opens in | 🔨 batch 2 |
@@ -66,11 +67,11 @@ the header of each of its source files, with rippl's status for each.
 | Feature | rippl |
 |---|---|
 | One field: address or search, never sends before Return | ✅ |
-| Completion from history, typo tolerance | ✅ completion; typos 🔨 batch 1 |
-| Site keywords, "yt cats" | ✅ built-in set; your own 🔨 batch 1 |
-| Search a site from the field | 🔨 batch 1 |
-| Commands in the field | 🔨 batch 1 |
-| Search engine suggestions, off by default | 🔨 batch 1 (off by default) |
+| Completion from history, typo tolerance | ✅ |
+| Site keywords, "yt cats" | ✅ built-in set and your own (`keyword.<word>` in the config) |
+| Search a site from the field | ✅ as a row; OpenSearch discovery 🔨 later |
+| Commands in the field | ✅ rippl's pages by name; menu commands 🔨 with batch 4 shortcuts |
+| Search engine suggestions, off by default | ✅ off by default |
 | Address always in sight | ✅ the field |
 | Where a link goes, at the foot of the page | ✅ |
 | Copy address / copy clean link | ✅ Ctrl+Shift+C, always clean |
@@ -89,8 +90,8 @@ the header of each of its source files, with rippl's status for each.
 | Click IDs off links | ✅ in every request |
 | Global Privacy Control | ✅ |
 | HTTPS first (`HTTPSFirst`) | ✅ HTTPS-only with a warning page |
-| Site permissions in the site card | ✅ prompts + rippl://settings; site card 🔨 batch 1 |
-| Blocked pop-ups with Open / Always Allow | 🔨 batch 1 |
+| Site card and site permissions | ✅ Ctrl+I or a click on the tab you're on |
+| Blocked pop-ups with Open / Always Allow | ✅ |
 | Proxy | 🔨 batch 5 (NetworkProxySettings) |
 | Client certificates | 🔨 batch 5 |
 | Private tab with its own cookie jar | ✅ |
@@ -116,7 +117,7 @@ the header of each of its source files, with rippl's status for each.
 | Translate on device | 🔨 batch 6 (needs a local model) |
 | Capture part or all of a page | 🔨 batch 3 (WebView snapshot) |
 | Save page as web archive | 🔨 batch 3 (WebView save as MHTML) |
-| Print | 🔨 batch 1 |
+| Print | ✅ Ctrl+P |
 | Web Inspector | ✅ Ctrl+Shift+I |
 | Developer tools packages | ⛔/🍎 (the Web Inspector is built in) |
 | Zoom, smooth wheel, 120 Hz | ✅ zoom; WebKitGTK scrolls smoothly; refresh rate follows the compositor |
@@ -171,9 +172,9 @@ the header of each of its source files, with rippl's status for each.
 
 ## Batches
 
-1. **Small, daily**: site card (permissions, Shield, keep awake for the site), duplicate tab,
-   blocked pop-ups with Open, typo-tolerant field, site search and your own keywords, field
-   commands, print, opt-in engine suggestions.
+1. ✅ **Small, daily** ([notes](phases/batch-1.md)): site card, keep awake, duplicate,
+   tab menu, blocked pop-ups, typos, site search, your own keywords, page commands, print, opt-in
+   engine suggestions.
 2. **Organising**: spaces (each with its own sign-ins), profiles, tab groups, pin folders, sending
    links to a space.
 3. **Pages**: dark pages (Dusk), your own CSS per site, capture, save as archive, site icons, peek,
