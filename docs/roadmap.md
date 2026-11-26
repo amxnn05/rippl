@@ -11,7 +11,7 @@
 | 6 | Passwords in the system keyring (libsecret): saved after a sign-in works, offered under the box for the exact origin, never filled without a click | ✅ done, [notes](phases/phase-6-passwords.md) |
 | 7 | Split view, bookmark folders (import keeps them), settings edited from `rippl://settings`, HTTPS-only, Global Privacy Control (web process extension) | ✅ done, [notes](phases/phase-7-more.md) |
 | 8 | Same-site tabs share a page process, the look (`look.rs`), reopen closed tab, clean copy, paste and go, click IDs stripped, keywords, link status line, the features map | ✅ done, [notes](phases/phase-8-look.md) |
-| Feature batches | Batches 1–6 in [features.md](features.md): every features that can exist on Linux | batches 1–3 ✅ ([1](phases/batch-1.md), [2](phases/batch-2.md), [3](phases/batch-3.md)); batch 4 ✅ ([notes](phases/batch-4.md)), 5 ✅ ([notes](phases/batch-5.md)); next: batch 6 |
+| Feature batches | Batches 1–6 in [features.md](features.md): every features that can exist on Linux | batches 1–3 ✅ ([1](phases/batch-1.md), [2](phases/batch-2.md), [3](phases/batch-3.md)); batch 4 ✅ ([notes](phases/batch-4.md)), 5 ✅ ([notes](phases/batch-5.md)), 6 ✅ ([notes](phases/batch-6.md)); next: Phase 9, shipping |
 | 9 | **Ship**: `.desktop` file, icon, default-browser registration, install layout (`/usr/lib/rippl` for the extension), AUR `PKGBUILD`, Flatpak, welcome | planned |
 | Polish | instant per-site Shield toggle, split pairs in the session, capped HTTP cache | planned |
 

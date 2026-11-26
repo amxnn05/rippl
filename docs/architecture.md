@@ -38,13 +38,14 @@ crates/rippl-core/        no GTK, no WebKit: everything here runs under `cargo t
   src/places.rs           places.sqlite: history, bookmarks, permission answers
   src/suggest.rs          ranking what the field offers; inline completion
   src/downloads.rs        safe, never-overwriting download file names
-  src/pages.rs            rippl:// pages and the reader page, as escaped HTML
+  src/pages.rs            rippl:// pages and the reader page, as escaped HTML; Settings as the
   src/import.rs           bookmarks from Chromium- and Firefox-family browsers
   src/passwords.rs        origins, which pages may save, save/update/nothing
   src/settings_file.rs    change one line of the config file, keep the rest
   src/import_more.rs      history, open tabs (SNSS, mozlz4), Chromium passwords from other browsers
   src/mail.rs             mailto: links read, webmail compose addresses
   src/sync.rs             folder sync: items, stamps, tombstones, the merge
+  src/ai.rs               the AI add-on's requests and answers (OpenAI-style), translations
   src/clean.rs            click IDs and campaign tags off addresses
   examples/shield_convert.rs   runs the converter on a list file, for inspection
 
@@ -89,6 +90,10 @@ app/src/
   windows.rs              several windows sharing one engine; their sessions
   certificates.rs         client certificates: the folder, the picker
   sync.rs                 sync through a folder: scopes, applying changes, the files
+  ai.rs                   Ask about this page (panel, streamed answers), Translate page
+  translate.js            Translate page's script (rippl's world): read and put back words
+  agents.rs               an agent's commands on the socket: its own tabs, the rules
+  mcp.rs                  `rippl --mcp`: the MCP server an agent runs (stdio JSON-RPC)
   pressure.rs             Linux PSI reading; malloc_trim
   control.rs              Unix socket for tests and measurement (opt-in)
 

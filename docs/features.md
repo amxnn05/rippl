@@ -119,7 +119,7 @@ the header of each of its source files, with rippl's status for each.
 |---|---|
 | Reading mode | ✅ F9 |
 | Find on page | ✅ Ctrl+F |
-| Translate on device | 🔨 batch 6 (needs a local model) |
+| Translate on device | ✅ Ctrl+Shift+L, with a model on this computer |
 | Capture part or all of a page | ✅ whole page, Ctrl+Shift+S; a chosen part 🔨 |
 | Save page as web archive | ✅ Ctrl+Alt+A (MHTML) |
 | Print | ✅ Ctrl+P |
@@ -159,8 +159,8 @@ the header of each of its source files, with rippl's status for each.
 | Chrome extensions | ⛔ WebKitGTK has no WebExtensions API |
 | Safari extensions from apps | 🍎 |
 | Script-driven test socket | ✅ `control.rs` + `scripts/ctl.sh` |
-| Coding agents using the browser over MCP | 🔨 batch 6 (an MCP server over the control socket) |
-| AI add-on: summarize/ask a page, on device | 🔨 batch 6 |
+| Coding agents using the browser over MCP | ✅ `rippl --mcp`, `agents = on` |
+| AI add-on: summarize/ask a page, on device | ✅ Ctrl+Shift+A, with Ollama / llama-server / LM Studio |
 
 ## App
 
@@ -190,6 +190,6 @@ the header of each of its source files, with rippl's status for each.
    own shortcuts.
 5. ✅ **Moving in** ([notes](phases/batch-5.md)): import history, open tabs and Chromium passwords; folder sync; proxy; client
    certificates; download pause/resume; webmail for mailto; media keys.
-6. **Big**: translation and the AI add-on on device, agents over MCP.
+6. ✅ **Big** ([notes](phases/batch-6.md)): translation and the AI add-on on device, agents over MCP.
 
 Phase 9 (shipping: desktop entry, default browser, packages, welcome) can happen between any of them.

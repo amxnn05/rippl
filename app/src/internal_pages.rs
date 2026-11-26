@@ -120,6 +120,13 @@ impl Browser {
                 let hidden = self.places.hidden().unwrap_or_default();
                 let config = self.config.borrow().rows();
                 let shortcuts = self.shortcut_rows();
+                let about = vec![
+                    ("Version".to_string(), env!("CARGO_PKG_VERSION").to_string()),
+                    ("Engine".to_string(), format!("WebKitGTK {}.{}.{}", webkit6::functions::major_version(), webkit6::functions::minor_version(), webkit6::functions::micro_version())),
+                    ("Profile".to_string(), crate::engine::profile().unwrap_or("default").to_string()),
+                    ("Your data".to_string(), crate::engine::data_dir().display().to_string()),
+                    ("Source".to_string(), "github.com/amxnn05/rippl".to_string()),
+                ];
                 let path = crate::config::path();
                 pages::settings(
                     &SettingsView {
@@ -128,6 +135,7 @@ impl Browser {
                         hidden: &hidden,
                         config: &config,
                         shortcuts: &shortcuts,
+                        about: &about,
                         config_path: &path.to_string_lossy(),
                         note: &note,
                     },
@@ -199,7 +207,23 @@ impl Browser {
             }
             ("settings", "set") => {
                 let (key, value) = arg.split_once('=').unwrap_or((arg, ""));
-                self.change_setting(key, value)
+                let r = self.change_setting(key, value);
+                // A key just recorded (or the recorder left): every
+                // command has its keys back.
+                self.restore_shortcuts();
+                r
+            }
+            // The shortcut recorder listens: rippl's own keys step aside.
+            ("settings", "record-start") => {
+                self.suspend_shortcuts();
+                Ok(String::new())
+            }
+            ("settings", "record-stop") => {
+                self.restore_shortcuts();
+                Ok(String::new())
+            }
+            ("settings", "clear-history") => {
+                self.places.clear_history(None).map(|_| "History cleared.".to_string()).map_err(|e| e.to_string())
             }
             ("settings", "forget-permissions") => {
                 self.places.forget_permissions(Some(arg)).map(|_| String::new()).map_err(|e| e.to_string())
@@ -238,6 +262,13 @@ impl Browser {
             k if k.starts_with("shortcut.") => self.apply_shortcut(&k["shortcut.".len()..]),
             "home_theme" | "home_colour" | "home_image" => self.apply_home_theme(),
             "sync_folder" => return Ok(format!("Saved. {}", self.sync_now())),
+            "agents" => {
+                if config.agents
+                    && let Some(me) = crate::windows::all().into_iter().next()
+                {
+                    crate::control::start(&me);
+                }
+            }
             "proxy" => {
                 self.engine.set_proxy(config.proxy.clone());
                 return Ok("Saved. New connections go this way now, open pages included; private tabs already open keep the old way.".into());

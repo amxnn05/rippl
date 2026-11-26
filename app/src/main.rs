@@ -1,5 +1,7 @@
 //! rippl: a small, fast, quiet web browser for Linux, on WebKit.
 
+mod agents;
+mod ai;
 mod bookmarks_bar;
 mod browser;
 mod certificates;
@@ -14,6 +16,7 @@ mod engine;
 mod find;
 mod internal_pages;
 mod keyring;
+mod mcp;
 mod look;
 mod home;
 mod home_theme;
@@ -66,6 +69,10 @@ fn main() -> glib::ExitCode {
     if let Err(e) = engine::set_profile(profile.as_deref()) {
         eprintln!("rippl: {e}");
         return glib::ExitCode::FAILURE;
+    }
+    // `rippl --mcp`: the MCP server an agent runs; no window (mcp.rs).
+    if args.iter().any(|a| a == "--mcp") {
+        return glib::ExitCode::from(mcp::run() as u8);
     }
     // A profile is a separate browser: its own application id, so it has a
     // window of its own rather than joining the default profile's.

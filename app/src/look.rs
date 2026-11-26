@@ -172,6 +172,13 @@ window.rippl .swatch.swatch-f59e33 { background: #f59e33; }
 window.rippl .swatch.swatch-e65466 { background: #e65466; }
 window.rippl .swatch.swatch-9e66e6 { background: #9e66e6; }
 window.rippl .pin.pin-folder { color: var(--muted); -gtk-icon-size: 14px; }
+/* The AI add-on's panel (ai.rs). */
+window.rippl .ai-panel { margin: 8px 8px 8px 0; padding: 12px; border-radius: 10px; background: var(--ground);
+  box-shadow: 0 0 0 1px var(--hairline); }
+window.rippl .ai-title { font-weight: 600; font-size: 13px; }
+window.rippl .ai-answer { background: transparent; color: var(--ink); font-size: 13px; }
+window.rippl .ai-answer text { background: transparent; }
+window.rippl .ai-ask { min-height: 32px; border-radius: 9px; }
 window.rippl .switcher-dim { background: rgba(0,0,0,0.22); }
 window.rippl .switcher { background: var(--ground); border-radius: 14px; padding: 18px;
   box-shadow: 0 0 0 1px var(--hairline), 0 10px 30px rgba(0,0,0,0.25); }
@@ -524,6 +531,11 @@ impl Browser {
             }
             if tab.group.is_some() {
                 row.add_css_class("in-group");
+            }
+            if self.agent_tabs.borrow().contains(&id) {
+                row.add_css_class("agent");
+                row.set_tooltip_text(Some(&format!("{} · an agent's tab", tab.url)));
+                label.set_label(&format!("✦ {}", label.label()));
             }
             if self.in_split(id) {
                 row.add_css_class("split");

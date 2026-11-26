@@ -44,9 +44,18 @@ pub fn socket_path() -> PathBuf {
     webkit6::glib::user_runtime_dir().join(name)
 }
 
-/// Starts listening, if RIPPL_CONTROL is set.
+thread_local! {
+    static STARTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Starts listening: every command with RIPPL_CONTROL=1 (tests), or only
+/// an agent's (`agent-…`, agents.rs) with `agents = on`. Once.
 pub fn start(browser: &Rc<Browser>) {
-    if std::env::var_os("RIPPL_CONTROL").is_none() {
+    let full = std::env::var_os("RIPPL_CONTROL").is_some();
+    if !full && !browser.config.borrow().agents {
+        return;
+    }
+    if STARTED.with(|s| s.replace(true)) {
         return;
     }
     BROWSER.with(|b| *b.borrow_mut() = Rc::downgrade(browser));
@@ -69,6 +78,11 @@ pub fn start(browser: &Rc<Browser>) {
             // and wait for its answer.
             let (tx, rx) = mpsc::channel();
             let command = line.trim().to_string();
+            if !full && !command.starts_with("agent-") {
+                let mut stream = stream;
+                let _ = writeln!(stream, "{{\"error\": \"only an agent's commands here\"}}");
+                continue;
+            }
             glib::MainContext::default().invoke(move || {
                 // The window in front, or the one it started with.
                 BROWSER.with(|b| match crate::windows::front().or_else(|| b.borrow().upgrade()) {

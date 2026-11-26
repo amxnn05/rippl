@@ -51,6 +51,17 @@
 //! # email links open in a webmail: none (default: your mail app), gmail,
 //! # outlook, fastmail, proton
 //! webmail = none
+//! # let a coding agent on this computer use rippl, through `rippl --mcp`
+//! # (off, default); with agents_see_tabs, it may read your tabs too
+//! agents = off
+//! agents_see_tabs = off
+//! # the AI add-on (off, default): ask about a page, summarize it, translate
+//! # it, with a model running on this computer (Ollama, llama.cpp's
+//! # llama-server, LM Studio), through its OpenAI-style API
+//! ai = off
+//! ai_endpoint = http://127.0.0.1:11434/v1
+//! ai_model = llama3.2
+//! translate_to = English
 //! # sync bookmarks, pins, spaces and settings through a folder that
 //! # something else keeps the same on your devices (Syncthing, Nextcloud…);
 //! # empty (default): off
@@ -124,6 +135,12 @@ pub struct Config {
     pub proxy: rippl_core::address::Proxy,
     pub webmail: String,
     pub sync_folder: String,
+    pub ai: bool,
+    pub agents: bool,
+    pub agents_see_tabs: bool,
+    pub ai_endpoint: String,
+    pub ai_model: String,
+    pub translate_to: String,
     pub home_theme: String,
     pub home_colour: String,
     pub home_image: String,
@@ -198,6 +215,12 @@ impl Default for Config {
             proxy: rippl_core::address::Proxy::System,
             webmail: "none".into(),
             sync_folder: String::new(),
+            ai: false,
+            agents: false,
+            agents_see_tabs: false,
+            ai_endpoint: "http://127.0.0.1:11434/v1".into(),
+            ai_model: "llama3.2".into(),
+            translate_to: "English".into(),
             home_theme: "off".into(),
             home_colour: "#4285f5".into(),
             home_image: String::new(),
@@ -248,6 +271,27 @@ impl Config {
             "video_keys" => self.video_keys = on(value).ok_or_else(bad)?,
             "peek" => self.peek = on(value).ok_or_else(bad)?,
             "player" => self.player = on(value).ok_or_else(bad)?,
+            "ai" => self.ai = on(value).ok_or_else(bad)?,
+            "agents" => self.agents = on(value).ok_or_else(bad)?,
+            "agents_see_tabs" => self.agents_see_tabs = on(value).ok_or_else(bad)?,
+            "ai_endpoint" => {
+                if !(value.starts_with("http://") || value.starts_with("https://")) {
+                    return Err(bad());
+                }
+                self.ai_endpoint = value.trim_end_matches('/').to_string();
+            }
+            "ai_model" => {
+                if value.is_empty() || value.contains(char::is_whitespace) {
+                    return Err(bad());
+                }
+                self.ai_model = value.to_string();
+            }
+            "translate_to" => {
+                if value.is_empty() {
+                    return Err(bad());
+                }
+                self.translate_to = value.to_string();
+            }
             "sync_folder" => self.sync_folder = value.to_string(),
             "webmail" => {
                 if !rippl_core::mail::WEBMAILS.contains(&value) {
@@ -386,6 +430,12 @@ impl Config {
             choice("peek", "Shift+click a link to peek at it", onoff(self.peek), &["on", "off"], "Esc puts it away; Ctrl+Return keeps it as a tab"),
             choice("player", "What plays in another tab, at the foot of the column", onoff(self.player), &["on", "off"], "With its pause"),
             choice("video_keys", "Space and ← → control videos", onoff(self.video_keys), &["on", "off"], "Videos with the browser's own controls, once clicked"),
+            choice("agents", "Let a coding agent use rippl", onoff(self.agents), &["on", "off"], "Claude Code, Codex…: add `rippl --mcp` as an MCP server. It works in tabs of its own, marked ✦; never on the network"),
+            choice("agents_see_tabs", "Let it read my open tabs", onoff(self.agents_see_tabs), &["on", "off"], "Read only: it never clicks or types in your tabs, and never sees private ones"),
+            choice("ai", "The AI add-on", onoff(self.ai), &["on", "off"], "Ask about a page (Ctrl+Shift+A), summarize it, translate it (Ctrl+Shift+L). Nothing is sent until you ask"),
+            choice("ai_endpoint", "Where the model runs", self.ai_endpoint.clone(), &[], "Its OpenAI-style address. Ollama: http://127.0.0.1:11434/v1; llama-server: http://127.0.0.1:8080/v1. Another computer's address sends it the page you ask about"),
+            choice("ai_model", "Model", self.ai_model.clone(), &[], "As the server names it: llama3.2, qwen2.5, gemma3…"),
+            choice("translate_to", "Translate pages into", self.translate_to.clone(), &rippl_core::ai::LANGUAGES, ""),
             choice("sync_folder", "Sync through this folder", self.sync_folder.clone(), &[], "Bookmarks, pinned tabs, spaces and settings; never history, passwords or sign-ins. Any folder Syncthing, Nextcloud or a shared disk keeps the same on your devices; empty: off"),
             choice("webmail", "Email links open in", self.webmail.clone(), &rippl_core::mail::WEBMAILS, "none: your mail app"),
             choice("proxy", "Proxy", match &self.proxy {

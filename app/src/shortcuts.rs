@@ -65,6 +65,27 @@ impl Browser {
         }
     }
 
+    /// The recorder on rippl://settings is listening: no command takes a
+    /// key until it is done.
+    pub(crate) fn suspend_shortcuts(&self) {
+        let Some(app) = self.window.application() else { return };
+        for (name, _) in self.known_actions.borrow().iter() {
+            app.set_accels_for_action(&format!("win.{name}"), &[]);
+        }
+        self.keys_suspended.set(true);
+    }
+
+    /// Every command's keys back, as the settings have them.
+    pub(crate) fn restore_shortcuts(&self) {
+        if !self.keys_suspended.replace(false) {
+            return;
+        }
+        let names: Vec<String> = self.known_actions.borrow().iter().map(|(n, _)| n.clone()).collect();
+        for name in names {
+            self.apply_shortcut(&name);
+        }
+    }
+
     /// Every command and its keys, for rippl://settings.
     pub(crate) fn shortcut_rows(&self) -> Vec<Setting> {
         let app = self.window.application();

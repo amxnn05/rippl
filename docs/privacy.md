@@ -56,6 +56,8 @@ models do not depend on profiling you. If you want certainty, host SearXNG yours
 | **No cross-site pings** | `<a ping>` and beacons sent to another site are blocked by Shield. (WebKitGTK 2.54 ignores its own hyperlink-auditing setting, so Shield is what stops them) | `rippl_core::shield` |
 | **Permissions asked, per site** | Camera, microphone, screen, location, notifications, clipboard reading, DRM and storage access are all asked for; nothing is granted silently. Answers are kept per site, never for private tabs | `permissions.rs` |
 | **History stays local and optional** | Kept in `places.sqlite` on your machine; never recorded from private tabs; `history = off` stops it | `rippl_core::places` |
+| **AI on this computer** | The AI add-on and Translate page send the page you asked about to the model address you set (this computer's by default), and only when you ask; off by default | `ai.rs` |
+| **Agents only where you let them** | `agents = on` opens a user-only socket for an agent's commands; it acts in its own tabs, reads yours only if allowed, never password fields or private tabs | `agents.rs`, `mcp.rs` |
 | **One proxy for everything** | `proxy` goes on every network session and on rippl's own requests (filter lists, suggestions, resumed downloads), so nothing leaks around it; this machine and `.local` stay direct | `engine.rs` |
 | **Sync without a server** | `sync_folder`: files in a folder you choose; never history, passwords, cookies or open tabs | `sync.rs`, `rippl_core::sync` |
 | **Importing reads copies** | Another browser's files are copied and read; its passwords are decrypted in memory and go only to your keyring, after you confirm | `rippl_core::import_more` |

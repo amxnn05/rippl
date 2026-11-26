@@ -113,6 +113,13 @@ pub struct Browser {
     pub(crate) cert_choices: crate::certificates::Choices,
     /// Every command and its own keys (shortcuts.rs).
     pub(crate) known_actions: RefCell<Vec<(String, Vec<String>)>>,
+    /// The shortcut recorder has them set aside.
+    pub(crate) keys_suspended: Cell<bool>,
+    /// The agent's own tabs, and when it was last said to be at work (agents.rs).
+    pub(crate) agent_tabs: crate::agents::AgentTabs,
+    pub(crate) agent_said: Cell<i64>,
+    /// The AI add-on's panel (ai.rs).
+    pub(crate) ai: crate::ai::Panel,
     /// Ctrl+Tab's cards (switcher.rs).
     pub(crate) switcher: crate::switcher::Switcher,
     /// The player at the column's foot (player.rs): tabs by when their
@@ -305,9 +312,11 @@ impl Browser {
         right.append(&top.bar);
         right.append(&bookmarks_bar);
         right.append(&overlay);
+        let ai = crate::ai::Panel::new();
         let body = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         body.append(&column);
         body.append(&right);
+        body.append(&ai.panel);
         window.set_child(Some(&body));
 
         // What every window shares: made by the first, borrowed after.
@@ -399,7 +408,11 @@ impl Browser {
             peek_keep,
             peeking: RefCell::new(None),
             switcher,
+            ai,
+            agent_tabs: RefCell::new(HashSet::new()),
+            agent_said: Cell::new(0),
             known_actions: RefCell::new(Vec::new()),
+            keys_suspended: Cell::new(false),
             cert_choices: RefCell::new(HashMap::new()),
             space_css: gtk::CssProvider::new(),
             home_css: gtk::CssProvider::new(),
@@ -479,6 +492,7 @@ impl Browser {
         browser.fill_bookmarks_bar();
         browser.wire_chrome();
         browser.wire_space_swipe();
+        browser.wire_ai();
         gtk::style_context_add_provider_for_display(
             &WidgetExt::display(&browser.window),
             &browser.space_css,
@@ -1447,6 +1461,17 @@ impl Browser {
             },
             "bar" => self.bar_state(rest.trim() == "more"),
             "sync" => self.sync_now(),
+            // ask [question]: the AI panel's question (empty: summarize);
+            // answer: what it says now; translate: as Ctrl+Shift+L.
+            "ask" => {
+                self.ask_page(rest.trim());
+                "ok".into()
+            }
+            "answer" => self.ai.answer_text(),
+            "translate" => {
+                self.translate_page();
+                "ok".into()
+            }
             // For tests: trust a server certificate (a PEM file) for a host.
             "trust" => {
                 let (file, host) = rest.split_once(' ').unwrap_or((rest, ""));
@@ -1669,6 +1694,8 @@ impl Browser {
     /// A control-socket command whose answer may come later: `js <code>`
     /// runs script in the front page and answers with its result as JSON.
     pub fn command_with(&self, line: &str, reply: Box<dyn FnOnce(String)>) {
+        // An agent's command answers here (agents.rs).
+        let Some(reply) = self.agent_command(line, reply) else { return };
         // Keyring commands answer when the keyring does.
         if line == "passwords" || line == "accounts" {
             let origin = if line == "accounts" {
@@ -1785,6 +1812,8 @@ impl Browser {
                 crate::windows::open(&app);
             }
         });
+        self.action(app, "ask-page", &["<Ctrl><Shift>a"], |b| b.toggle_ai_panel());
+        self.action(app, "translate", &["<Ctrl><Shift>l"], |b| b.translate_page());
         self.action(app, "new-tab", &["<Ctrl>t"], |b| {
             b.open("", false, true);
         });
@@ -1847,7 +1876,20 @@ impl Browser {
             let Some(host) = url.as_deref().and_then(shield::host_of) else { return };
             b.toggle_shield_for(&host);
         });
-        self.action(app, "find", &["<Ctrl>f"], |b| b.open_find());
+        self.action(app, "find", &["<Ctrl>f"], |b| {
+            // On Settings, Ctrl+F finds a setting.
+            let settings = b.front_view().filter(|v| v.uri().is_some_and(|u| u.starts_with("rippl://settings")));
+            match settings {
+                Some(v) => v.evaluate_javascript(
+                    "window.__ripplFindSetting && window.__ripplFindSetting()",
+                    None,
+                    None,
+                    None::<&gio::Cancellable>,
+                    |_| {},
+                ),
+                None => b.open_find(),
+            }
+        });
         self.action(app, "find-next", &["<Ctrl>g", "F3"], |b| {
             if let Some(f) = b.front_view().and_then(|v| v.find_controller()) {
                 f.search_next();

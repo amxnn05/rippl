@@ -87,6 +87,17 @@ home_theme = off
 home_colour = #4285f5
 home_image = /home/you/Pictures/wall.jpg
 
+# The AI add-on (off, default): ask about a page (Ctrl+Shift+A), translate it (Ctrl+Shift+L),
+# with a model running on this computer, through its OpenAI-style API
+ai = off
+ai_endpoint = http://127.0.0.1:11434/v1
+ai_model = llama3.2
+translate_to = English
+
+# Let a coding agent use rippl through `rippl --mcp` (off, default)
+agents = off
+agents_see_tabs = off
+
 # Where pages and rippl's own requests go out: system (default), direct, or a proxy,
 # e.g. socks5://127.0.0.1:9050 (Tor) or http://proxy.example:3128. Never a password.
 proxy = system
@@ -134,6 +145,12 @@ frosted.
 Put each identity (certificate and key) in `~/.local/share/rippl/certificates/`: a `.pem` with
 both, or a `.p12` / `.pfx` without a password. A site that asks gets a dialog to choose one or
 none.
+
+## Agents (MCP)
+
+With `agents = on`, add rippl to a coding agent as an MCP server, e.g. Claude Code:
+`claude mcp add rippl -- rippl --mcp`. It works in tabs of its own (✦), reads yours only with
+`agents_see_tabs = on`, and never types into password fields.
 
 ## Profiles
 
@@ -192,6 +209,9 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 | `Ctrl+Alt+A` | Save the page as a web archive (.mhtml) in Downloads |
 | `Shift+click` a link | Peek at it; `Esc` puts it away, `Ctrl+Return` keeps it as a tab |
 | `Alt+1`–`Alt+9`, two fingers sideways on the column | Go to that space / the next or previous |
+| `Ctrl+Shift+A` | Ask about this page / summarize it (`ai = on`) |
+| `Ctrl+Shift+L` | Translate the page, or show the original (`ai = on`) |
+| `Ctrl+F` on Settings | Find a setting |
 | `Ctrl+N` | New window (its own tabs; shares sign-ins, history, settings) |
 | `Ctrl+Alt+T`, **+** at the column's foot | New space (its own tabs and sign-ins) |
 | Right-click a space's button | Rename it, colour it (or a gradient), or delete it with its tabs and sign-ins |

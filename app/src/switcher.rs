@@ -115,6 +115,10 @@ impl Browser {
         let weak = self.weak();
         keys.connect_key_pressed(move |_, key, _, state| {
             let Some(b) = weak.upgrade() else { return glib::Propagation::Proceed };
+            // The shortcut recorder is listening: the page gets the keys.
+            if b.keys_suspended.get() {
+                return glib::Propagation::Proceed;
+            }
             let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);
             let shift = state.contains(gdk::ModifierType::SHIFT_MASK);
             let walking = b.switcher.walk.borrow().is_some();

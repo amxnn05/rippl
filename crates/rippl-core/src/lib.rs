@@ -3,6 +3,7 @@
 //! with no display.
 
 pub mod address;
+pub mod ai;
 pub mod clean;
 pub mod downloads;
 pub mod import;
