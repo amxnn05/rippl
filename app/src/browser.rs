@@ -122,6 +122,14 @@ pub struct Browser {
     /// "‹ Tabs" put them away for now.
     pub(crate) rail: crate::settings_rail::Rail,
     pub(crate) rail_away: Cell<bool>,
+    /// Motion (motion.rs): the column's slide, tabs folding away as they
+    /// close, each tab's row (for that), and the tabs already shown once.
+    pub(crate) column_slide: gtk::Revealer,
+    pub(crate) closing: RefCell<HashSet<TabId>>,
+    pub(crate) row_of: RefCell<HashMap<TabId, gtk::Widget>>,
+    pub(crate) seen_rows: RefCell<HashSet<TabId>>,
+    pub(crate) rendered_once: Cell<bool>,
+    pub(crate) motion_css: gtk::CssProvider,
     /// The AI add-on's panel (ai.rs).
     pub(crate) ai: crate::ai::Panel,
     /// Ctrl+Tab's cards (switcher.rs).
@@ -320,8 +328,14 @@ impl Browser {
         right.append(&bookmarks_bar);
         right.append(&overlay);
         let ai = crate::ai::Panel::new();
+        // The column slides away and back with Ctrl+S (motion.rs).
+        let column_slide = gtk::Revealer::builder()
+            .transition_type(gtk::RevealerTransitionType::SlideRight)
+            .reveal_child(true)
+            .child(&column)
+            .build();
         let body = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        body.append(&column);
+        body.append(&column_slide);
         body.append(&right);
         body.append(&ai.panel);
         window.set_child(Some(&body));
@@ -417,6 +431,12 @@ impl Browser {
             switcher,
             rail,
             rail_away: Cell::new(false),
+            column_slide,
+            closing: RefCell::new(HashSet::new()),
+            row_of: RefCell::new(HashMap::new()),
+            seen_rows: RefCell::new(HashSet::new()),
+            rendered_once: Cell::new(false),
+            motion_css: gtk::CssProvider::new(),
             ai,
             agent_tabs: RefCell::new(HashSet::new()),
             agent_said: Cell::new(0),
@@ -514,6 +534,14 @@ impl Browser {
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
         );
         browser.apply_home_theme();
+        browser.motion_css.load_from_string(crate::motion::CSS);
+        gtk::style_context_add_provider_for_display(
+            &WidgetExt::display(&browser.window),
+            &browser.motion_css,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 2,
+        );
+        browser.wire_motion();
+        browser.apply_motion();
         if browser.primary {
             browser.install_page_scripts();
         }
@@ -711,6 +739,10 @@ impl Browser {
     }
 
     pub fn close(&self, id: TabId) {
+        // Gone already (closed while it folded away, say): nothing to do.
+        if self.tabs.borrow().get(id).is_none() {
+            return;
+        }
         self.remember_closed(id);
         self.drop_picture(id);
         self.separate(id);
@@ -1808,6 +1840,7 @@ impl Browser {
 
     /// A short message over the page, gone after three seconds.
     pub(crate) fn notice(&self, text: &str) {
+        self.toast.remove_css_class("leaving");
         self.toast.set_label(text);
         self.toast.set_visible(true);
         let generation = self.toast_gen.get().wrapping_add(1);
@@ -1817,7 +1850,7 @@ impl Browser {
             if let Some(b) = weak.upgrade()
                 && b.toast_gen.get() == generation
             {
-                b.toast.set_visible(false);
+                b.toast_leave();
             }
         });
     }
@@ -1949,9 +1982,7 @@ impl Browser {
         self.action(app, "reader", &["F9", "<Ctrl><Alt>r"], |b| b.toggle_reader());
         self.action(app, "hide-element", &["<Ctrl><Shift>h"], |b| b.pick_to_hide());
         self.action(app, "unhide", &["<Ctrl><Shift>u"], |b| b.unhide_here());
-        self.action(app, "toggle-column", &["<Ctrl>s"], |b| {
-            b.column.set_visible(!b.column.is_visible());
-        });
+        self.action(app, "toggle-column", &["<Ctrl>s"], |b| b.toggle_column());
         self.action(app, "inspector", &["<Ctrl><Shift>i", "F12"], |b| {
             if let Some(inspector) = b.front_view().and_then(|v| v.inspector()) {
                 inspector.show();

@@ -42,6 +42,7 @@ const YOUTUBE_SKIPPER: &str = include_str!("youtube_skipper.js");
 pub const SOUND: &str = "sound";
 
 const AUTOSCROLL: &str = include_str!("autoscroll.js");
+const ELASTIC: &str = include_str!("elastic.js");
 
 const VIDEO_KEYS: &str = r#"
 (() => {
@@ -101,6 +102,17 @@ impl Browser {
                     &block,
                 ));
             }
+        }
+        // Elastic edges (motion.rs), with motion on.
+        if config.elastic && config.motion_full {
+            scripts.push(UserScript::for_world(
+                ELASTIC,
+                UserContentInjectedFrames::TopFrame,
+                UserScriptInjectionTime::End,
+                "rippl",
+                &[],
+                &[],
+            ));
         }
         if config.autoscroll {
             scripts.push(UserScript::for_world(

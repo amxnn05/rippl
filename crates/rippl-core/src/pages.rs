@@ -125,6 +125,25 @@ body.page-welcome {{ max-width: 600px; margin: 0 auto; padding: 56px 24px; font:
   border-radius: 7px; padding: 4px 10px; text-decoration: none; cursor: pointer; }}
 .welcome .button.primary {{ background: var(--ink); color: var(--ground); border-color: var(--ink); padding: 8px 18px; font-size: 13.5px; }}
 .done {{ color: var(--muted); font-size: 12px; }}
+/* Motion, as rippl's own (motion.rs): sections slide in, rows answer the
+   pointer, buttons give; the welcome's parts rise one after another. */
+@keyframes in-up {{ from {{ opacity: 0; transform: translateY(8px); }} to {{ opacity: 1; transform: none; }} }}
+@keyframes in-pop {{ from {{ opacity: 0; transform: scale(.92); }} to {{ opacity: 1; transform: none; }} }}
+.settings .cat:not([hidden]) {{ animation: in-up .28s cubic-bezier(.25,1.15,.4,1); }}
+.setting {{ transition: background-color .14s ease-out; }}
+.settings .card .setting:hover {{ background: var(--hover); }}
+button, a.button, .row {{ transition: background-color .14s ease-out, border-color .14s ease-out, transform .16s cubic-bezier(.2,1.3,.4,1); }}
+button:active, a.button:active {{ transform: scale(.97); }}
+.settings aside a {{ transition: background-color .2s ease-out, color .14s ease-out, box-shadow .24s ease-out; }}
+.toast {{ animation: in-up .3s cubic-bezier(.25,1.2,.4,1); }}
+.welcome .logo {{ animation: in-pop .5s cubic-bezier(.2,1.35,.4,1) both; }}
+.welcome h1 {{ animation: in-up .45s .08s cubic-bezier(.25,1.15,.4,1) both; }}
+.welcome .lede {{ animation: in-up .45s .14s cubic-bezier(.25,1.15,.4,1) both; }}
+.welcome .card {{ animation: in-up .5s .2s cubic-bezier(.25,1.15,.4,1) both; }}
+.welcome .keys {{ animation: in-up .5s .28s cubic-bezier(.25,1.15,.4,1) both; }}
+.welcome .go {{ animation: in-up .5s .34s cubic-bezier(.25,1.15,.4,1) both; }}
+.row:hover {{ background: #8881; }}
+@media (prefers-reduced-motion: reduce) {{ *, *::before, *::after {{ animation: none !important; transition: none !important; }} }}
 .settings {{ display: flex; min-height: 100vh; }}
 body.rail-in-column .settings aside {{ display: none; }}
 .settings aside {{ flex: none; width: 196px; box-sizing: border-box; padding: 8px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
@@ -474,6 +493,7 @@ pub fn place(key: &str) -> (&'static str, &'static str) {
         "sync_folder" => ("general", "Sync and other devices"),
         "theme" | "dusk" => ("appearance", "Light and dark"),
         "glass" | "frame_rate" => ("appearance", "Window"),
+        "motion" | "elastic" => ("appearance", "Motion"),
         "tabs" | "column" | "icons" | "bookmarks_bar" | "player" => ("appearance", "Tabs"),
         "home_theme" | "home_colour" | "home_image" | "home_grid" => ("themes", "New tab"),
         "tab_switcher" => ("tabs", "Switching"),
@@ -540,6 +560,8 @@ fn glyph(key: &str) -> &'static str {
         "dusk" => "☾",
         "glass" => "◇",
         "frame_rate" => "≋",
+        "motion" => "∿",
+        "elastic" => "⇕",
         "tabs" | "column" => "▥",
         "icons" => "◉",
         "bookmarks_bar" => "★",
@@ -748,8 +770,8 @@ pub fn settings(v: &SettingsView, token: &str) -> String {
     add("about", "rippl", about);
 
     // Sections in the order within each category.
-    const ORDER: [&str; 27] = [
-        "Your browser", "Sync and other devices", "Light and dark", "Window", "Tabs", "New tab", "Switching", "Closing",
+    const ORDER: [&str; 28] = [
+        "Your browser", "Sync and other devices", "Light and dark", "Window", "Motion", "Tabs", "New tab", "Switching", "Closing",
         "Memory", "Searching", "Links", "Video", "Spaces", "Pins", "Profiles", "Your passwords", "Client certificates",
         "Blocking", "Connection", "Sites without blocking", "Hidden on sites", "Site permissions", "History", "Shortcuts",
         "Mouse", "rippl", "Developer",

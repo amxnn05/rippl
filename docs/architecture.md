@@ -95,6 +95,8 @@ app/src/
   sync.rs                 sync through a folder: scopes, applying changes, the files
   ai.rs                   Ask about this page (panel, streamed answers), Translate page
   translate.js            Translate page's script (rippl's world): read and put back words
+  motion.rs               the springs as CSS; what animates, `enter`, reduced motion
+  elastic.js              elastic page edges (rippl's world)
   desktop.rs              installed? the default browser? making it so (xdg-settings)
   settings_rail.rs        Settings' sections in the column while Settings is in front
   agents.rs               an agent's commands on the socket: its own tabs, the rules

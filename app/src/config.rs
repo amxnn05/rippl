@@ -70,6 +70,11 @@
 //! # desktop's proxy settings), direct, or a proxy, e.g. socks5://127.0.0.1:9050
 //! # (Tor) or http://proxy.example:3128; this machine and .local stay direct
 //! proxy = system
+//! # motion: springs, fades, the column's slide, tabs sliding in (full,
+//! # default) or everything immediate (reduced)
+//! motion = full
+//! # pages stretch a little at their top and bottom and spring back (on, default)
+//! elastic = on
 //! # pages, their animations and smooth scrolling at the screen's own rate
 //! # (display, default: 144 on a 144 Hz screen) or near 60 (60, saves power)
 //! frame_rate = display
@@ -132,6 +137,9 @@ pub struct Config {
     pub tab_switcher: bool,
     /// Pages at the screen's refresh rate rather than near 60.
     pub full_rate: bool,
+    /// Animations (motion.rs), and the elastic edges of pages.
+    pub motion_full: bool,
+    pub elastic: bool,
     pub proxy: rippl_core::address::Proxy,
     pub webmail: String,
     pub sync_folder: String,
@@ -212,6 +220,8 @@ impl Default for Config {
             top_tabs: false,
             tab_switcher: true,
             full_rate: true,
+            motion_full: true,
+            elastic: true,
             proxy: rippl_core::address::Proxy::System,
             webmail: "none".into(),
             sync_folder: String::new(),
@@ -313,6 +323,14 @@ impl Config {
                 self.home_colour = value.to_lowercase();
             }
             "home_image" => self.home_image = value.to_string(),
+            "motion" => {
+                self.motion_full = match value {
+                    "full" => true,
+                    "reduced" => false,
+                    _ => return Err(bad()),
+                }
+            }
+            "elastic" => self.elastic = on(value).ok_or_else(bad)?,
             "frame_rate" => {
                 self.full_rate = match value {
                     "display" => true,
@@ -446,6 +464,8 @@ impl Config {
             choice("autoplay", "Videos start by themselves", if self.autoplay { "muted" } else { "never" }.into(), &["muted", "never"], "Muted: without sound, until you let a site play sound from its card. Never: they wait for a click"),
             choice("autoscroll", "Scroll with the middle button", onoff(self.autoscroll), &["on", "off"], "A click of the wheel on a page, then move the pointer"),
             choice("close_after", "Tabs left alone close themselves after", close_name(self.close_after), &CLOSE_CHOICES, "Not pinned tabs, tabs in a group, or kept-awake sites. rippl://archive keeps them a month"),
+            choice("motion", "Animations", if self.motion_full { "full" } else { "reduced" }.into(), &["full", "reduced"], "Springs, fades, slides. Reduced: everything immediate"),
+            choice("elastic", "Pages stretch at their edges", onoff(self.elastic), &["on", "off"], "Scrolled past the top or bottom, a page gives a little and springs back"),
             choice("frame_rate", "Pages and scrolling", if self.full_rate { "display" } else { "60" }.into(), &["display", "60"], "Display: at your screen's refresh rate (144 Hz gets 144). 60: less power on battery"),
             choice("tab_switcher", "Ctrl+Tab shows the tabs as pictures", onoff(self.tab_switcher), &["on", "off"], "Latest first. Off: the next tab in the column"),
             choice("bookmarks_bar", "Bookmarks bar above the page", onoff(self.bookmarks_bar), &["on", "off"], ""),

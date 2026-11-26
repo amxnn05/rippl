@@ -54,6 +54,12 @@ icons = on
 # The new tab shows the sites of the bookmark folder "Home" (off, default)
 home_grid = off
 
+# Animations: springs, fades, the column's slide (full, default) or everything immediate (reduced)
+motion = full
+
+# Pages stretch a little past their top and bottom and spring back (on, default)
+elastic = on
+
 # Pages, their animations and smooth scrolling at the screen's own refresh rate
 # (display, default: 144 on a 144 Hz screen, 120 on a 120 Hz one) or near 60 (60: less power)
 frame_rate = display

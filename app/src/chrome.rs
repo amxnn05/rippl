@@ -196,6 +196,7 @@ impl Browser {
 
     /// Draws the row of top tabs again (from `render`).
     pub(crate) fn render_top(&self) {
+        self.row_of.borrow_mut().clear();
         let strip = &self.top.tabs;
         while let Some(c) = strip.first_child() {
             strip.remove(&c);
@@ -243,7 +244,7 @@ impl Browser {
                 let weak = self.weak();
                 close.connect_clicked(move |_| {
                     if let Some(b) = weak.upgrade() {
-                        b.close(id);
+                        b.close_animated(id);
                     }
                 });
                 line.append(&close);
@@ -260,9 +261,11 @@ impl Browser {
                 tile.add_css_class("split");
             }
             self.on_click(&tile, id);
+            self.mark_fresh(id, tile.upcast_ref());
             strip.append(&tile);
         }
         drop(tabs);
+        self.settle_fresh();
         self.size_top_tabs();
         // The tab you are on, in sight.
         if let Some(live) = live_tab {

@@ -21,6 +21,7 @@ mod mcp;
 mod look;
 mod home;
 mod home_theme;
+mod motion;
 mod omnibox;
 mod pagescripts;
 mod peek;

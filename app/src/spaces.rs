@@ -208,6 +208,7 @@ impl Browser {
         }
         let popover = gtk::Popover::builder().child(&menu).has_arrow(false).build();
         popover.add_css_class("tab-menu");
+        crate::motion::enters(&popover);
         popover.set_parent(anchor);
         // Gone with its button when the column is drawn again.
         popover.connect_closed(|p| {

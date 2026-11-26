@@ -306,6 +306,11 @@ impl Browser {
                 self.engine.set_proxy(config.proxy.clone());
                 return Ok("Saved. New connections go this way now, open pages included; private tabs already open keep the old way.".into());
             }
+            "motion" => {
+                self.apply_motion();
+                self.install_page_scripts();
+            }
+            "elastic" => self.install_page_scripts(),
             "frame_rate" => {
                 self.engine.set_full_rate(config.full_rate);
                 return Ok("Saved. Pages loaded from now on use it; reload a page to change it there.".into());

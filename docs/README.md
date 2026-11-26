@@ -34,6 +34,7 @@ development phase did.
 | Feature batch 4: screen-rate pages, autoplay, autoscroll, closing tabs, archive, tab switcher, bookmarks bar, icon column, top tabs, 4-page split, shortcuts, space colours, new-tab walls, pin folders, windows | done | [batch-4.md](phases/batch-4.md) |
 | Feature batch 5: moving in (history, tabs, passwords), folder sync, proxy, client certificates, webmail, download pause/resume, media keys | done | [batch-5.md](phases/batch-5.md) |
 | Feature batch 6: Settings, the AI add-on, Translate page, agents over MCP | done | [batch-6.md](phases/batch-6.md) |
+| Motion: springs, fades, slides, elastic page edges, reduced motion | done | [motion.md](phases/motion.md) |
 | Phase 9: shipping — logo, desktop entry, default browser, install script, packages, welcome | done | [phase-9-ship.md](phases/phase-9-ship.md) |
 | 9. Ship: desktop entry, default browser, packages | planned | [roadmap.md](roadmap.md) |
 

@@ -161,6 +161,7 @@ impl Browser {
         more.add_css_class("bar-item");
         let pop = gtk::Popover::new();
         pop.add_css_class("bar-menu");
+        crate::motion::enters(&pop);
         more.set_popover(Some(&pop));
         let weak = self.weak();
         pop.connect_show(move |pop| {
@@ -274,6 +275,7 @@ impl Browser {
             list.append(&self.menu_site(p, &pop));
         }
         pop.set_child(Some(&list));
+        crate::motion::enters(&pop);
         button.set_popover(Some(&pop));
         button
     }

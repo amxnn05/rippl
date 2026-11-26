@@ -412,6 +412,7 @@ impl Browser {
             return;
         }
         let icons = self.config.borrow().icon_column;
+        self.row_of.borrow_mut().clear();
         while let Some(child) = self.list.first_child() {
             self.list.remove(&child);
         }
@@ -486,6 +487,7 @@ impl Browser {
                     pin.add_css_class("asleep");
                 }
                 self.on_click(&pin, id);
+                self.mark_fresh(id, pin.upcast_ref());
                 let across = if icons { 1 } else { 6 };
                 self.pins.attach(&pin, pin_at % across, pin_at / across, 1, 1);
                 pin_at += 1;
@@ -559,13 +561,18 @@ impl Browser {
             let weak = self.weak();
             close.connect_clicked(move |_| {
                 if let Some(b) = weak.upgrade() {
-                    b.close(id);
+                    b.close_animated(id);
                 }
             });
             self.on_click(&row, id);
+            self.mark_fresh(id, row.upcast_ref());
+            if self.closing.borrow().contains(&id) {
+                row.add_css_class("leaving");
+            }
             self.list.append(&row);
         }
         self.pins.set_visible(any_pin);
+        self.settle_fresh();
         self.place_settings_rail();
         self.render_player();
         drop(tabs);
@@ -664,6 +671,22 @@ impl Browser {
     }
 
     /// Click: select. Middle-click: close. Alt-click: beside the front tab.
+    /// A tab seen in the column for the first time slides in (motion.rs);
+    /// at start-up nothing does.
+    pub(crate) fn mark_fresh(&self, id: rippl_core::tabs::TabId, w: &gtk::Widget) {
+        self.row_of.borrow_mut().insert(id, w.clone());
+        if self.rendered_once.get() && !self.seen_rows.borrow().contains(&id) {
+            w.add_css_class("fresh");
+        }
+    }
+
+    /// After a drawing: every tab drawn now has been seen.
+    pub(crate) fn settle_fresh(&self) {
+        let ids: std::collections::HashSet<_> = self.row_of.borrow().keys().copied().collect();
+        *self.seen_rows.borrow_mut() = ids;
+        self.rendered_once.set(true);
+    }
+
     pub(crate) fn on_click(&self, widget: &impl IsA<gtk::Widget>, id: rippl_core::tabs::TabId) {
         let click = gtk::GestureClick::builder().button(0).build();
         let weak = self.weak();
@@ -676,7 +699,7 @@ impl Browser {
             let front = b.front() == Some(id);
             let anchor = gesture.widget();
             glib::idle_add_local_once(move || match (button, alt) {
-                (2, _) => b.close(id),
+                (2, _) => b.close_animated(id),
                 (3, _) => {
                     if let Some(w) = anchor {
                         b.tab_menu(id, &w);

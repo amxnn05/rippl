@@ -116,6 +116,7 @@ impl Browser {
         }
         let popover = gtk::Popover::builder().child(&menu).has_arrow(false).build();
         popover.add_css_class("tab-menu");
+        crate::motion::enters(&popover);
         // Hung from the pins' grid, which stays, at the square's place: the
         // square itself goes whenever the column is drawn again.
         popover.set_parent(&self.pins);
