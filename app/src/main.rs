@@ -1,7 +1,10 @@
 //! rippl: a small, fast, quiet web browser for Linux, on WebKit.
 
+mod bookmarks_bar;
 mod browser;
+mod chrome;
 mod closed;
+mod closing;
 mod config;
 mod control;
 mod curtain;
@@ -25,6 +28,7 @@ mod signin;
 mod sitecard;
 mod spaces;
 mod split;
+mod switcher;
 
 use std::cell::RefCell;
 use std::rc::Rc;

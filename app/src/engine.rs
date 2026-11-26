@@ -235,6 +235,25 @@ impl Engine {
 
     /// Tells every page process the two switches again (after a change in
     /// rippl://settings).
+    ///
+    /// Pages at the screen's own rate (`frame_rate = display`), or near 60
+    /// (`60`). WebKit holds a page's animations, `requestAnimationFrame`
+    /// and the scrolling it animates to the divisor of the refresh rate
+    /// nearest 60: on a 144 Hz screen, 72. Its flag for that is turned off
+    /// here, so a 144 Hz screen gets 144, a 120 Hz one 120, a 60 Hz one 60.
+    /// A page standing still costs nothing either way; one that animates
+    /// draws as often as the screen does.
+    pub fn set_full_rate(&self, full: bool) {
+        let Some(features) = Settings::all_features() else { return };
+        for i in 0..features.length() {
+            if let Some(f) = features.get(i)
+                && f.identifier().as_deref() == Some("PreferPageRenderingUpdatesNear60FPS")
+            {
+                self.settings.set_feature_enabled(&f, !full);
+            }
+        }
+    }
+
     pub fn send_settings(&self, gpc: bool, https_only: bool) {
         {
             let mut start = self.start.borrow_mut();

@@ -74,6 +74,10 @@ impl Permission {
     }
 }
 
+/// The archive keeps a month, and 500 tabs at most.
+const ARCHIVE_DAYS: i64 = 30;
+const ARCHIVE_CAP: i64 = 500;
+
 pub struct Places {
     db: Connection,
 }
@@ -100,6 +104,7 @@ impl Places {
                  PRIMARY KEY (host, selector));
              CREATE TABLE IF NOT EXISTS site_css (host TEXT PRIMARY KEY, css TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS site_flags (host TEXT NOT NULL, flag TEXT NOT NULL, PRIMARY KEY (host, flag));
+             CREATE TABLE IF NOT EXISTS archive (url TEXT PRIMARY KEY, title TEXT NOT NULL, closed INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS never_save (origin TEXT PRIMARY KEY, added INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS permissions (
                  host TEXT NOT NULL, kind TEXT NOT NULL, allow INTEGER NOT NULL,
@@ -113,6 +118,60 @@ impl Places {
             db.execute_batch("ALTER TABLE bookmarks ADD COLUMN folder TEXT NOT NULL DEFAULT ''")?;
         }
         Ok(Places { db })
+    }
+
+    // ---- the archive: tabs rippl closed by itself ------------------------
+
+    /// A tab rippl just closed. A page already
+    /// here moves to the top; past a month, or the last 500, they go.
+    pub fn archive_tab(&self, url: &str, title: &str) -> Result<(), Error> {
+        if !(url.starts_with("https://") || url.starts_with("http://")) {
+            return Ok(());
+        }
+        let now = now();
+        self.db.execute(
+            "INSERT INTO archive (url, title, closed) VALUES (?1, ?2, ?3)
+             ON CONFLICT(url) DO UPDATE SET title = ?2, closed = ?3",
+            params![url, title, now],
+        )?;
+        self.db.execute("DELETE FROM archive WHERE closed < ?1", params![now - ARCHIVE_DAYS * 86_400])?;
+        self.db.execute(
+            "DELETE FROM archive WHERE url NOT IN (SELECT url FROM archive ORDER BY closed DESC LIMIT ?1)",
+            params![ARCHIVE_CAP],
+        )?;
+        Ok(())
+    }
+
+    /// The archive, newest first; with `q`, what has every word of it.
+    pub fn archived(&self, q: &str) -> Result<Vec<Place>, Error> {
+        let mut stmt = self.db.prepare_cached("SELECT url, title, closed FROM archive WHERE closed >= ?1 ORDER BY closed DESC")?;
+        let since = now() - ARCHIVE_DAYS * 86_400;
+        let words: Vec<String> = q.split_whitespace().map(str::to_lowercase).collect();
+        let rows = stmt.query_map(params![since], |r| {
+            Ok(Place {
+                url: r.get(0)?,
+                title: r.get(1)?,
+                visits: 0,
+                last: r.get(2)?,
+                bookmarked: false,
+                folder: String::new(),
+            })
+        })?;
+        Ok(rows
+            .filter_map(Result::ok)
+            .filter(|p| {
+                let hay = format!("{} {}", p.url, p.title).to_lowercase();
+                words.iter().all(|w| hay.contains(w))
+            })
+            .collect())
+    }
+
+    /// One out of the archive (opened again, or forgotten); `None`: all.
+    pub fn unarchive(&self, url: Option<&str>) -> Result<usize, Error> {
+        match url {
+            Some(u) => self.db.execute("DELETE FROM archive WHERE url = ?1", params![u]),
+            None => self.db.execute("DELETE FROM archive", []),
+        }
     }
 
     // ---- history -------------------------------------------------------
@@ -143,6 +202,8 @@ impl Places {
 
     /// Forgets history: all of it, or what was visited since `since`.
     pub fn clear_history(&self, since: Option<i64>) -> Result<usize, Error> {
+        // The archive is history too.
+        self.db.execute("DELETE FROM archive WHERE closed >= ?1", params![since.unwrap_or(i64::MIN)])?;
         self.db.execute("DELETE FROM history WHERE last >= ?1", params![since.unwrap_or(i64::MIN)])
     }
 
@@ -541,6 +602,22 @@ mod tests {
         assert_eq!(p.never_save_list().unwrap(), vec!["https://bank.com".to_string()]);
         p.set_never_save("https://bank.com", false).unwrap();
         assert!(p.never_save_list().unwrap().is_empty());
+    }
+
+    #[test]
+    fn archive_keeps_newest_once() {
+        let p = Places::open(None).unwrap();
+        p.archive_tab("https://a.com/", "A").unwrap();
+        p.archive_tab("https://b.com/", "Bee").unwrap();
+        p.archive_tab("https://a.com/", "A again").unwrap();
+        p.archive_tab("rippl://history", "no").unwrap();
+        let all = p.archived("").unwrap();
+        assert_eq!(all.len(), 2);
+        assert_eq!(p.archived("bee").unwrap().len(), 1);
+        p.unarchive(Some("https://b.com/")).unwrap();
+        assert_eq!(p.archived("").unwrap().len(), 1);
+        p.clear_history(None).unwrap();
+        assert!(p.archived("").unwrap().is_empty());
     }
 
     #[test]

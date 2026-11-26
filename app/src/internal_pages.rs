@@ -90,6 +90,10 @@ impl Browser {
                 };
                 pages::history(&places, &q, now(), &self.token)
             }
+            "archive" => {
+                let closing = self.config.borrow().close_after.is_some();
+                pages::archive(&self.places.archived(&q).unwrap_or_default(), &q, closing, now(), &self.token)
+            }
             "bookmarks" => {
                 let labels: Vec<String> =
                     other_browsers().iter().map(|s| format!("{} · {}", s.browser, s.profile)).collect();
@@ -146,8 +150,19 @@ impl Browser {
 
     /// A button on one of the pages. Returns a note to show, if any.
     fn act(&self, page: &str, act: &str, arg: &str) -> String {
+        if page == "bookmarks" {
+            // Whatever it was, the bar shows it after.
+            let weak = self.weak();
+            glib::idle_add_local_once(move || {
+                if let Some(b) = weak.upgrade() {
+                    b.fill_bookmarks_bar();
+                }
+            });
+        }
         let result: Result<String, String> = match (page, act) {
             ("history", "forget") => self.places.forget(arg).map(|_| String::new()).map_err(|e| e.to_string()),
+            ("archive", "forget") => self.places.unarchive(Some(arg)).map(|_| String::new()).map_err(|e| e.to_string()),
+            ("archive", "clear") => self.places.unarchive(None).map(|_| String::new()).map_err(|e| e.to_string()),
             ("history", "clear") => self.places.clear_history(None).map(|_| String::new()).map_err(|e| e.to_string()),
             ("bookmarks", "remove") => {
                 let r = self.places.remove_bookmark(arg).map(|_| String::new()).map_err(|e| e.to_string());
@@ -195,7 +210,13 @@ impl Browser {
             "theme" | "glass" => self.apply_look(),
             "icons" => self.render(),
             "home_grid" => self.fill_home_grid(),
-            "video_keys" => self.install_page_scripts(),
+            "bookmarks_bar" => self.fill_bookmarks_bar(),
+            "tabs" | "column" => self.apply_chrome(),
+            "frame_rate" => {
+                self.engine.set_full_rate(config.full_rate);
+                return Ok("Saved. Pages loaded from now on use it; reload a page to change it there.".into());
+            }
+            "video_keys" | "autoscroll" => self.install_page_scripts(),
             "player" => self.render_player(),
             "gpc" | "https_only" => self.engine.send_settings(config.gpc, config.https_only),
             "shield" | "ublock" => return Ok("Saved. Blocking changes after rippl restarts.".into()),

@@ -185,12 +185,22 @@ impl Browser {
                 db.favicon(url, None::<&gio::Cancellable>, move |r| {
                     if let (Some(b), Ok(t)) = (weak.upgrade(), r) {
                         b.icons.borrow_mut().insert(key, t);
-                        glib::idle_add_local_once(move || b.render());
+                        glib::idle_add_local_once(move || {
+                            b.render();
+                            if b.config.borrow().bookmarks_bar {
+                                b.fill_bookmarks_bar();
+                            }
+                        });
                     }
                 });
             }
         }
         None
+    }
+
+    /// A site's icon for something that isn't a tab (the bookmarks bar).
+    pub(crate) fn icon_for_url(&self, url: &str) -> Option<gdk::Texture> {
+        self.icon_for(TabId::MAX, url)
     }
 
     /// The site card's editor for the site's own CSS.

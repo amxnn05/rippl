@@ -56,6 +56,9 @@ pub struct Tab {
     pub group: Option<GroupId>,
     /// Last time it was on screen.
     pub touched: Instant,
+    /// The same, in unix seconds, kept in the session: tabs that close
+    /// themselves count from it across restarts.
+    pub left: i64,
     /// WebKit's serialized session state, kept while asleep.
     pub memory: Option<Vec<u8>>,
 }
@@ -77,6 +80,7 @@ impl Tab {
             space: 0,
             group: None,
             touched: Instant::now(),
+            left: crate::places::now(),
             memory: None,
         }
     }
@@ -129,6 +133,45 @@ pub fn due_for_sleep(tabs: &[Tab], on_screen: &[TabId], now: Instant, wait: Dura
         .collect();
     due.sort_by_key(|t| t.touched);
     due.into_iter().map(|t| t.id).collect()
+}
+
+/// Why `tab` stays open however long it is left,
+/// or `None` if it may close itself: what you said to keep (pinned, in a
+/// group, a site kept awake), what nothing could bring back (private), a
+/// blank tab, and anything busy.
+pub fn stays_open(tab: &Tab, on_screen: &[TabId]) -> Option<&'static str> {
+    if tab.private {
+        return Some("private");
+    }
+    if tab.group.is_some() {
+        return Some("in a group");
+    }
+    if tab.url.is_empty() {
+        return Some("blank");
+    }
+    kept_awake(tab, on_screen).map(|k| match k {
+        KeptAwake::OnScreen => "on screen",
+        KeptAwake::Pinned => "pinned",
+        KeptAwake::Chosen => "kept awake",
+        _ => "busy",
+    })
+}
+
+/// The tabs left alone at least `after` by `now` (unix seconds), that may
+/// close themselves. A split pair (`pairs`) goes whole or not at all.
+pub fn due_for_closing(tabs: &[Tab], on_screen: &[TabId], pairs: &[(TabId, TabId)], now: i64, after: Duration) -> Vec<TabId> {
+    let since = now - after.as_secs() as i64;
+    let due: Vec<TabId> =
+        tabs.iter().filter(|t| t.left <= since && stays_open(t, on_screen).is_none()).map(|t| t.id).collect();
+    due.iter()
+        .copied()
+        .filter(|id| {
+            pairs
+                .iter()
+                .find(|(a, b)| a == id || b == id)
+                .is_none_or(|(a, b)| due.contains(a) && due.contains(b))
+        })
+        .collect()
 }
 
 pub type SpaceId = u32;
@@ -257,8 +300,10 @@ impl Tabs {
     /// space with it.
     pub fn select(&mut self, id: TabId) {
         let now = Instant::now();
+        let unix = crate::places::now();
         if let Some(old) = self.front.and_then(|f| self.get_mut(f)) {
             old.touched = now;
+            old.left = unix;
         }
         let Some(space) = self.get(id).map(|t| t.space) else { return };
         if space != self.space {
@@ -269,6 +314,7 @@ impl Tabs {
         }
         if let Some(tab) = self.get_mut(id) {
             tab.touched = now;
+            tab.left = unix;
             self.front = Some(id);
         }
     }
@@ -522,6 +568,25 @@ pub fn unread(title: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tabs_left_alone_close() {
+        let mut list: Vec<Tab> = (1..=7).map(|i| Tab::new(i, format!("https://s{i}.com/"))).collect();
+        for t in &mut list {
+            t.left = 1000;
+        }
+        list[1].pinned = true;
+        list[2].group = Some(1);
+        list[3].private = true;
+        list[4].url.clear();
+        list[6].left = 5000; // looked at since
+        let after = Duration::from_secs(3600);
+        assert_eq!(due_for_closing(&list, &[], &[], 5000, after), vec![1, 6]);
+        assert_eq!(due_for_closing(&list, &[1], &[], 5000, after), vec![6]);
+        // Half of a pair still wanted: both stay.
+        assert_eq!(due_for_closing(&list, &[], &[(6, 7)], 5000, after), vec![1]);
+        assert!(due_for_closing(&list, &[], &[], 2000, after).is_empty());
+    }
 
     #[test]
     fn unread_counts_from_titles() {

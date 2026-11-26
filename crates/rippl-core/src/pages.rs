@@ -102,7 +102,7 @@ input[type=search] {{ font: inherit; width: 100%; box-sizing: border-box; paddin
 .allow {{ color: #2a2; }} .deny {{ color: #e44; }}
 code {{ font-size: 13px; }}
 </style></head><body>
-<nav><a href="rippl://history"{h}>History</a><a href="rippl://bookmarks"{b}>Bookmarks</a><a href="rippl://passwords"{p}>Passwords</a><a href="rippl://settings"{s}>Settings</a></nav>
+<nav><a href="rippl://history"{h}>History</a><a href="rippl://bookmarks"{b}>Bookmarks</a><a href="rippl://archive"{a}>Archive</a><a href="rippl://passwords"{p}>Passwords</a><a href="rippl://settings"{s}>Settings</a></nav>
 {body}
 <script>
 const TOKEN = "{token}", PAGE = "{page}";
@@ -136,6 +136,7 @@ if (new URLSearchParams(location.search).has("do")) {{
         title = escape(title),
         h = if page == "history" { r#" class="here""# } else { "" },
         b = if page == "bookmarks" { r#" class="here""# } else { "" },
+        a = if page == "archive" { r#" class="here""# } else { "" },
         s = if page == "settings" { r#" class="here""# } else { "" },
         p = if page == "passwords" { r#" class="here""# } else { "" },
         token = token.chars().filter(char::is_ascii_hexdigit).collect::<String>(),
@@ -180,6 +181,30 @@ pub fn history(places: &[Place], q: &str, now: i64, token: &str) -> String {
     }
     body.push_str(r#"<h2>Clear</h2><p><button class="danger" data-do="clear" data-confirm="Forget all history? Bookmarks stay.">Clear all history</button></p>"#);
     frame("history", "History", token, &body)
+}
+
+/// The tabs rippl closed by itself, newest first.
+pub fn archive(places: &[Place], q: &str, closing: bool, now: i64, token: &str) -> String {
+    let mut body = format!(
+        r#"<h1>Archive</h1><p class="note">Tabs rippl closed because they were left alone, kept for a month. {when}</p><form action="rippl://archive"><input type="search" name="q" value="{q}" placeholder="Search the archive" autofocus></form>"#,
+        q = escape(q),
+        when = if closing {
+            "Settings › Tabs left alone close themselves sets how long."
+        } else {
+            "Tabs don't close themselves now: Settings › Tabs left alone close themselves."
+        },
+    );
+    if places.is_empty() {
+        body.push_str(r#"<p class="empty">Nothing here.</p>"#);
+    }
+    for p in places {
+        let button = format!(r#"<button data-do="forget" data-arg="{}">Forget</button>"#, escape(&p.url));
+        body.push_str(&place_row(p, now, &button));
+    }
+    if !places.is_empty() {
+        body.push_str(r#"<h2>Clear</h2><p><button class="danger" data-do="clear" data-confirm="Empty the archive? History keeps the pages.">Empty the archive</button></p>"#);
+    }
+    frame("archive", "Archive", token, &body)
 }
 
 /// `sources`: other browsers found, as labels ("Chrome — Default").

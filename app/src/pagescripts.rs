@@ -14,11 +14,20 @@
 //!   The blocking rules that go with them are compiled into Shield's filters
 //!   (`rippl_core::shield::youtube_rules`). Both scripts are off with
 //!   Shield, and on a YouTube host Shield is off for.
+//! - **Autoscroll**: a click
+//!   of the middle button on a page (not on a link, which it still opens in
+//!   a new tab) leaves a mark, and the page scrolls towards the pointer,
+//!   faster the further away it is. Another click, Esc or the wheel stops
+//!   it; held and dragged, letting go stops it.
+//! - **Autoplay**: not a script but the
+//!   page's own policy, given with each navigation: muted by default (as
+//!   WebKit's own), nothing until a click with `autoplay = never`, and with
+//!   sound for a site whose card says so (never in a private tab).
 //! - **Video keys**: Space and
 //!   ← → on a video with the browser's own controls, once it has been
 //!   clicked. Players a site draws itself handle their own keys.
 
-use webkit6::{UserContentInjectedFrames, UserScript, UserScriptInjectionTime};
+use webkit6::{AutoplayPolicy, UserContentInjectedFrames, UserScript, UserScriptInjectionTime, WebsitePolicies};
 
 use crate::browser::Browser;
 
@@ -28,6 +37,11 @@ const YOUTUBE_HOSTS: [&str; 6] =
 
 const YOUTUBE_PAGE: &str = include_str!("youtube_page.js");
 const YOUTUBE_SKIPPER: &str = include_str!("youtube_skipper.js");
+
+/// The site flag: may play sound by itself.
+pub const SOUND: &str = "sound";
+
+const AUTOSCROLL: &str = include_str!("autoscroll.js");
 
 const VIDEO_KEYS: &str = r#"
 (() => {
@@ -88,6 +102,16 @@ impl Browser {
                 ));
             }
         }
+        if config.autoscroll {
+            scripts.push(UserScript::for_world(
+                AUTOSCROLL,
+                UserContentInjectedFrames::AllFrames,
+                UserScriptInjectionTime::End,
+                "rippl",
+                &[],
+                &[],
+            ));
+        }
         if config.video_keys {
             scripts.push(UserScript::for_world(
                 VIDEO_KEYS,
@@ -102,5 +126,20 @@ impl Browser {
             content.add_script(script);
         }
         *self.page_scripts.borrow_mut() = scripts;
+    }
+
+    /// The policy a page loading `url` gets: may its videos start by
+    /// themselves, and with sound?
+    pub(crate) fn website_policies(&self, url: &str, private: bool) -> WebsitePolicies {
+        let policy = if !self.config.borrow().autoplay {
+            AutoplayPolicy::Deny
+        } else if !private
+            && crate::shield::host_of(url).is_some_and(|h| self.places.site_flag(&h, SOUND).unwrap_or(false))
+        {
+            AutoplayPolicy::Allow
+        } else {
+            AutoplayPolicy::AllowWithoutSound
+        };
+        WebsitePolicies::builder().autoplay(policy).build()
     }
 }

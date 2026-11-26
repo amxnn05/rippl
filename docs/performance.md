@@ -31,6 +31,22 @@ about **195 MB**, under half of any Chromium browser.
 | A tab switch | instant: the page is already there, only the visible view changes |
 | Waking a sleeping tab | a page reload, with history and scroll restored |
 
+### Frame rate (batch 4)
+
+WebKit holds pages to the divisor of the screen's refresh rate nearest 60: on a 144 Hz screen,
+72. rippl turns that off (`frame_rate = display`, WebKit's `PreferPageRenderingUpdatesNear60FPS`
+feature), so pages, their animations and smooth scrolling run at the screen's own rate.
+
+| 144 Hz screen (eDP-1) | `requestAnimationFrame` | Window paints while a page scrolls |
+|---|---|---|
+| WebKit's default (= `frame_rate = 60`) | 73 fps | 72 per second |
+| `frame_rate = display` | 145 fps | 144 per second |
+
+The rate comes from the monitor the window is on, so a 120 Hz screen gets 120 and a 60 Hz one 60.
+A page standing still draws nothing either way; one that animates draws twice as often as before,
+which costs some power on battery (choose `60` there). Measured with the control socket's `paints`
+(the window's frame clock, counted for a second) and a `requestAnimationFrame` counter in the page.
+
 ## Memory
 
 ### One light page

@@ -54,6 +54,33 @@ icons = on
 # The new tab shows the sites of the bookmark folder "Home" (off, default)
 home_grid = off
 
+# Pages, their animations and smooth scrolling at the screen's own refresh rate
+# (display, default: 144 on a 144 Hz screen, 120 on a 120 Hz one) or near 60 (60: less power)
+frame_rate = display
+
+# Videos start by themselves without sound (muted, default) or wait for a click (never).
+# A site's card can let it play with sound.
+autoplay = muted
+
+# A click of the middle button on a page scrolls it towards the pointer (off, default)
+autoscroll = off
+
+# Tabs left unseen this long close themselves, into rippl://archive
+# (never, default; 12h, 1d, 7d, 30d)
+close_after = never
+
+# Ctrl+Tab shows the tabs as pictures, latest first (on, default); off: the next tab
+tab_switcher = on
+
+# A row of bookmarks above the page (off, default)
+bookmarks_bar = off
+
+# Tabs down the side (side, default) or across the top (top)
+tabs = side
+
+# The column with titles (full, default) or as icons only (icons)
+column = full
+
 # Suggestions from the search engine while you type (off, default).
 # On, each keystroke is sent to the engine (DuckDuckGo and Brave offer them).
 suggestions = off
@@ -93,6 +120,7 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 | Variable | Effect |
 |---|---|
 | `RIPPL_SLEEP_AFTER=<seconds>` | Overrides `sleep`, in seconds (for measuring) |
+| `RIPPL_CLOSE_AFTER=<seconds>` | Overrides `close_after`, in seconds (for measuring) |
 | `RIPPL_LEAN=1` | WebKit's smaller cache model: less RAM, slower Back |
 | `RIPPL_NO_SHARE=1` | Every tab in a page process of its own, even on the same site |
 | `RIPPL_NO_GPU=1` | Pages drawn without the GPU: 167 → 95 MB per light page, but about twice the CPU while scrolling ([performance.md](performance.md)) |
@@ -110,7 +138,9 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 | `Esc` in the field | Put the page's address back and return to the page |
 | `Ctrl+T` / `Ctrl+Shift+N` | New tab / new private tab |
 | `Ctrl+W`, `Ctrl+F4`, middle-click a tab | Close tab |
-| `Ctrl+Tab` / `Ctrl+Shift+Tab` (`Ctrl+PgDn` / `PgUp`) | Next / previous tab |
+| `Ctrl+Tab` (hold `Ctrl`, `Tab` again to walk on) | The tab switcher: tabs as pictures, latest first; let go of `Ctrl` to go there, `Esc` to stay. A quick `Ctrl+Tab` is the tab you were on before |
+| `Ctrl+PgDn` / `Ctrl+PgUp` | Next / previous tab in the column |
+| Middle-click a page (`autoscroll = on`) | Scroll towards the pointer; click, `Esc` or the wheel stops it |
 | `Ctrl+1`–`Ctrl+8`, `Ctrl+9` | Go to that tab / the last tab |
 | `Alt+←` / `Alt+→` | Back / forward |
 | `Ctrl+R`, `F5` / `Ctrl+Shift+R` | Reload / reload without the cache |

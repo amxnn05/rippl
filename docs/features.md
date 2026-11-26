@@ -22,9 +22,9 @@ the header of each of its source files, with rippl's status for each.
 | Pinned tabs as letter squares at the top | ✅ |
 | Quiet "+ New tab" row | ✅ |
 | Settings from the column's foot | ✅ (gear) |
-| Tabs across the top instead | 🔨 batch 4 |
+| Tabs across the top instead | ✅ `tabs = top` (no sliding pill, no dragging tabs yet) |
 | Column folds away | ✅ Ctrl+S hides it; the slide animation 🔨 |
-| Column as icons only | 🔨 batch 4 |
+| Column as icons only | ✅ `column = icons` |
 | Glass window | ✅ `glass = on` (off by default): the compositor's blur through `ext-background-effect` |
 | Liquid Glass | 🍎 |
 | Traffic lights, title bar | 🍎; rippl hides the title bar on tiling compositors |
@@ -51,10 +51,10 @@ the header of each of its source files, with rippl's status for each.
 | Profiles in one window | 🔨 later |
 | Send links to a space | 🔨 Phase 9 (with links from other apps) |
 | Several windows, same tabs in every window | 🔨 batch 4 |
-| ⌃Tab tab switcher with pictures | 🔨 batch 4 |
+| ⌃Tab tab switcher with pictures | ✅ Ctrl+Tab (keys on a card, ⌃W/⌃R, 🔨) |
 | ⌘K switch to a tab | ✅ Ctrl+K: the field finds open tabs |
 | ⌘1–⌘9 | ✅ Ctrl+1–9 |
-| Tabs close themselves; archive of closed tabs | 🔨 batch 4 |
+| Tabs close themselves; archive of closed tabs | ✅ `close_after`, rippl://archive |
 | Duplicate tab (⌘D) | ✅ Ctrl+Shift+D, tab menu |
 | Tab menu (right-click a tab) | ✅ |
 | Peek at a link in a panel | ✅ Shift+click |
@@ -125,11 +125,11 @@ the header of each of its source files, with rippl's status for each.
 | Print | ✅ Ctrl+P |
 | Web Inspector | ✅ Ctrl+Shift+I |
 | Developer tools packages | ⛔/🍎 (the Web Inspector is built in) |
-| Zoom, smooth wheel, 120 Hz | ✅ zoom; WebKitGTK scrolls smoothly; refresh rate follows the compositor |
+| Zoom, smooth wheel, 120 Hz | ✅ zoom; WebKitGTK's smooth scrolling; pages at the screen's refresh rate (`frame_rate = display`: 144 on 144 Hz, measured) |
 | Video keys | ✅ `video_keys = on` |
-| Autoplay choice | 🔨 batch 4 |
+| Autoplay choice | ✅ `autoplay = muted / never`, sound per site from its card |
 | Swipe back/forward | ✅ WebKit's gestures |
-| Middle-button autoscroll | 🔨 batch 4 |
+| Middle-button autoscroll | ✅ `autoscroll = on` |
 
 ## History, bookmarks, downloads
 
@@ -137,7 +137,7 @@ the header of each of its source files, with rippl's status for each.
 |---|---|
 | History, searchable | ✅ rippl://history |
 | Bookmarks with folders | ✅ |
-| Bookmarks bar | 🔨 batch 4 |
+| Bookmarks bar | ✅ `bookmarks_bar = on` |
 | Import from other browsers: bookmarks, history, open tabs, Arc/Zen spaces | ✅ bookmarks (Chromium family, Firefox family); history and tabs 🔨 batch 5 |
 | Downloads list, pause/resume | ✅ list; pause/resume 🔨 batch 5 |
 | Email links in a webmail | 🔨 batch 5 |

@@ -128,6 +128,41 @@ window.rippl .home-tile { min-height: 50px; padding: 0 10px; border-radius: 14px
   box-shadow: inset 0 0 0 1px var(--hairline); border: none; color: var(--muted); font-size: 12px; }
 window.rippl .home-tile:hover { background: var(--hover); color: var(--ink); }
 /* Peek: the page dimmed, a panel over it. */
+window.rippl .bookmarks-bar { margin: 6px 8px 0 0; }
+window.rippl .stage.under-bar { margin-top: 4px; }
+window.rippl .bar-item { min-height: 24px; padding: 0 8px; border-radius: 6px; font-size: 12px; color: var(--ink); background: none; box-shadow: none; }
+window.rippl .bar-item:hover { background: var(--wash); }
+window.rippl .bar-hint { font-size: 12px; color: var(--muted); padding: 0 8px; }
+window.rippl .bar-menu .bar-item { padding: 4px 8px; }
+window.rippl .bar-folder-head { font-size: 11px; color: var(--muted); padding: 6px 8px 2px; }
+/* The column as icons only (chrome.rs). */
+window.rippl .column.icons { padding: 10px 6px 8px 6px; }
+window.rippl .column.icons .tabs row.tile { min-height: 32px; padding: 0; margin: 1px 4px; border-radius: 8px; }
+window.rippl .column.icons .new-tab { padding: 0; }
+window.rippl.no-column .stage { margin-left: 8px; }
+window.rippl.no-column .bookmarks-bar { margin-left: 8px; }
+/* The strip above the page: the field, and the tabs across the top. */
+window.rippl .top-strip { margin: 8px 8px 0 8px; min-height: 32px; }
+window.rippl .top-strip .field { margin-bottom: 0; }
+window.rippl .top-tabs { padding: 0 2px; }
+window.rippl .top-tab { min-height: 30px; padding: 0 4px 0 10px; border-radius: 9px; color: var(--muted); font-size: 12.5px; }
+window.rippl .top-tab.pinned { padding: 0 10px; }
+window.rippl .top-tab:hover { background: var(--hover); color: var(--ink); }
+window.rippl .top-tab.front { background: var(--wash); color: var(--ink); }
+window.rippl .top-tab.asleep { opacity: 0.75; }
+window.rippl .top-tab .close { min-width: 20px; min-height: 20px; padding: 0; opacity: 0; }
+window.rippl .top-tab:hover .close, window.rippl .top-tab.front .close { opacity: 0.7; }
+window.rippl .top-knob { min-width: 30px; min-height: 30px; padding: 0; border-radius: 9px; border: none;
+  background: none; box-shadow: none; color: var(--muted); }
+window.rippl .top-knob:hover { background: var(--hover); color: var(--ink); }
+window.rippl .top-offers { margin: 4px 0 0 4px; }
+window.rippl .switcher-dim { background: rgba(0,0,0,0.22); }
+window.rippl .switcher { background: var(--ground); border-radius: 14px; padding: 18px;
+  box-shadow: 0 0 0 1px var(--hairline), 0 10px 30px rgba(0,0,0,0.25); }
+window.rippl .switch-card { padding: 6px; border-radius: 10px; font-size: 12px; color: var(--ink); }
+window.rippl .switch-card.chosen { background: var(--wash); }
+window.rippl .switch-face { border-radius: 7px; background: var(--frame); box-shadow: inset 0 0 0 1px var(--hairline); }
+window.rippl .switch-mark { font-size: 28px; font-weight: 600; opacity: 0.6; }
 window.rippl .peek-dim { background: rgba(0,0,0,0.22); }
 window.rippl .peek-panel { background: var(--ground); border-radius: 12px;
   box-shadow: 0 0 0 1px var(--hairline), 0 10px 30px rgba(0,0,0,0.25); }
@@ -331,6 +366,12 @@ impl Browser {
     /// Draws the column again: pins, then rows. Cheap enough at browser
     /// scale to do whole.
     pub(crate) fn render(&self) {
+        if self.config.borrow().top_tabs {
+            self.render_top();
+            self.render_player();
+            return;
+        }
+        let icons = self.config.borrow().icon_column;
         while let Some(child) = self.list.first_child() {
             self.list.remove(&child);
         }
@@ -389,7 +430,8 @@ impl Browser {
                     pin.add_css_class("asleep");
                 }
                 self.on_click(&pin, id);
-                self.pins.attach(&pin, pin_at % 6, pin_at / 6, 1, 1);
+                let across = if icons { 1 } else { 6 };
+                self.pins.attach(&pin, pin_at % across, pin_at / across, 1, 1);
                 pin_at += 1;
                 continue;
             }
@@ -427,10 +469,19 @@ impl Browser {
             close.add_css_class("close");
             close.set_tooltip_text(Some("Close tab"));
             close.set_focusable(false);
-            line.append(&label);
-            line.append(&close);
+            if icons {
+                // A tile: the mark alone, its title a tooltip.
+                line.set_halign(gtk::Align::Center);
+                if tab.url.is_empty() {
+                    line.append(&gtk::Image::from_icon_name("list-add-symbolic"));
+                }
+                row.add_css_class("tile");
+            } else {
+                line.append(&label);
+                line.append(&close);
+            }
             row.set_child(Some(&line));
-            row.set_tooltip_text(Some(&tab.url));
+            row.set_tooltip_text(Some(&if icons { format!("{}\n{}", tab.title, tab.url) } else { tab.url.clone() }));
             if live {
                 row.add_css_class("front");
             }
@@ -552,7 +603,7 @@ impl Browser {
     }
 
     /// Click: select. Middle-click: close. Alt-click: beside the front tab.
-    fn on_click(&self, widget: &impl IsA<gtk::Widget>, id: rippl_core::tabs::TabId) {
+    pub(crate) fn on_click(&self, widget: &impl IsA<gtk::Widget>, id: rippl_core::tabs::TabId) {
         let click = gtk::GestureClick::builder().button(0).build();
         let weak = self.weak();
         click.connect_released(move |gesture, _, _, _| {

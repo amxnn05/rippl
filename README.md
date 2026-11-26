@@ -59,7 +59,7 @@ cargo build --release
 
 `cargo build` also builds `librippl_web_extension.so` beside the binary; rippl finds it there.
 
-`Ctrl+L` address · `Ctrl+T` new tab · `Ctrl+W` close · `Ctrl+Shift+N` private tab · `Ctrl+Tab` next ·
+`Ctrl+L` address · `Ctrl+T` new tab · `Ctrl+W` close · `Ctrl+Shift+N` private tab · `Ctrl+Tab` tab switcher ·
 `Ctrl+1`–`9` jump · `Alt+←/→` back/forward · `Ctrl+F` find · `Ctrl+D` bookmark · `Ctrl+H` history ·
 `Ctrl+Shift+P` pin · `Ctrl+Alt+S` split view · `Ctrl+Alt+P` passwords · `F9` reading mode · `Ctrl+Shift+H` hide something · `Ctrl+,` settings ·
 `Ctrl+Shift+B` Shield off for this site · `Ctrl+S` hide tabs.

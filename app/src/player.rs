@@ -54,7 +54,7 @@ impl Browser {
 
     /// The tab the player is for, if any.
     fn player_tab(&self) -> Option<TabId> {
-        if !self.config.borrow().player {
+        if !self.config.borrow().player || self.config.borrow().icon_column || self.config.borrow().top_tabs {
             return None;
         }
         let shown = self.on_screen();

@@ -69,11 +69,16 @@ app/src/
   spaces.rs               spaces: switch, new, rename, delete, move tabs; the foot's buttons
   pagelook.rs             dark pages, your CSS per site, capture, site icons
   home.rs                 the new tab: the field in the middle of the page, the Home grid
-  pagescripts.rs          scripts switched by settings: YouTube's ads, video keys
+  pagescripts.rs          scripts switched by settings (YouTube's ads, video keys, autoscroll); autoplay policy
   youtube_page.js         YouTube: the ad schedule out of the player's data (page world)
   youtube_skipper.js      YouTube: an ad that plays anyway, muted at 16x (rippl's world)
   peek.rs                 Shift+click: a link's page in a panel over this one
   player.rs               what plays in another tab, at the column's foot
+  autoscroll.js           middle-button scrolling (rippl's world)
+  closing.rs              tabs left alone close themselves, into the archive
+  switcher.rs             Ctrl+Tab: the tabs as pictures, latest first
+  bookmarks_bar.rs        the bookmarks bar, with a » for what doesn't fit
+  chrome.rs               tabs on the side, as icons, or across the top; the strip above the page
   pressure.rs             Linux PSI reading; malloc_trim
   control.rs              Unix socket for tests and measurement (opt-in)
 

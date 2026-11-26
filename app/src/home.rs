@@ -123,6 +123,12 @@ impl Browser {
             self.field.add_css_class("home-field");
             self.field.set_placeholder_text(Some("Enter a web address"));
             self.suggest_area.add_css_class("home-offers");
+            self.suggest_area.remove_css_class("top-offers");
+            self.suggest_area.set_halign(gtk::Align::Fill);
+            self.suggest_area.set_valign(gtk::Align::Fill);
+            self.suggest_area.set_size_request(-1, -1);
+            self.field.set_size_request(-1, -1);
+            self.field.set_hexpand(false);
             self.suggest_area.set_vexpand(false);
             self.suggest_area.set_propagate_natural_height(true);
             self.suggest_area.set_max_content_height(420);
@@ -130,15 +136,7 @@ impl Browser {
             self.tabs_area.set_visible(true);
             self.fill_home_grid();
         } else {
-            self.column.prepend(&self.suggest_area);
-            self.column.prepend(&self.field);
-            self.field.remove_css_class("home-field");
-            self.field.set_placeholder_text(Some("Search or enter address"));
-            self.suggest_area.remove_css_class("home-offers");
-            self.suggest_area.set_vexpand(true);
-            self.suggest_area.set_propagate_natural_height(false);
-            self.suggest_area.set_max_content_height(-1);
-            self.tabs_area.set_visible(!self.suggest_area.is_visible());
+            self.put_field_back();
         }
         if focused || home {
             let field = self.field.clone();

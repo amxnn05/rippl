@@ -25,6 +25,26 @@
 //! peek = on
 //! # what plays in another tab, at the foot of the column (off, default)
 //! player = off
+//! # videos start by themselves without sound (muted, default) or wait for
+//! # a click (never); a site's card can let it play with sound
+//! autoplay = muted
+//! # a click of the middle button on a page scrolls it (off, default)
+//! autoscroll = off
+//! # tabs left unseen this long close themselves, into rippl://archive
+//! # (never, default; or 12h, 1d, 7d, 30d)
+//! close_after = never
+//! # a row of bookmarks above the page (off, default)
+//! bookmarks_bar = off
+//! # the column with titles (full, default) or as icons only
+//! column = full
+//! # Ctrl+Tab shows the tabs as pictures, latest first (on, default) or
+//! # simply goes to the next tab (off)
+//! tab_switcher = on
+//! # tabs down the side (side, default) or across the top
+//! tabs = side
+//! # pages, their animations and smooth scrolling at the screen's own rate
+//! # (display, default: 144 on a 144 Hz screen) or near 60 (60, saves power)
+//! frame_rate = display
 //! # minutes a tab sits unseen before it sleeps (default 30)
 //! sleep = 30
 //! # keep history (on, default) or not (off); bookmarks are kept either way
@@ -69,6 +89,19 @@ pub struct Config {
     pub video_keys: bool,
     pub peek: bool,
     pub player: bool,
+    /// Videos may start by themselves, without sound (true) or not at all.
+    pub autoplay: bool,
+    pub autoscroll: bool,
+    /// Tabs left unseen this long close themselves; None: never.
+    pub close_after: Option<Duration>,
+    pub bookmarks_bar: bool,
+    /// The column as icons only.
+    pub icon_column: bool,
+    /// Tabs across the top instead of down the side.
+    pub top_tabs: bool,
+    pub tab_switcher: bool,
+    /// Pages at the screen's refresh rate rather than near 60.
+    pub full_rate: bool,
     pub sleep_after: Duration,
     pub history: bool,
     pub theme: Theme,
@@ -91,6 +124,29 @@ fn on(value: &str) -> Option<bool> {
     }
 }
 
+/// `close_after`'s choices Settings › Tabs offers them.
+pub const CLOSE_CHOICES: [&str; 5] = ["never", "12h", "1d", "7d", "30d"];
+
+fn close_after(value: &str) -> Option<Option<Duration>> {
+    let hours = match value {
+        "never" => return Some(None),
+        "12h" => 12,
+        "1d" => 24,
+        "7d" => 7 * 24,
+        "30d" => 30 * 24,
+        _ => return None,
+    };
+    Some(Some(Duration::from_secs(hours * 3600)))
+}
+
+fn close_name(after: Option<Duration>) -> String {
+    let Some(d) = after else { return "never".into() };
+    CLOSE_CHOICES
+        .iter()
+        .find(|c| close_after(c) == Some(Some(d)))
+        .map_or_else(|| format!("{}s", d.as_secs()), |c| c.to_string())
+}
+
 impl Default for Config {
     fn default() -> Config {
         Config {
@@ -104,6 +160,14 @@ impl Default for Config {
             video_keys: false,
             peek: true,
             player: false,
+            autoplay: true,
+            autoscroll: false,
+            close_after: None,
+            bookmarks_bar: false,
+            icon_column: false,
+            top_tabs: false,
+            tab_switcher: true,
+            full_rate: true,
             sleep_after: Duration::from_secs(30 * 60),
             history: true,
             theme: Theme::System,
@@ -124,6 +188,10 @@ impl Config {
             if let Err(e) = config.apply(key.trim(), value.trim()) {
                 eprintln!("rippl: config: {e}");
             }
+        }
+        // For measuring: seconds, not hours.
+        if let Some(secs) = std::env::var("RIPPL_CLOSE_AFTER").ok().and_then(|s| s.parse().ok()) {
+            config.close_after = Some(Duration::from_secs(secs));
         }
         // For measuring: seconds, not minutes.
         if let Some(secs) = std::env::var("RIPPL_SLEEP_AFTER").ok().and_then(|s| s.parse().ok()) {
@@ -146,6 +214,38 @@ impl Config {
             "video_keys" => self.video_keys = on(value).ok_or_else(bad)?,
             "peek" => self.peek = on(value).ok_or_else(bad)?,
             "player" => self.player = on(value).ok_or_else(bad)?,
+            "frame_rate" => {
+                self.full_rate = match value {
+                    "display" => true,
+                    "60" => false,
+                    _ => return Err(bad()),
+                }
+            }
+            "tab_switcher" => self.tab_switcher = on(value).ok_or_else(bad)?,
+            "autoscroll" => self.autoscroll = on(value).ok_or_else(bad)?,
+            "bookmarks_bar" => self.bookmarks_bar = on(value).ok_or_else(bad)?,
+            "autoplay" => {
+                self.autoplay = match value {
+                    "muted" => true,
+                    "never" => false,
+                    _ => return Err(bad()),
+                }
+            }
+            "close_after" => self.close_after = close_after(value).ok_or_else(bad)?,
+            "column" => {
+                self.icon_column = match value {
+                    "full" => false,
+                    "icons" => true,
+                    _ => return Err(bad()),
+                }
+            }
+            "tabs" => {
+                self.top_tabs = match value {
+                    "side" => false,
+                    "top" => true,
+                    _ => return Err(bad()),
+                }
+            }
             "history" => self.history = on(value).ok_or_else(bad)?,
             "https_only" => self.https_only = on(value).ok_or_else(bad)?,
             "gpc" => self.gpc = on(value).ok_or_else(bad)?,
@@ -223,6 +323,14 @@ impl Config {
             choice("peek", "Shift+click a link to peek at it", onoff(self.peek), &["on", "off"], "Esc puts it away; Ctrl+Return keeps it as a tab"),
             choice("player", "What plays in another tab, at the foot of the column", onoff(self.player), &["on", "off"], "With its pause"),
             choice("video_keys", "Space and ← → control videos", onoff(self.video_keys), &["on", "off"], "Videos with the browser's own controls, once clicked"),
+            choice("autoplay", "Videos start by themselves", if self.autoplay { "muted" } else { "never" }.into(), &["muted", "never"], "Muted: without sound, until you let a site play sound from its card. Never: they wait for a click"),
+            choice("autoscroll", "Scroll with the middle button", onoff(self.autoscroll), &["on", "off"], "A click of the wheel on a page, then move the pointer"),
+            choice("close_after", "Tabs left alone close themselves after", close_name(self.close_after), &CLOSE_CHOICES, "Not pinned tabs, tabs in a group, or kept-awake sites. rippl://archive keeps them a month"),
+            choice("frame_rate", "Pages and scrolling", if self.full_rate { "display" } else { "60" }.into(), &["display", "60"], "Display: at your screen's refresh rate (144 Hz gets 144). 60: less power on battery"),
+            choice("tab_switcher", "Ctrl+Tab shows the tabs as pictures", onoff(self.tab_switcher), &["on", "off"], "Latest first. Off: the next tab in the column"),
+            choice("bookmarks_bar", "Bookmarks bar above the page", onoff(self.bookmarks_bar), &["on", "off"], ""),
+            choice("tabs", "Tabs", if self.top_tabs { "top" } else { "side" }.into(), &["side", "top"], "Down the side, or across the top"),
+            choice("column", "The column", if self.icon_column { "icons" } else { "full" }.into(), &["full", "icons"], "With titles, or icons only"),
             choice("home_grid", "New tab: the sites in the bookmark folder Home", onoff(self.home_grid), &["on", "off"], "Four to a row, sixteen at most"),
             choice("history", "Keep history", onoff(self.history), &["on", "off"], ""),
             choice(
@@ -255,6 +363,12 @@ mod tests {
         assert!(c.apply("https_only", "off").is_ok() && !c.https_only);
         assert!(c.apply("keyword.npm", "https://www.npmjs.com/search?q=%s").is_ok());
         assert_eq!(c.keywords[0].0, "npm");
+        assert!(c.apply("close_after", "7d").is_ok());
+        assert_eq!(c.close_after, Some(Duration::from_secs(7 * 86400)));
+        assert_eq!(close_name(c.close_after), "7d");
+        assert!(c.apply("close_after", "3d").is_err());
+        assert!(c.apply("autoplay", "never").is_ok() && !c.autoplay);
+        assert!(c.apply("tabs", "top").is_ok() && c.top_tabs);
         assert!(c.apply("keyword.evil", "https://%s.evil.com/").is_err());
     }
 }

@@ -146,6 +146,17 @@ impl Browser {
                         b.apply_keep_awake();
                     }
                 }));
+                // Sound by itself: only while videos may start at all.
+                if self.config.borrow().autoplay {
+                    let sound = self.places.site_flag(&host, crate::pagescripts::SOUND).unwrap_or(false);
+                    let weak = self.weak();
+                    let h = host.clone();
+                    card.append(&self.switch_line("Play sound by itself", sound, move |on| {
+                        if let Some(b) = weak.upgrade() {
+                            let _ = b.places.set_site_flag(&h, crate::pagescripts::SOUND, on);
+                        }
+                    }));
+                }
                 let popups = self.places.site_flag(&host, POPUPS).unwrap_or(false);
                 let weak = self.weak();
                 let h = host.clone();
@@ -420,7 +431,8 @@ impl Browser {
             menu.append(&button);
         }
         self.tab_menu.set_child(Some(&menu));
-        let Some(bounds) = anchor.compute_bounds(&self.tabs_area) else { return };
+        let Some(parent) = self.tab_menu.parent() else { return };
+        let Some(bounds) = anchor.compute_bounds(&parent) else { return };
         let rect = webkit6::gdk::Rectangle::new(
             (bounds.x() + 24.0) as i32,
             (bounds.y() + bounds.height()) as i32,

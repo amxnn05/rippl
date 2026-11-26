@@ -14,6 +14,9 @@
 //! tab 0 3 1 https://docs.rs/ Docs.rs
 //! ```
 //!
+//! `left <tab index> <unix seconds>` (when each tab was last on screen,
+//! for tabs that close themselves; older files have none, and their tabs
+//! count from the restore),
 //! `space <id> <name>`, `group <id> <space> <collapsed> <name>`,
 //! `front <space> <tab index>`, `tab <pinned> <space> <group or -> <url>
 //! <title>`. URLs never contain spaces (WebKit percent-encodes them);
@@ -32,6 +35,8 @@ pub struct Saved {
     pub pinned: bool,
     pub space: SpaceId,
     pub group: Option<u32>,
+    /// When it was last on screen, unix seconds.
+    pub left: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -73,6 +78,7 @@ impl Session {
                     pinned: t.pinned,
                     space: t.space,
                     group: t.group,
+                    left: Some(t.left),
                 })
                 .collect(),
             spaces: tabs.spaces.clone(),
@@ -98,6 +104,11 @@ impl Session {
             let group = t.group.map_or("-".to_string(), |g| g.to_string());
             out.push_str(&format!("tab {} {} {group} {} {}\n", u8::from(t.pinned), t.space, t.url, flat(&t.title)));
         }
+        for (i, t) in self.tabs.iter().enumerate() {
+            if let Some(left) = t.left {
+                out.push_str(&format!("left {i} {left}\n"));
+            }
+        }
         out
     }
 
@@ -113,6 +124,7 @@ impl Session {
         };
         let mut session = Session::default();
         let mut v1_front = None;
+        let mut lefts = Vec::new();
         for line in lines {
             let (kind, rest) = line.split_once(' ').unwrap_or((line, ""));
             match kind {
@@ -147,7 +159,7 @@ impl Session {
                         continue;
                     }
                     let title = parts.next().unwrap_or("").to_string();
-                    session.tabs.push(Saved { url: url.into(), title, pinned: pin == "1", space: 0, group: None });
+                    session.tabs.push(Saved { url: url.into(), title, pinned: pin == "1", space: 0, group: None, left: None });
                 }
                 "tab" => {
                     let mut p = rest.splitn(5, ' ');
@@ -165,13 +177,22 @@ impl Session {
                         pinned: pin == "1",
                         space,
                         group: group.parse().ok(),
+                        left: None,
                     });
                 }
+                "left" => lefts.extend(
+                    rest.split_once(' ').and_then(|(i, l)| Some((i.parse::<usize>().ok()?, l.trim().parse::<i64>().ok()?))),
+                ),
                 _ => {}
             }
         }
         if let Some(f) = v1_front {
             session.fronts.push((0, f));
+        }
+        for (i, left) in lefts {
+            if let Some(t) = session.tabs.get_mut(i) {
+                t.left = Some(left);
+            }
         }
         let n = session.tabs.len();
         session.fronts.retain(|(_, i)| *i < n);
@@ -203,6 +224,9 @@ impl Session {
                 t.pinned = saved.pinned;
                 t.space = saved.space;
                 t.group = saved.group;
+                if let Some(left) = saved.left {
+                    t.left = left;
+                }
             }
             ids.push(id);
         }

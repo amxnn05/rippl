@@ -96,6 +96,11 @@ pub struct Browser {
     pub(crate) peek_close: gtk::Button,
     pub(crate) peek_keep: gtk::Button,
     pub(crate) peeking: RefCell<Option<crate::peek::Peeking>>,
+    pub(crate) bookmarks_bar: gtk::Box,
+    /// The strip above the page: the field and the top tabs (chrome.rs).
+    pub(crate) top: crate::chrome::TopStrip,
+    /// Ctrl+Tab's cards (switcher.rs).
+    pub(crate) switcher: crate::switcher::Switcher,
     /// The player at the column's foot (player.rs): tabs by when their
     /// sound started, the ones it paused, and the one it shows.
     pub(crate) player_row: gtk::Box,
@@ -257,6 +262,8 @@ impl Browser {
         overlay.add_overlay(&popup_bar);
         let (peek_dim, peek_frame, peek_close, peek_keep) = Browser::peek_layer();
         overlay.add_overlay(&peek_dim);
+        let switcher = crate::switcher::Switcher::new();
+        overlay.add_overlay(&switcher.layer);
         let accounts_list = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
         accounts_list.add_css_class("accounts");
         let accounts_popover = gtk::Popover::builder().child(&accounts_list).build();
@@ -281,9 +288,16 @@ impl Browser {
         status.set_can_target(false);
         overlay.add_overlay(&status);
 
+        // The bookmarks bar, above the page's card (bookmarks_bar.rs).
+        let bookmarks_bar = Browser::bookmarks_bar();
+        let top = crate::chrome::TopStrip::new();
+        let right = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        right.append(&top.bar);
+        right.append(&bookmarks_bar);
+        right.append(&overlay);
         let body = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         body.append(&column);
-        body.append(&overlay);
+        body.append(&right);
         window.set_child(Some(&body));
 
         let config = Config::load();
@@ -294,6 +308,7 @@ impl Browser {
             Places::open(None).expect("in-memory SQLite")
         });
         let engine = Engine::new(shield.content.clone(), config.gpc, config.https_only);
+        engine.set_full_rate(config.full_rate);
         // Downloads from every session: the kept one here, private ones as
         // they are made (engine.rs).
         let hook = {
@@ -347,6 +362,9 @@ impl Browser {
             peek_close,
             peek_keep,
             peeking: RefCell::new(None),
+            switcher,
+            bookmarks_bar,
+            top,
             player_row,
             sounding: RefCell::new(Vec::new()),
             stilled: RefCell::new(HashSet::new()),
@@ -417,6 +435,9 @@ impl Browser {
         browser.wire_actions(app);
         browser.wire_window();
         browser.wire_home();
+        browser.wire_switcher();
+        browser.fill_bookmarks_bar();
+        browser.wire_chrome();
         browser.install_page_scripts();
         browser.wire_peek();
         browser.wire_player();
@@ -463,6 +484,11 @@ impl Browser {
     /// Puts `id` in front, waking it if it has no view.
     pub fn select(&self, id: TabId) {
         debug!("select {id}");
+        if let Some(old) = self.front().filter(|f| *f != id)
+            && let Some(view) = self.views.borrow().get(&old).cloned()
+        {
+            self.keep_picture(old, &view);
+        }
         let (url, life) = {
             let mut tabs = self.tabs.borrow_mut();
             tabs.select(id);
@@ -599,6 +625,7 @@ impl Browser {
 
     pub fn close(&self, id: TabId) {
         self.remember_closed(id);
+        self.drop_picture(id);
         self.separate(id);
         let view = self.views.borrow_mut().remove(&id);
         if let Some(view) = view {
@@ -826,7 +853,7 @@ impl Browser {
                 .and_then(|d| d.navigation_action())
                 .and_then(|a| a.request())
                 .and_then(|r| r.uri());
-            if let Some(uri) = uri.filter(|u| u.starts_with("http://"))
+            if let Some(uri) = uri.clone().filter(|u| u.starts_with("http://"))
                 && let Some(origin) = rippl_core::passwords::origin_of(&uri)
             {
                 let host = rippl_core::passwords::host_of_origin(&origin).to_string();
@@ -842,6 +869,12 @@ impl Browser {
                         list.remove(0);
                     }
                 }
+            }
+            // Whether its videos may start by themselves, and with sound.
+            if let Some(uri) = uri.filter(|u| u.starts_with("http")) {
+                let private = b.tabs.borrow().get(id).is_some_and(|t| t.private);
+                decision.use_with_policies(&b.website_policies(&uri, private));
+                return true;
             }
             false
         });
@@ -1292,6 +1325,63 @@ impl Browser {
                 }
                 _ => "none".into(),
             },
+            // A setting, as rippl://settings changes it (written to the file).
+            "set" => {
+                let (key, value) = rest.split_once(' ').unwrap_or((rest, ""));
+                self.change_setting(key.trim(), value.trim()).unwrap_or_else(|e| format!("error {e}"))
+            }
+            "switcher" => match rest.trim() {
+                "" => self.walk_state(),
+                "next" => {
+                    self.walk_next();
+                    self.walk_state()
+                }
+                "go" => {
+                    self.end_walk(true);
+                    "ok".into()
+                }
+                _ => {
+                    self.end_walk(false);
+                    "ok".into()
+                }
+            },
+            "bar" => self.bar_state(rest.trim() == "more"),
+            // The window's own frame clock, counted for a second.
+            // How often the window really paints for a second: with only a
+            // page moving, how many frames it gave the screen.
+            "paints" => {
+                let Some(clock) = self.window.frame_clock() else { return "no clock".into() };
+                let count = Rc::new(Cell::new(0u32));
+                let c = count.clone();
+                let handler = clock.connect_after_paint(move |_| c.set(c.get() + 1));
+                glib::timeout_add_local_once(Duration::from_millis(1000), move || {
+                    clock.disconnect(handler);
+                    eprintln!("rippl: paints {} in 1s", count.get());
+                });
+                "counting".into()
+            }
+            "frames" => {
+                let count = Rc::new(Cell::new(0u32));
+                let c = count.clone();
+                let start = std::time::Instant::now();
+                self.window.add_tick_callback(move |w, _| {
+                    c.set(c.get() + 1);
+                    w.queue_draw();
+                    if start.elapsed() < Duration::from_secs(1) { glib::ControlFlow::Continue } else { glib::ControlFlow::Break }
+                });
+                let rate = self.window.surface().and_then(|s| WidgetExt::display(&self.window).monitor_at_surface(&s)).map(|m| m.refresh_rate());
+                let c = count.clone();
+                glib::timeout_add_local_once(Duration::from_millis(1100), move || eprintln!("rippl: frames {} in 1s", c.get()));
+                format!("monitor {} mHz; counting (see the log)", rate.unwrap_or(0))
+            }
+            "archived" => self
+                .places
+                .archived(rest)
+                .unwrap_or_default()
+                .iter()
+                .map(|p| format!("{}\t{}", p.url, p.title))
+                .collect::<Vec<_>>()
+                .join("\n"),
             "archive" => {
                 self.save_archive();
                 "ok".into()
@@ -1499,7 +1589,8 @@ impl Browser {
                 b.close(id);
             }
         });
-        self.action(app, "next-tab", &["<Ctrl>Tab", "<Ctrl>Page_Down"], |b| {
+        // Ctrl+Tab and Ctrl+Shift+Tab: the switcher's (switcher.rs).
+        self.action(app, "next-tab", &["<Ctrl>Page_Down"], |b| {
             if let Some(id) = b.tabs.borrow().neighbour(1) {
                 glib::idle_add_local_once({
                     let w = b.weak();
@@ -1511,7 +1602,7 @@ impl Browser {
                 });
             }
         });
-        self.action(app, "prev-tab", &["<Ctrl><Shift>Tab", "<Ctrl><Shift>ISO_Left_Tab", "<Ctrl>Page_Up"], |b| {
+        self.action(app, "prev-tab", &["<Ctrl>Page_Up"], |b| {
             if let Some(id) = b.tabs.borrow().neighbour(-1) {
                 glib::idle_add_local_once({
                     let w = b.weak();
@@ -1671,6 +1762,7 @@ impl Browser {
             let chosen = b.config.borrow().sleep_after;
             let pressure = pressure::read();
             b.sleep_idle(tabs::sleep_wait(chosen, pressure));
+            b.close_left_alone();
             if pressure == Pressure::Critical {
                 pressure::trim();
             }
@@ -1745,6 +1837,7 @@ impl Browser {
             eprintln!("rippl: bookmarks: {e}");
         }
         self.show_front();
+        self.fill_bookmarks_bar();
     }
 
     fn sleep_idle(&self, wait: Duration) {
@@ -1803,6 +1896,7 @@ impl Browser {
             self.open("", false, true);
         }
         self.apply_keep_awake();
+        self.close_left_alone();
         self.render();
     }
 
