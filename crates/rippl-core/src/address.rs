@@ -188,6 +188,49 @@ pub fn url_from(typed: &str) -> Option<String> {
 
 /// This machine, the local network, or a name with no dot (an intranet
 /// host like `router`): places that rarely have a certificate.
+/// Where pages and rippl's own requests go out.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Proxy {
+    /// The desktop's own proxy settings (none, unless it has some).
+    System,
+    /// Straight out, whatever the desktop says.
+    Direct,
+    /// Through this proxy: `http://host:port`, `socks5://host:port`, …
+    Through(String),
+}
+
+/// Hosts never sent through a proxy: this machine and `.local` names, or
+/// a proxy would cut you off from them.
+pub const PROXY_DIRECT: [&str; 4] = ["localhost", "127.0.0.1", "::1", "*.local"];
+
+/// The `proxy` setting, checked: `system`, `direct`, or a proxy's address
+/// with its scheme and port. No password in it: the config is plain text.
+pub fn proxy(value: &str) -> Option<Proxy> {
+    let value = value.trim();
+    match value {
+        "system" | "" => return Some(Proxy::System),
+        "direct" | "off" | "none" => return Some(Proxy::Direct),
+        _ => {}
+    }
+    let (scheme, rest) = value.split_once("://")?;
+    if !["http", "https", "socks", "socks4", "socks4a", "socks5"].contains(&scheme) {
+        return None;
+    }
+    let rest = rest.trim_end_matches('/');
+    let host_port = match rest.rsplit_once('@') {
+        Some((user, hp)) if !user.contains(':') && !user.is_empty() => hp,
+        Some(_) => return None,
+        None => rest,
+    };
+    let (host, port) = host_port.rsplit_once(':')?;
+    port.parse::<u16>().ok().filter(|p| *p > 0)?;
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    if host.is_empty() || host.contains(['/', ' ', '?', '#']) {
+        return None;
+    }
+    Some(Proxy::Through(format!("{scheme}://{rest}")))
+}
+
 pub fn is_local_host(host: &str) -> bool {
     let host = host.trim_start_matches('[').trim_end_matches(']').to_ascii_lowercase();
     host == "localhost"
@@ -320,6 +363,19 @@ pub fn pretty(url: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn proxies_are_checked() {
+        assert_eq!(proxy("system"), Some(Proxy::System));
+        assert_eq!(proxy("direct"), Some(Proxy::Direct));
+        assert_eq!(proxy("socks5://127.0.0.1:9050"), Some(Proxy::Through("socks5://127.0.0.1:9050".into())));
+        assert_eq!(proxy("http://me@proxy.example:3128/"), Some(Proxy::Through("http://me@proxy.example:3128".into())));
+        assert_eq!(proxy("http://[::1]:8080"), Some(Proxy::Through("http://[::1]:8080".into())));
+        assert_eq!(proxy("http://me:secret@proxy.example:3128"), None, "no passwords in the config");
+        assert_eq!(proxy("ftp://proxy:21"), None);
+        assert_eq!(proxy("socks5://proxy"), None, "a port is needed");
+        assert_eq!(proxy("socks5://proxy:0"), None);
+    }
 
     fn go(t: &str) -> String {
         match resolve(t, DEFAULT_SEARCH) {

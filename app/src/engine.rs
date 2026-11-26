@@ -66,8 +66,40 @@ fn install_extension() -> Option<PathBuf> {
 const GPC_SCRIPT: &str = "Object.defineProperty(Navigator.prototype, 'globalPrivacyControl', \
     { get() { return true; }, configurable: true, enumerable: true });";
 
+thread_local! {
+    /// The `proxy` setting, as every session made from now on takes it.
+    static PROXY: std::cell::RefCell<rippl_core::address::Proxy> =
+        const { std::cell::RefCell::new(rippl_core::address::Proxy::System) };
+}
+
+/// Puts the proxy on `session`.
+fn apply_proxy(session: &NetworkSession) {
+    use rippl_core::address::{Proxy, PROXY_DIRECT};
+    PROXY.with(|p| match &*p.borrow() {
+        Proxy::System => session.set_proxy_settings(webkit6::NetworkProxyMode::Default, None),
+        Proxy::Direct => session.set_proxy_settings(webkit6::NetworkProxyMode::NoProxy, None),
+        Proxy::Through(uri) => {
+            let settings = webkit6::NetworkProxySettings::new(Some(uri), &PROXY_DIRECT);
+            session.set_proxy_settings(webkit6::NetworkProxyMode::Custom, Some(&settings));
+        }
+    });
+}
+
+/// The proxy for rippl's own requests (filter lists, suggestions): the
+/// same as the pages', or a page's sites could be read through them.
+pub fn proxy_resolver() -> Option<webkit6::gio::ProxyResolver> {
+    use rippl_core::address::{Proxy, PROXY_DIRECT};
+    use webkit6::prelude::*;
+    PROXY.with(|p| match &*p.borrow() {
+        Proxy::System => None,
+        Proxy::Direct => Some(webkit6::gio::SimpleProxyResolver::new(Some("direct://"), &[] as &[&str]).upcast()),
+        Proxy::Through(uri) => Some(webkit6::gio::SimpleProxyResolver::new(Some(uri), &PROXY_DIRECT[..]).upcast()),
+    })
+}
+
 /// What every network session gets, kept or private.
 fn harden(session: &NetworkSession) {
+    apply_proxy(session);
     // Site icons for the tabs (pagelook.rs): kept with the session's data.
     if let Some(manager) = session.website_data_manager() {
         manager.set_favicons_enabled(true);
@@ -139,6 +171,12 @@ fn total_ram_mb() -> Option<u32> {
 }
 
 impl Engine {
+    /// `new`, with the proxy every session takes from the start.
+    pub fn new_with_proxy(content: UserContentManager, gpc: bool, https_only: bool, proxy: rippl_core::address::Proxy) -> Engine {
+        PROXY.with(|p| *p.borrow_mut() = proxy);
+        Engine::new(content, gpc, https_only)
+    }
+
     pub fn new(content: UserContentManager, gpc: bool, https_only: bool) -> Engine {
         // Each web process is told how much it may use before it starts
         // dropping its caches. WebKit's own default is generous (most of the
@@ -287,6 +325,16 @@ impl Engine {
         if self.extension {
             let start = self.start.borrow().clone();
             self.context.set_web_process_extensions_initialization_user_data(&start.to_variant());
+        }
+    }
+
+    /// The `proxy` setting: for every session there is and every one made
+    /// from now on.
+    pub fn set_proxy(&self, proxy: rippl_core::address::Proxy) {
+        PROXY.with(|p| *p.borrow_mut() = proxy);
+        apply_proxy(&self.session);
+        for s in self.spaces.borrow().values() {
+            apply_proxy(s);
         }
     }
 

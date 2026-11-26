@@ -56,6 +56,10 @@ models do not depend on profiling you. If you want certainty, host SearXNG yours
 | **No cross-site pings** | `<a ping>` and beacons sent to another site are blocked by Shield. (WebKitGTK 2.54 ignores its own hyperlink-auditing setting, so Shield is what stops them) | `rippl_core::shield` |
 | **Permissions asked, per site** | Camera, microphone, screen, location, notifications, clipboard reading, DRM and storage access are all asked for; nothing is granted silently. Answers are kept per site, never for private tabs | `permissions.rs` |
 | **History stays local and optional** | Kept in `places.sqlite` on your machine; never recorded from private tabs; `history = off` stops it | `rippl_core::places` |
+| **One proxy for everything** | `proxy` goes on every network session and on rippl's own requests (filter lists, suggestions, resumed downloads), so nothing leaks around it; this machine and `.local` stay direct | `engine.rs` |
+| **Sync without a server** | `sync_folder`: files in a folder you choose; never history, passwords, cookies or open tabs | `sync.rs`, `rippl_core::sync` |
+| **Importing reads copies** | Another browser's files are copied and read; its passwords are decrypted in memory and go only to your keyring, after you confirm | `rippl_core::import_more` |
+| **Certificates only when chosen** | A site asking for a client certificate gets one only if you pick it; a private tab asks for itself | `certificates.rs` |
 | **The archive is history** | Tabs rippl closes by itself (`close_after`) are kept in `places.sqlite` for a month, only while `history = on`, never private tabs; clearing history empties it | `closing.rs`, `rippl_core::places` |
 | **Address suggestions are local** | Offers come from your own history, bookmarks and tabs; nothing typed is sent anywhere before Return | `omnibox.rs` |
 | **rippl:// pages unreachable from the web** | The scheme is local and display-isolated; buttons need a per-launch random token, so neither a website nor a downloaded HTML file can clear history or change permissions | `internal_pages.rs` |

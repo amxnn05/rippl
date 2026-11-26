@@ -109,6 +109,8 @@ pub struct Browser {
     pub(crate) space_css: gtk::CssProvider,
     /// The new tab's background (home_theme.rs).
     pub(crate) home_css: gtk::CssProvider,
+    /// Each site's certificate answer, this run (certificates.rs).
+    pub(crate) cert_choices: crate::certificates::Choices,
     /// Every command and its own keys (shortcuts.rs).
     pub(crate) known_actions: RefCell<Vec<(String, Vec<String>)>>,
     /// Ctrl+Tab's cards (switcher.rs).
@@ -326,7 +328,8 @@ impl Browser {
                     eprintln!("rippl: history and bookmarks unavailable ({e}); keeping them in memory this time");
                     Places::open(None).expect("in-memory SQLite")
                 });
-                let engine = Engine::new(shield.content.clone(), config.gpc, config.https_only);
+                // Before any session is made: each takes it as it is made.
+                let engine = Engine::new_with_proxy(shield.content.clone(), config.gpc, config.https_only, config.proxy.clone());
                 engine.set_full_rate(config.full_rate);
                 // Downloads from every session: the kept one here, private
                 // ones as they are made (engine.rs). They are listed in the
@@ -338,6 +341,7 @@ impl Browser {
                 let kept = hook.clone();
                 engine.session.connect_download_started(move |_, d| kept(d));
                 *engine.on_download.borrow_mut() = Some(hook);
+                *downloads.session.borrow_mut() = Some(engine.session.clone());
                 (
                     Rc::new(RefCell::new(config)),
                     shield,
@@ -396,6 +400,7 @@ impl Browser {
             peeking: RefCell::new(None),
             switcher,
             known_actions: RefCell::new(Vec::new()),
+            cert_choices: RefCell::new(HashMap::new()),
             space_css: gtk::CssProvider::new(),
             home_css: gtk::CssProvider::new(),
             bookmarks_bar,
@@ -888,6 +893,20 @@ impl Browser {
         let weak = self.weak();
         view.connect_decide_policy(move |v, decision, kind| {
             let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) else { return false };
+            // An email link: the webmail's compose page, or the mail app.
+            if matches!(kind, webkit6::PolicyDecisionType::NavigationAction | webkit6::PolicyDecisionType::NewWindowAction)
+                && let Some(link) = decision
+                    .downcast_ref::<webkit6::NavigationPolicyDecision>()
+                    .and_then(|d| d.navigation_action())
+                    .and_then(|a| a.request())
+                    .and_then(|r| r.uri())
+                    .filter(|u| u.get(..7).is_some_and(|s| s.eq_ignore_ascii_case("mailto:")))
+            {
+                decision.ignore();
+                let link = link.to_string();
+                glib::idle_add_local_once(move || b.email_link(&link));
+                return true;
+            }
             // Shift+click on a link: a peek, not a navigation or a window.
             if matches!(kind, webkit6::PolicyDecisionType::NavigationAction | webkit6::PolicyDecisionType::NewWindowAction)
                 && let Some(action) =
@@ -932,6 +951,12 @@ impl Browser {
                 return true;
             }
             false
+        });
+
+        let weak = self.weak();
+        view.connect_authenticate(move |v, request| {
+            let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) else { return false };
+            b.authenticate(id, request)
         });
 
         let weak = self.weak();
@@ -1230,6 +1255,11 @@ impl Browser {
                 _ => "error: permissions [forget [host] | answer allow|deny]".into(),
             },
             "downloads" => self.downloads.status(),
+            // download-pause <n>: the nth download's pause / resume button.
+            "download-pause" => {
+                self.downloads.press_pause(rest.trim().parse::<usize>().unwrap_or(1).saturating_sub(1));
+                "ok".into()
+            }
             "save" => match rest.trim() {
                 "" => match self.save_question.borrow().as_ref() {
                     Some(q) => format!("{:?}\t{}\t{}", q.ask, q.pending.origin, q.pending.capture.username),
@@ -1416,6 +1446,27 @@ impl Browser {
                 }
             },
             "bar" => self.bar_state(rest.trim() == "more"),
+            "sync" => self.sync_now(),
+            // For tests: trust a server certificate (a PEM file) for a host.
+            "trust" => {
+                let (file, host) = rest.split_once(' ').unwrap_or((rest, ""));
+                match gio::TlsCertificate::from_file(file.trim()) {
+                    Ok(c) => {
+                        self.engine.session.allow_tls_certificate_for_host(&c, host.trim());
+                        "ok".into()
+                    }
+                    Err(e) => format!("error {e}"),
+                }
+            }
+            // certificates: the identities found; certificate <host> <n|none>:
+            // answers that site's question ahead (as a pick in the dialog).
+            "certificates" => crate::certificates::identities().iter().map(|i| i.label.clone()).collect::<Vec<_>>().join("\n"),
+            "certificate" => {
+                let (host, pick) = rest.split_once(' ').unwrap_or((rest, ""));
+                let choice = pick.trim().parse::<usize>().ok().and_then(|i| crate::certificates::identities().get(i).map(|x| x.certificate.clone()));
+                self.cert_choices.borrow_mut().insert(host.trim().to_string(), choice);
+                "ok".into()
+            }
             // windows: each window's number and tab count; window new;
             // window close: the one in front.
             "windows" => crate::windows::all()
@@ -1684,6 +1735,28 @@ impl Browser {
         }
         self.dirty.set(true);
         self.render();
+    }
+
+    /// A `mailto:` link: the chosen webmail's compose page in a new tab,
+    /// or the desktop's mail app.
+    pub(crate) fn email_link(&self, link: &str) {
+        let webmail = self.config.borrow().webmail.clone();
+        match rippl_core::mail::Draft::read(link).and_then(|d| d.compose(&webmail)) {
+            Some(compose) => {
+                self.open(&compose, false, true);
+            }
+            None => {
+                let launcher = gtk::UriLauncher::new(link);
+                let weak = self.weak();
+                launcher.launch(Some(&self.window), None::<&gio::Cancellable>, move |r| {
+                    if r.is_err()
+                        && let Some(b) = weak.upgrade()
+                    {
+                        b.notice("No mail app to open the email link: choose a webmail in Settings");
+                    }
+                });
+            }
+        }
     }
 
     /// A short message over the page, gone after three seconds.
@@ -2027,6 +2100,7 @@ impl Browser {
         self.apply_space_look();
         self.close_left_alone();
         self.render();
+        self.start_sync();
     }
 
 }

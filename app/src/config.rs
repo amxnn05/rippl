@@ -48,6 +48,17 @@
 //! home_theme = off
 //! home_colour = #4285f5
 //! home_image = /home/you/Pictures/wall.jpg
+//! # email links open in a webmail: none (default: your mail app), gmail,
+//! # outlook, fastmail, proton
+//! webmail = none
+//! # sync bookmarks, pins, spaces and settings through a folder that
+//! # something else keeps the same on your devices (Syncthing, Nextcloud…);
+//! # empty (default): off
+//! sync_folder =
+//! # where pages and rippl's own requests go out: system (default: the
+//! # desktop's proxy settings), direct, or a proxy, e.g. socks5://127.0.0.1:9050
+//! # (Tor) or http://proxy.example:3128; this machine and .local stay direct
+//! proxy = system
 //! # pages, their animations and smooth scrolling at the screen's own rate
 //! # (display, default: 144 on a 144 Hz screen) or near 60 (60, saves power)
 //! frame_rate = display
@@ -110,6 +121,9 @@ pub struct Config {
     pub tab_switcher: bool,
     /// Pages at the screen's refresh rate rather than near 60.
     pub full_rate: bool,
+    pub proxy: rippl_core::address::Proxy,
+    pub webmail: String,
+    pub sync_folder: String,
     pub home_theme: String,
     pub home_colour: String,
     pub home_image: String,
@@ -181,6 +195,9 @@ impl Default for Config {
             top_tabs: false,
             tab_switcher: true,
             full_rate: true,
+            proxy: rippl_core::address::Proxy::System,
+            webmail: "none".into(),
+            sync_folder: String::new(),
             home_theme: "off".into(),
             home_colour: "#4285f5".into(),
             home_image: String::new(),
@@ -231,6 +248,14 @@ impl Config {
             "video_keys" => self.video_keys = on(value).ok_or_else(bad)?,
             "peek" => self.peek = on(value).ok_or_else(bad)?,
             "player" => self.player = on(value).ok_or_else(bad)?,
+            "sync_folder" => self.sync_folder = value.to_string(),
+            "webmail" => {
+                if !rippl_core::mail::WEBMAILS.contains(&value) {
+                    return Err(bad());
+                }
+                self.webmail = value.to_string();
+            }
+            "proxy" => self.proxy = address::proxy(value).ok_or_else(bad)?,
             "home_theme" => {
                 if !crate::home_theme::THEMES.contains(&value) {
                     return Err(bad());
@@ -361,6 +386,13 @@ impl Config {
             choice("peek", "Shift+click a link to peek at it", onoff(self.peek), &["on", "off"], "Esc puts it away; Ctrl+Return keeps it as a tab"),
             choice("player", "What plays in another tab, at the foot of the column", onoff(self.player), &["on", "off"], "With its pause"),
             choice("video_keys", "Space and ← → control videos", onoff(self.video_keys), &["on", "off"], "Videos with the browser's own controls, once clicked"),
+            choice("sync_folder", "Sync through this folder", self.sync_folder.clone(), &[], "Bookmarks, pinned tabs, spaces and settings; never history, passwords or sign-ins. Any folder Syncthing, Nextcloud or a shared disk keeps the same on your devices; empty: off"),
+            choice("webmail", "Email links open in", self.webmail.clone(), &rippl_core::mail::WEBMAILS, "none: your mail app"),
+            choice("proxy", "Proxy", match &self.proxy {
+                address::Proxy::System => "system".into(),
+                address::Proxy::Direct => "direct".into(),
+                address::Proxy::Through(u) => u.clone(),
+            }, &[], "system, direct, or socks5://host:port, http://host:port. Everything goes through it: pages and rippl's own requests; this machine and .local stay direct"),
             choice("autoplay", "Videos start by themselves", if self.autoplay { "muted" } else { "never" }.into(), &["muted", "never"], "Muted: without sound, until you let a site play sound from its card. Never: they wait for a click"),
             choice("autoscroll", "Scroll with the middle button", onoff(self.autoscroll), &["on", "off"], "A click of the wheel on a page, then move the pointer"),
             choice("close_after", "Tabs left alone close themselves after", close_name(self.close_after), &CLOSE_CHOICES, "Not pinned tabs, tabs in a group, or kept-awake sites. rippl://archive keeps them a month"),

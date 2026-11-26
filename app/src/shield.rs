@@ -405,6 +405,9 @@ pub async fn fetch_text(url: &str) -> Result<String, String> {
     let session = soup::Session::new();
     session.set_user_agent("rippl");
     session.set_timeout(5);
+    if let Some(r) = crate::engine::proxy_resolver() {
+        session.set_proxy_resolver(Some(&r));
+    }
     let message = soup::Message::new("GET", url).map_err(|e| e.to_string())?;
     let bytes = session.send_and_read_future(&message, glib::Priority::DEFAULT).await.map_err(|e| e.to_string())?;
     if message.status() != soup::Status::Ok {
@@ -419,6 +422,9 @@ async fn fetch(url: &str) -> Result<String, String> {
     let session = soup::Session::new();
     session.set_user_agent("rippl");
     session.set_timeout(60);
+    if let Some(r) = crate::engine::proxy_resolver() {
+        session.set_proxy_resolver(Some(&r));
+    }
     let message = soup::Message::new("GET", url).map_err(|e| e.to_string())?;
     let bytes = session
         .send_and_read_future(&message, glib::Priority::LOW)

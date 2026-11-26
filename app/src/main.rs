@@ -2,6 +2,7 @@
 
 mod bookmarks_bar;
 mod browser;
+mod certificates;
 mod chrome;
 mod closed;
 mod closing;
@@ -33,6 +34,7 @@ mod space_look;
 mod spaces;
 mod split;
 mod switcher;
+mod sync;
 mod windows;
 
 use std::cell::RefCell;

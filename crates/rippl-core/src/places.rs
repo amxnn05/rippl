@@ -313,6 +313,40 @@ impl Places {
         Ok(added)
     }
 
+    /// History from another browser: new pages added, known ones keep the
+    /// larger count and the later visit. Returns how many were new.
+    pub fn import_history(&self, list: &[crate::import_more::Visit]) -> Result<usize, Error> {
+        let tx = self.db.unchecked_transaction()?;
+        let mut added = 0;
+        {
+            let mut exists = tx.prepare("SELECT 1 FROM history WHERE url = ?1")?;
+            let mut stmt = tx.prepare(
+                "INSERT INTO history (url, title, visits, typed, last) VALUES (?1, ?2, ?3, ?4, ?5)
+                 ON CONFLICT(url) DO UPDATE SET visits = MAX(visits, ?3), typed = MAX(typed, ?4), last = MAX(last, ?5),
+                     title = CASE WHEN title = '' THEN ?2 ELSE title END",
+            )?;
+            for v in list {
+                if !exists.exists([&v.url])? {
+                    added += 1;
+                }
+                stmt.execute(params![v.url, v.title, v.visits.max(1), v.typed, v.last])?;
+            }
+        }
+        tx.commit()?;
+        Ok(added)
+    }
+
+    /// A bookmark as another device has it: added, or its title and
+    /// folder changed.
+    pub fn put_bookmark(&self, url: &str, title: &str, folder: &str) -> Result<(), Error> {
+        self.db.execute(
+            "INSERT INTO bookmarks (url, title, added, folder) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(url) DO UPDATE SET title = ?2, folder = ?4",
+            params![url, title, now(), folder],
+        )?;
+        Ok(())
+    }
+
     pub fn is_bookmarked(&self, url: &str) -> Result<bool, Error> {
         Ok(self.db.query_row("SELECT 1 FROM bookmarks WHERE url = ?1", [url], |_| Ok(())).optional()?.is_some())
     }
@@ -602,6 +636,17 @@ mod tests {
         assert_eq!(p.never_save_list().unwrap(), vec!["https://bank.com".to_string()]);
         p.set_never_save("https://bank.com", false).unwrap();
         assert!(p.never_save_list().unwrap().is_empty());
+    }
+
+    #[test]
+    fn history_imported_once() {
+        let p = Places::open(None).unwrap();
+        p.visit("https://a.com/", "A", false).unwrap();
+        let v = |url: &str, visits, last| crate::import_more::Visit { url: url.into(), title: "T".into(), visits, typed: 0, last };
+        assert_eq!(p.import_history(&[v("https://a.com/", 9, 5), v("https://b.com/", 2, 7)]).unwrap(), 1);
+        let a = p.search("a.com", 5).unwrap();
+        assert_eq!((a[0].visits, a[0].title.as_str()), (9, "A"), "more visits taken, own title kept");
+        assert_eq!(p.import_history(&[v("https://b.com/", 1, 1)]).unwrap(), 0);
     }
 
     #[test]

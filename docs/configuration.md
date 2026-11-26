@@ -87,6 +87,17 @@ home_theme = off
 home_colour = #4285f5
 home_image = /home/you/Pictures/wall.jpg
 
+# Where pages and rippl's own requests go out: system (default), direct, or a proxy,
+# e.g. socks5://127.0.0.1:9050 (Tor) or http://proxy.example:3128. Never a password.
+proxy = system
+
+# Email links open in a webmail: none (default: your mail app), gmail, outlook, fastmail, proton
+webmail = none
+
+# Sync bookmarks, pinned tabs, spaces and settings through a folder something else keeps the
+# same on your devices (Syncthing, Nextcloud, a shared disk). Empty (default): off.
+sync_folder = /home/you/Sync
+
 # Your own keys for a command (rippl://settings lists them all); none for no keys
 shortcut.new-tab = <Ctrl>t, <Ctrl>n
 
@@ -117,6 +128,12 @@ With `glass = on` (off by default), rippl asks the compositor to blur behind its
 looks. Omarchy also makes every window 95% opaque, which shows the desktop faintly through the page
 too; a window rule giving `dev.rippl.Rippl` opacity 1 keeps the page solid while the column stays
 frosted.
+
+## Client certificates
+
+Put each identity (certificate and key) in `~/.local/share/rippl/certificates/`: a `.pem` with
+both, or a `.p12` / `.pfx` without a password. A site that asks gets a dialog to choose one or
+none.
 
 ## Profiles
 

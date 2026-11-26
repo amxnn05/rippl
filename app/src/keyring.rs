@@ -136,3 +136,21 @@ impl Keyring {
         }
     }
 }
+
+/// The key a Chromium-family browser keeps its passwords under: "<Browser>
+/// Safe Storage" in the keyring, found by its `application` attribute. The
+/// keyring may ask to unlock. `None` if there is none (then its passwords
+/// are under the fixed `v10` key, or out of reach).
+pub async fn chromium_key(browser: &str) -> Option<Zeroizing<String>> {
+    let application = rippl_core::import_more::keyring_application(browser)?;
+    if std::env::var("RIPPL_KEYRING").as_deref() == Ok("memory") {
+        return None;
+    }
+    let schema = Schema::new(
+        "chrome_libsecret_os_crypt_password_v2",
+        SchemaFlags::DONT_MATCH_NAME,
+        HashMap::from([("application", SchemaAttributeType::String)]),
+    );
+    let found = libsecret::password_lookup_future(Some(&schema), HashMap::from([("application", application)])).await.ok()??;
+    Some(Zeroizing::new(found.to_string()))
+}

@@ -42,6 +42,9 @@ crates/rippl-core/        no GTK, no WebKit: everything here runs under `cargo t
   src/import.rs           bookmarks from Chromium- and Firefox-family browsers
   src/passwords.rs        origins, which pages may save, save/update/nothing
   src/settings_file.rs    change one line of the config file, keep the rest
+  src/import_more.rs      history, open tabs (SNSS, mozlz4), Chromium passwords from other browsers
+  src/mail.rs             mailto: links read, webmail compose addresses
+  src/sync.rs             folder sync: items, stamps, tombstones, the merge
   src/clean.rs            click IDs and campaign tags off addresses
   examples/shield_convert.rs   runs the converter on a list file, for inspection
 
@@ -56,7 +59,7 @@ app/src/
   omnibox.rs              the field while typing: offers, completion, ↑↓
   find.rs                 find-in-page bar (Ctrl+F)
   permissions.rs          the permission question bar and its rules
-  downloads.rs            the downloads list at the foot of the column
+  downloads.rs            the downloads list at the foot of the column; pause, resume (Range)
   reader.rs               reading mode: extractor (isolated world) + reader page
   curtain.rs              hide elements: picker, per-site user style sheets
   internal_pages.rs       serves rippl://history|bookmarks|passwords|settings, token-checked buttons
@@ -84,6 +87,8 @@ app/src/
   home_theme.rs           the new tab's background: the painted walls (cairo), colours, image
   pin_folders.rs          folders among the pins
   windows.rs              several windows sharing one engine; their sessions
+  certificates.rs         client certificates: the folder, the picker
+  sync.rs                 sync through a folder: scopes, applying changes, the files
   pressure.rs             Linux PSI reading; malloc_trim
   control.rs              Unix socket for tests and measurement (opt-in)
 

@@ -208,7 +208,9 @@ pub fn archive(places: &[Place], q: &str, closing: bool, now: i64, token: &str) 
 }
 
 /// `sources`: other browsers found, as labels ("Chrome — Default").
-pub fn bookmarks(places: &[Place], sources: &[String], note: &str, now: i64, token: &str) -> String {
+/// `sources`: other browsers found, as (label, whether it is of the
+/// Chromium family, whose passwords can come too).
+pub fn bookmarks(places: &[Place], sources: &[(String, bool)], note: &str, now: i64, token: &str) -> String {
     let mut body = String::from("<h1>Bookmarks</h1>");
     if !note.is_empty() {
         body.push_str(&format!(r#"<p class="tag">{}</p>"#, escape(note)));
@@ -230,13 +232,18 @@ pub fn bookmarks(places: &[Place], sources: &[String], note: &str, now: i64, tok
         );
         body.push_str(&place_row(p, now, &buttons));
     }
-    body.push_str("<h2>Bring bookmarks over</h2>");
+    body.push_str(r#"<h2>Move in from another browser</h2><p class="note">Read from a copy: nothing in the other browser changes. Open tabs come in a space of their own; passwords go to your system keyring.</p>"#);
     if sources.is_empty() {
-        body.push_str(r#"<p class="empty">No other browser's bookmarks found on this machine.</p>"#);
+        body.push_str(r#"<p class="empty">No other browser found on this machine.</p>"#);
     }
-    for (i, label) in sources.iter().enumerate() {
+    for (i, (label, chromium)) in sources.iter().enumerate() {
+        let passwords = if *chromium {
+            format!(r#"<button data-do="import-passwords" data-arg="{i}" data-confirm="Bring this browser's saved passwords into your keyring? Your keyring may ask to unlock.">Passwords</button>"#)
+        } else {
+            String::new()
+        };
         body.push_str(&format!(
-            r#"<div class="row"><div class="main">{}</div><button data-do="import" data-arg="{i}">Import</button></div>"#,
+            r#"<div class="row"><div class="main">{}</div><button data-do="import" data-arg="{i}">Bookmarks and history</button><button data-do="import-tabs" data-arg="{i}">Open tabs</button>{passwords}</div>"#,
             escape(label)
         ));
     }

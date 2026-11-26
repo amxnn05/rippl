@@ -64,7 +64,7 @@ the header of each of its source files, with rippl's status for each.
 | Unread counts from titles | ✅ on pins |
 | Media player at the foot of the column | ✅ `player = on` |
 | Floating video / picture in picture | ⛔ WebKitGTK has no picture-in-picture API |
-| Media keys for the playing tab | 🔨 batch 5 (MPRIS) |
+| Media keys for the playing tab | ✅ WebKitGTK's own MPRIS (play/pause key measured) |
 
 ## The field
 
@@ -97,8 +97,8 @@ the header of each of its source files, with rippl's status for each.
 | HTTPS first (`HTTPSFirst`) | ✅ HTTPS-only with a warning page |
 | Site card and site permissions | ✅ Ctrl+I or a click on the tab you're on |
 | Blocked pop-ups with Open / Always Allow | ✅ |
-| Proxy | 🔨 batch 5 (NetworkProxySettings) |
-| Client certificates | 🔨 batch 5 |
+| Proxy | ✅ `proxy`: every session and rippl's own requests |
+| Client certificates | ✅ from a folder, with a picker |
 | Private tab with its own cookie jar | ✅ |
 
 ## Passwords and forms
@@ -107,7 +107,7 @@ the header of each of its source files, with rippl's status for each.
 |---|---|
 | Passwords in the system keychain | ✅ Secret Service (GNOME Keyring) |
 | Offered under the box, saved after a sign-in works | ✅ |
-| Import from Chrome, Arc, Brave, Edge | 🔨 batch 5 (Chromium on Linux keeps its key in the keyring) |
+| Import from Chrome, Arc, Brave, Edge | ✅ Chromium-family passwords (v10, v11 from the keyring); Firefox's 🔨 |
 | Passkeys | ⛔ no WebAuthn platform authenticator in WebKitGTK yet |
 | Apple Passwords app, verification codes | 🍎 |
 | Touch ID before filling | 🍎 (polkit/fprintd is a possible Linux route) |
@@ -138,16 +138,16 @@ the header of each of its source files, with rippl's status for each.
 | History, searchable | ✅ rippl://history |
 | Bookmarks with folders | ✅ |
 | Bookmarks bar | ✅ `bookmarks_bar = on` |
-| Import from other browsers: bookmarks, history, open tabs, Arc/Zen spaces | ✅ bookmarks (Chromium family, Firefox family); history and tabs 🔨 batch 5 |
-| Downloads list, pause/resume | ✅ list; pause/resume 🔨 batch 5 |
-| Email links in a webmail | 🔨 batch 5 |
+| Import from other browsers: bookmarks, history, open tabs, Arc/Zen spaces | ✅ bookmarks, history, open tabs (Chromium and Firefox families); Arc/Zen spaces 🔨 |
+| Downloads list, pause/resume | ✅ list, pause and resume (HTTP Range) |
+| Email links in a webmail | ✅ `webmail` |
 
 ## Sync and devices
 
 | Feature | rippl |
 |---|---|
 | Sync with iCloud | 🍎 |
-| Sync through a shared folder | 🔨 batch 5: the same idea works with Syncthing or any synced folder |
+| Sync through a shared folder | ✅ `sync_folder`: bookmarks, pins, spaces, settings |
 | Handoff | 🍎 (KDE Connect would be the Linux route) |
 | AppleScript | 🍎 (the control socket is rippl's scripting door) |
 | Share sheet | 🍎 (the XDG portal could share) |
@@ -188,7 +188,7 @@ the header of each of its source files, with rippl's status for each.
 4. **Layout**: tabs across the top, icon column, several windows, Ctrl+Tab switcher, bookmarks bar,
    home grid and themes, tabs closing themselves and their archive, 3–4 pages in split view, your
    own shortcuts.
-5. **Moving in**: import history, open tabs and Chromium passwords; folder sync; proxy; client
+5. ✅ **Moving in** ([notes](phases/batch-5.md)): import history, open tabs and Chromium passwords; folder sync; proxy; client
    certificates; download pause/resume; webmail for mailto; media keys.
 6. **Big**: translation and the AI add-on on device, agents over MCP.
 

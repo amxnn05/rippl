@@ -108,8 +108,10 @@ impl Browser {
                 pages::archive(&self.places.archived(&q).unwrap_or_default(), &q, closing, now(), &self.token)
             }
             "bookmarks" => {
-                let labels: Vec<String> =
-                    other_browsers().iter().map(|s| format!("{} · {}", s.browser, s.profile)).collect();
+                let labels: Vec<(String, bool)> = other_browsers()
+                    .iter()
+                    .map(|s| (format!("{} · {}", s.browser, s.profile), s.kind == import::Kind::Chromium))
+                    .collect();
                 pages::bookmarks(&self.places.bookmarks().unwrap_or_default(), &labels, &note, now(), &self.token)
             }
             _ => {
@@ -185,6 +187,12 @@ impl Browser {
                 r
             }
             ("bookmarks", "import") => self.import_from(arg.parse().unwrap_or(usize::MAX)),
+            ("bookmarks", "import-tabs") => self.import_tabs(arg.parse().unwrap_or(usize::MAX)),
+            ("bookmarks", "import-passwords") => {
+                // The keyring answers later: the note comes as a notice.
+                self.import_passwords(arg.parse().unwrap_or(usize::MAX));
+                Ok("Bringing passwords over…".into())
+            }
             ("bookmarks", "move") => {
                 let (url, folder) = arg.split_once('\n').unwrap_or((arg, ""));
                 self.places.move_bookmark(url, folder).map(|_| String::new()).map_err(|e| e.to_string())
@@ -229,6 +237,11 @@ impl Browser {
             "tabs" | "column" => self.apply_chrome(),
             k if k.starts_with("shortcut.") => self.apply_shortcut(&k["shortcut.".len()..]),
             "home_theme" | "home_colour" | "home_image" => self.apply_home_theme(),
+            "sync_folder" => return Ok(format!("Saved. {}", self.sync_now())),
+            "proxy" => {
+                self.engine.set_proxy(config.proxy.clone());
+                return Ok("Saved. New connections go this way now, open pages included; private tabs already open keep the old way.".into());
+            }
             "frame_rate" => {
                 self.engine.set_full_rate(config.full_rate);
                 return Ok("Saved. Pages loaded from now on use it; reload a page to change it there.".into());
@@ -242,18 +255,102 @@ impl Browser {
         Ok("Saved.".into())
     }
 
-    /// Imports bookmarks from the `index`th browser found.
+    /// Imports bookmarks and history from the `index`th browser found.
     pub(crate) fn import_from(&self, index: usize) -> Result<String, String> {
         let sources = other_browsers();
         let source = sources.get(index).ok_or("that browser isn't there any more")?;
         let scratch: PathBuf = crate::engine::cache_dir().join("import");
         let list = import::read(source, &scratch)?;
         let added = self.places.import_bookmarks(&list).map_err(|e| e.to_string())?;
+        // History too, unless you keep none; the last 20,000 pages.
+        let history = if self.config.borrow().history {
+            match rippl_core::import_more::history(source, &scratch, 20_000) {
+                Ok(pages) => {
+                    let new = self.places.import_history(&pages).map_err(|e| e.to_string())?;
+                    format!(" and {new} new page{} of history", if new == 1 { "" } else { "s" })
+                }
+                Err(e) => format!(" (history: {e})"),
+            }
+        } else {
+            String::new()
+        };
         Ok(format!(
-            "Brought over {added} new bookmark{} from {} ({} found)",
+            "Brought over {added} new bookmark{}{history} from {} ({} bookmarks found)",
             if added == 1 { "" } else { "s" },
             source.browser,
             list.len()
         ))
+    }
+
+    /// The tabs the `index`th browser has open, in a space of their own,
+    /// asleep until each is first looked at.
+    pub(crate) fn import_tabs(&self, index: usize) -> Result<String, String> {
+        let sources = other_browsers();
+        let source = sources.get(index).ok_or("that browser isn't there any more")?;
+        let found = rippl_core::import_more::open_tabs(source)?;
+        if found.is_empty() {
+            return Ok(format!("{} has no open tabs to bring over", source.browser));
+        }
+        {
+            let mut tabs = self.tabs.borrow_mut();
+            let space = tabs.add_space(&format!("From {}", source.browser));
+            let here = tabs.space;
+            tabs.space = space;
+            for t in &found {
+                let id = tabs.push(&t.url);
+                if let Some(tab) = tabs.get_mut(id) {
+                    tab.title = if t.title.trim().is_empty() { rippl_core::address::pretty(&t.url) } else { t.title.clone() };
+                    tab.space = space;
+                }
+                if t.pinned {
+                    tabs.set_pinned(id, true);
+                }
+            }
+            tabs.space = here;
+        }
+        self.dirty.set(true);
+        self.render_spaces();
+        Ok(format!(
+            "Brought over {} tab{} from {} into the space “From {}” (Alt+number, or the foot of the column)",
+            found.len(),
+            if found.len() == 1 { "" } else { "s" },
+            source.browser,
+            source.browser
+        ))
+    }
+
+    /// The `index`th browser's saved passwords, into your keyring. Its key
+    /// is asked of the keyring first; the result comes as a notice.
+    pub(crate) fn import_passwords(&self, index: usize) {
+        let sources = other_browsers();
+        let Some(source) = sources.get(index).cloned() else { return };
+        let scratch: PathBuf = crate::engine::cache_dir().join("import");
+        let logins = match rippl_core::import_more::logins(&source, &scratch) {
+            Ok(l) => l,
+            Err(e) => return self.notice(&format!("Passwords: {e}")),
+        };
+        let weak = self.weak();
+        glib::MainContext::default().spawn_local(async move {
+            let Some(b) = weak.upgrade() else { return };
+            let secret = crate::keyring::chromium_key(source.browser).await;
+            let (mut saved, mut sealed) = (0, 0);
+            for l in &logins {
+                let Some(password) =
+                    rippl_core::import_more::unseal(&l.sealed, secret.as_ref().map(|s| s.as_bytes())).map(zeroize::Zeroizing::new)
+                else {
+                    sealed += 1;
+                    continue;
+                };
+                let Some(origin) = rippl_core::passwords::origin_of(&l.origin) else { continue };
+                if b.keyring.save(&origin, &l.username, &password).await.is_ok() {
+                    saved += 1;
+                }
+            }
+            let mut note = format!("Brought over {saved} password{} from {}", if saved == 1 { "" } else { "s" }, source.browser);
+            if sealed > 0 {
+                note.push_str(&format!("; {sealed} couldn't be opened (its key isn't in your keyring)"));
+            }
+            b.notice(&note);
+        });
     }
 }
