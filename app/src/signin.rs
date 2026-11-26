@@ -153,22 +153,26 @@ impl Browser {
     }
 
     pub(crate) fn wire_signin(&self) {
-        let content = &self.engine.content;
-        content.add_script(&UserScript::for_world(
-            FORMS,
-            UserContentInjectedFrames::TopFrame,
-            UserScriptInjectionTime::End,
-            "rippl",
-            &[],
-            &[],
-        ));
-        content.register_script_message_handler(HANDLER, Some("rippl"));
-        let weak = self.weak();
-        content.connect_script_message_received(Some(HANDLER), move |_, value| {
-            if let Some(b) = weak.upgrade() {
-                b.signin_message(&value.to_str());
-            }
-        });
+        // Once, by the first window, for all: each window then looks for
+        // the page among its own tabs.
+        if self.primary {
+            let content = &self.engine.content;
+            content.add_script(&UserScript::for_world(
+                FORMS,
+                UserContentInjectedFrames::TopFrame,
+                UserScriptInjectionTime::End,
+                "rippl",
+                &[],
+                &[],
+            ));
+            content.register_script_message_handler(HANDLER, Some("rippl"));
+            content.connect_script_message_received(Some(HANDLER), move |_, value| {
+                let text = value.to_str();
+                for b in crate::windows::all() {
+                    b.signin_message(&text);
+                }
+            });
+        }
 
         let weak = self.weak();
         self.save_yes.connect_clicked(move |_| {

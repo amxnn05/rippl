@@ -15,20 +15,25 @@ mod internal_pages;
 mod keyring;
 mod look;
 mod home;
+mod home_theme;
 mod omnibox;
 mod pagescripts;
 mod peek;
+mod pin_folders;
 mod player;
 mod pagelook;
 mod permissions;
 mod pressure;
 mod reader;
 mod shield;
+mod shortcuts;
 mod signin;
 mod sitecard;
+mod space_look;
 mod spaces;
 mod split;
 mod switcher;
+mod windows;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -83,7 +88,7 @@ fn main() -> glib::ExitCode {
                 }
             }
             None => {
-                let browser = browser::Browser::new(app);
+                let browser = windows::start(app);
                 control::start(&browser);
                 *slot = Some(browser);
             }

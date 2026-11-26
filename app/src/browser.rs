@@ -36,7 +36,8 @@ macro_rules! debug {
 
 pub struct Browser {
     /// Settings; rippl://settings changes them while rippl runs.
-    pub(crate) config: RefCell<Config>,
+    /// Shared by every window (windows.rs).
+    pub(crate) config: Rc<RefCell<Config>>,
     /// HTTPS-only: hosts whose https failed, offered over http on their warning page.
     pub(crate) https_failed: RefCell<HashSet<String>>,
     /// HTTPS-only: per tab, the https addresses of http navigations seen
@@ -44,9 +45,9 @@ pub struct Browser {
     pub(crate) upgrades_seen: RefCell<HashMap<TabId, Vec<String>>>,
     pub(crate) upgrading: RefCell<HashMap<TabId, String>>,
     pub(crate) shield: Rc<Shield>,
-    pub(crate) engine: Engine,
+    pub(crate) engine: Rc<Engine>,
     /// History, bookmarks, permission answers (places.sqlite).
-    pub(crate) places: Places,
+    pub(crate) places: Rc<Places>,
     pub(crate) downloads: Rc<Downloads>,
     pub(crate) tabs: RefCell<Tabs>,
     pub(crate) views: RefCell<HashMap<TabId, WebView>>,
@@ -79,16 +80,21 @@ pub struct Browser {
     pub(crate) typing_gen: Cell<u32>,
     pub(crate) stage: gtk::Stack,
     // Split view (split.rs).
-    pub(crate) paned: gtk::Paned,
-    pub(crate) partner: RefCell<HashMap<TabId, TabId>>,
-    pub(crate) shown_split: RefCell<Option<(TabId, TabId)>>,
+    pub(crate) split_area: gtk::Box,
+    /// Each split: two to four tabs shown together.
+    pub(crate) splits: RefCell<Vec<Vec<TabId>>>,
+    pub(crate) shown_split: RefCell<Option<Vec<TabId>>>,
     pub(crate) blank: gtk::Box,
     /// The new tab's field, offers and Home grid, in the blank page (home.rs).
     pub(crate) home: gtk::Box,
     pub(crate) home_grid: gtk::FlowBox,
     pub(crate) home_mode: Cell<bool>,
     /// Scripts switched by settings: YouTube's ads, video keys (pagescripts.rs).
-    pub(crate) page_scripts: RefCell<Vec<webkit6::UserScript>>,
+    pub(crate) page_scripts: Rc<RefCell<Vec<webkit6::UserScript>>>,
+    /// Which window this is: 0 the first, then 1, 2, … (windows.rs); and
+    /// whether it set up what every window shares.
+    pub(crate) window_no: usize,
+    pub(crate) primary: bool,
     /// Peek: the layer over the page, the panel's frame, its buttons, and
     /// what is in it (peek.rs).
     pub(crate) peek_dim: gtk::Box,
@@ -99,6 +105,12 @@ pub struct Browser {
     pub(crate) bookmarks_bar: gtk::Box,
     /// The strip above the page: the field and the top tabs (chrome.rs).
     pub(crate) top: crate::chrome::TopStrip,
+    /// The space's colour, as a style sheet of its own (space_look.rs).
+    pub(crate) space_css: gtk::CssProvider,
+    /// The new tab's background (home_theme.rs).
+    pub(crate) home_css: gtk::CssProvider,
+    /// Every command and its own keys (shortcuts.rs).
+    pub(crate) known_actions: RefCell<Vec<(String, Vec<String>)>>,
     /// Ctrl+Tab's cards (switcher.rs).
     pub(crate) switcher: crate::switcher::Switcher,
     /// The player at the column's foot (player.rs): tabs by when their
@@ -162,7 +174,9 @@ pub struct Browser {
 }
 
 impl Browser {
-    pub fn new(app: &gtk::Application) -> Rc<Browser> {
+    /// A window: the first (`from` none) sets up the engine, Shield and
+    /// the rest; later ones share the first's.
+    pub fn new(app: &gtk::Application, from: Option<Rc<Browser>>, window_no: usize) -> Rc<Browser> {
         let window = gtk::ApplicationWindow::builder()
             .application(app)
             .title("rippl")
@@ -241,14 +255,8 @@ impl Browser {
         home.add_css_class("home");
         home.append(&home_grid);
         stage.add_named(&blank, Some("blank"));
-        let paned = gtk::Paned::builder()
-            .orientation(gtk::Orientation::Horizontal)
-            .wide_handle(true)
-            .shrink_start_child(false)
-            .shrink_end_child(false)
-            .build();
-        paned.add_css_class("split");
-        stage.add_named(&paned, Some("split"));
+        let split_area = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        stage.add_named(&split_area, Some("split"));
 
         // The find bar and the permission question float over the page.
         let (find_bar, find_entry, find_count) = Browser::find_bar();
@@ -300,29 +308,51 @@ impl Browser {
         body.append(&right);
         window.set_child(Some(&body));
 
-        let config = Config::load();
-        let shield = Shield::new(config.shield, config.ublock);
-        let _ = std::fs::create_dir_all(engine::data_dir());
-        let places = Places::open(Some(&engine::data_dir().join("places.sqlite"))).unwrap_or_else(|e| {
-            eprintln!("rippl: history and bookmarks unavailable ({e}); keeping them in memory this time");
-            Places::open(None).expect("in-memory SQLite")
-        });
-        let engine = Engine::new(shield.content.clone(), config.gpc, config.https_only);
-        engine.set_full_rate(config.full_rate);
-        // Downloads from every session: the kept one here, private ones as
-        // they are made (engine.rs).
-        let hook = {
-            let downloads = downloads.clone();
-            Rc::new(move |d: &webkit6::Download| downloads.started(d)) as engine::DownloadHook
+        // What every window shares: made by the first, borrowed after.
+        let (config, shield, places, engine, keyring, page_scripts) = match &from {
+            Some(f) => (
+                f.config.clone(),
+                f.shield.clone(),
+                f.places.clone(),
+                f.engine.clone(),
+                f.keyring.clone(),
+                f.page_scripts.clone(),
+            ),
+            None => {
+                let config = Config::load();
+                let shield = Shield::new(config.shield, config.ublock);
+                let _ = std::fs::create_dir_all(engine::data_dir());
+                let places = Places::open(Some(&engine::data_dir().join("places.sqlite"))).unwrap_or_else(|e| {
+                    eprintln!("rippl: history and bookmarks unavailable ({e}); keeping them in memory this time");
+                    Places::open(None).expect("in-memory SQLite")
+                });
+                let engine = Engine::new(shield.content.clone(), config.gpc, config.https_only);
+                engine.set_full_rate(config.full_rate);
+                // Downloads from every session: the kept one here, private
+                // ones as they are made (engine.rs). They are listed in the
+                // first window.
+                let hook = {
+                    let downloads = downloads.clone();
+                    Rc::new(move |d: &webkit6::Download| downloads.started(d)) as engine::DownloadHook
+                };
+                let kept = hook.clone();
+                engine.session.connect_download_started(move |_, d| kept(d));
+                *engine.on_download.borrow_mut() = Some(hook);
+                (
+                    Rc::new(RefCell::new(config)),
+                    shield,
+                    Rc::new(places),
+                    Rc::new(engine),
+                    Rc::new(crate::keyring::Keyring::new()),
+                    Rc::new(RefCell::new(Vec::new())),
+                )
+            }
         };
-        let kept = hook.clone();
-        engine.session.connect_download_started(move |_, d| kept(d));
-        *engine.on_download.borrow_mut() = Some(hook);
 
         let browser = Rc::new(Browser {
             engine,
             shield,
-            config: RefCell::new(config),
+            config,
             https_failed: RefCell::new(HashSet::new()),
             upgrades_seen: RefCell::new(HashMap::new()),
             upgrading: RefCell::new(HashMap::new()),
@@ -349,20 +379,25 @@ impl Browser {
             engine_says: RefCell::new((String::new(), Vec::new())),
             typing_gen: Cell::new(0),
             stage,
-            paned,
-            partner: RefCell::new(HashMap::new()),
+            split_area,
+            splits: RefCell::new(Vec::new()),
             shown_split: RefCell::new(None),
             blank,
             home,
             home_grid,
             home_mode: Cell::new(false),
-            page_scripts: RefCell::new(Vec::new()),
+            page_scripts,
+            window_no,
+            primary: from.is_none(),
             peek_dim,
             peek_frame,
             peek_close,
             peek_keep,
             peeking: RefCell::new(None),
             switcher,
+            known_actions: RefCell::new(Vec::new()),
+            space_css: gtk::CssProvider::new(),
+            home_css: gtk::CssProvider::new(),
             bookmarks_bar,
             top,
             player_row,
@@ -382,8 +417,8 @@ impl Browser {
             reading: RefCell::new(HashMap::new()),
             toast,
             toast_gen: Cell::new(0),
-            token: crate::internal_pages::new_token(),
-            keyring: Rc::new(crate::keyring::Keyring::new()),
+            token: from.as_ref().map_or_else(crate::internal_pages::new_token, |f| f.token.clone()),
+            keyring,
             pending: RefCell::new(HashMap::new()),
             save_question: RefCell::new(None),
             save_bar,
@@ -438,19 +473,39 @@ impl Browser {
         browser.wire_switcher();
         browser.fill_bookmarks_bar();
         browser.wire_chrome();
-        browser.install_page_scripts();
+        browser.wire_space_swipe();
+        gtk::style_context_add_provider_for_display(
+            &WidgetExt::display(&browser.window),
+            &browser.space_css,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
+        );
+        gtk::style_context_add_provider_for_display(
+            &WidgetExt::display(&browser.window),
+            &browser.home_css,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
+        );
+        browser.apply_home_theme();
+        if browser.primary {
+            browser.install_page_scripts();
+        }
         browser.wire_peek();
         browser.wire_player();
         browser.watch();
         browser.window.present();
         // Pages load once Shield's filters are in place (a second at most),
         // so the first requests of the restored tab are already blocked.
+        // A later window finds them in place already.
         let weak = Rc::downgrade(&browser);
-        browser.shield.start(move || {
+        let restore = move || {
             if let Some(b) = weak.upgrade() {
                 b.restore();
             }
-        });
+        };
+        if browser.primary {
+            browser.shield.start(restore);
+        } else {
+            glib::idle_add_local_once(restore);
+        }
         browser
     }
 
@@ -589,7 +644,7 @@ impl Browser {
         debug!("sleep {id}");
         let Some(view) = self.views.borrow_mut().remove(&id) else { return };
         let memory = view.session_state().and_then(|s| s.serialize()).map(|b| b.to_vec());
-        if self.shown_split.borrow().is_some_and(|(l, r)| l == id || r == id) {
+        if self.shown_split.borrow().as_ref().is_some_and(|s| s.contains(&id)) {
             self.unsplit_layout();
         }
         self.detach(&view);
@@ -1035,7 +1090,9 @@ impl Browser {
 
     // ---- wiring -------------------------------------------------------
 
-    fn action(&self, app: &gtk::Application, name: &str, keys: &[&str], run: impl Fn(&Browser) + 'static) {
+    fn action(&self, app: &gtk::Application, name: &str, own: &[&str], run: impl Fn(&Browser) + 'static) {
+        let keys = self.keys_for(name, own);
+        let keys: Vec<&str> = keys.iter().map(String::as_str).collect();
         let action = gio::SimpleAction::new(name, None);
         let weak = self.weak();
         let label = name.to_string();
@@ -1046,7 +1103,7 @@ impl Browser {
             }
         });
         self.window.add_action(&action);
-        app.set_accels_for_action(&format!("win.{name}"), keys);
+        app.set_accels_for_action(&format!("win.{name}"), &keys);
     }
 
     /// One command from the control socket (see control.rs).
@@ -1071,6 +1128,11 @@ impl Browser {
                     })
                     .collect();
                 lines.join("\n")
+            }
+            // A new tab, nowhere yet (as Ctrl+T).
+            "open" if rest.trim().is_empty() => {
+                let id = self.open("", false, true);
+                format!("ok {}", self.tabs.borrow().index(id).map_or(0, |i| i + 1))
             }
             "open" => match address::resolve(rest, &self.config.borrow().search.clone()) {
                 Destination::Page(url) => {
@@ -1231,6 +1293,14 @@ impl Browser {
                     self.switch_space(id);
                     format!("ok {id}")
                 }
+                // space colour <id> [#rrggbb [#rrggbb]]
+                ("colour", rest) => {
+                    let mut parts = rest.split_whitespace();
+                    let id = parts.next().and_then(|i| i.parse().ok()).unwrap_or(u32::MAX);
+                    let colours: Vec<String> = parts.map(String::from).collect();
+                    self.colour_space(id, &colours);
+                    "ok".into()
+                }
                 ("delete", id) => {
                     self.delete_space(id.trim().parse().unwrap_or(u32::MAX));
                     "ok".into()
@@ -1346,6 +1416,61 @@ impl Browser {
                 }
             },
             "bar" => self.bar_state(rest.trim() == "more"),
+            // windows: each window's number and tab count; window new;
+            // window close: the one in front.
+            "windows" => crate::windows::all()
+                .iter()
+                .map(|b| format!("{}\t{} tabs{}", b.window_no, b.tabs.borrow().list.len(), if b.window.is_active() { "\tfront" } else { "" }))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            "window" => match rest.trim() {
+                "new" => match self.window.application().and_then(|a| crate::windows::open(&a)) {
+                    Some(b) => {
+                        b.window.present();
+                        format!("ok {}", b.window_no)
+                    }
+                    None => "error".into(),
+                },
+                "close" => {
+                    self.window.close();
+                    "ok".into()
+                }
+                _ => "error: window new | close".into(),
+            },
+            // pinfolder <n> [name]: tab n into folder name (or out);
+            // pinfolder open <name>: opens it under its square.
+            "pinfolder" => match rest.split_once(' ').unwrap_or((rest, "")) {
+                ("open", name) => {
+                    let square = {
+                        let mut c = self.pins.first_child();
+                        let mut found = None;
+                        while let Some(w) = c {
+                            if w.has_css_class("pin-folder") && w.tooltip_text().is_some_and(|t| t.starts_with(name.trim())) {
+                                found = Some(w.clone());
+                            }
+                            c = w.next_sibling();
+                        }
+                        found
+                    };
+                    match square {
+                        Some(w) => {
+                            self.open_pin_folder(name.trim(), &w);
+                            "ok".into()
+                        }
+                        None => "error: no such folder".into(),
+                    }
+                }
+                (n, name) => match at(n) {
+                    Some(id) => {
+                        let name = name.trim();
+                        self.tabs.borrow_mut().set_pin_folder(id, if name.is_empty() { None } else { Some(name) });
+                        self.dirty.set(true);
+                        self.render();
+                        self.tabs.borrow().pin_folders(self.tabs.borrow().space).join(",")
+                    }
+                    None => "error: no such tab".into(),
+                },
+            },
             // The window's own frame clock, counted for a second.
             // How often the window really paints for a second: with only a
             // page moving, how many frames it gave the screen.
@@ -1427,8 +1552,12 @@ impl Browser {
                     "ok".into()
                 }
             },
-            "shown" => match *self.shown_split.borrow() {
-                Some((l, r)) => format!("split {l} {r} front {}", self.front().unwrap_or(0)),
+            "shown" => match self.shown_split.borrow().as_ref() {
+                Some(s) => format!(
+                    "split {} front {}",
+                    s.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(" "),
+                    self.front().unwrap_or(0)
+                ),
                 None => format!("single {}", self.front().unwrap_or(0)),
             },
             "allow-http" => {
@@ -1577,6 +1706,11 @@ impl Browser {
         self.action(app, "focus-field", &["<Ctrl>l", "F6", "<Alt>d"], |b| {
             b.field.grab_focus();
             b.field.select_region(0, -1);
+        });
+        self.action(app, "new-window", &["<Ctrl>n"], |b| {
+            if let Some(app) = b.window.application() {
+                crate::windows::open(&app);
+            }
         });
         self.action(app, "new-tab", &["<Ctrl>t"], |b| {
             b.open("", false, true);
@@ -1732,19 +1866,11 @@ impl Browser {
         let weak = self.weak();
         self.window.connect_close_request(move |_| {
             if let Some(b) = weak.upgrade() {
-                b.save();
+                crate::windows::closing(&b);
             }
             glib::Propagation::Proceed
         });
-        // Killed politely (logout, `pkill`): save what is open first.
-        let weak = self.weak();
-        glib_unix::unix_signal_add_local(libc::SIGTERM, move || {
-            if let Some(b) = weak.upgrade() {
-                b.save();
-                b.window.application().inspect(|a| a.quit());
-            }
-            glib::ControlFlow::Break
-        });
+        crate::windows::save_on_sigterm();
         // Out of focus: hand freed heap back to the system, a moment later.
         self.window.connect_is_active_notify(|w| {
             if !w.is_active() {
@@ -1853,13 +1979,15 @@ impl Browser {
 
     // ---- session ------------------------------------------------------
 
-    fn session_path() -> std::path::PathBuf {
-        engine::data_dir().join("session")
+    /// `session` for the first window, `session-2`, `session-3`, … for
+    /// the others.
+    pub(crate) fn session_path(&self) -> std::path::PathBuf {
+        crate::windows::session_file(self.window_no)
     }
 
-    fn save(&self) {
+    pub(crate) fn save(&self) {
         let text = Session::of(&self.tabs.borrow()).write();
-        let path = Self::session_path();
+        let path = self.session_path();
         let tmp = path.with_extension("tmp");
         let result = std::fs::create_dir_all(engine::data_dir())
             .and_then(|_| std::fs::write(&tmp, text))
@@ -1872,10 +2000,10 @@ impl Browser {
     /// Last session's tabs come back Lazy: only the one in front gets a
     /// view. A URL given on the command line opens after them.
     fn restore(&self) {
-        let session = std::fs::read_to_string(Self::session_path()).map(|t| Session::read(&t)).unwrap_or_default();
+        let session = std::fs::read_to_string(self.session_path()).map(|t| Session::read(&t)).unwrap_or_default();
         let front = session.restore_into(&mut self.tabs.borrow_mut());
         // URLs from the command line (not `--profile` and its name).
-        let mut args = std::env::args().skip(1);
+        let mut args = std::env::args().skip(if self.primary { 1 } else { usize::MAX });
         let mut asked = Vec::new();
         while let Some(a) = args.next() {
             if a == "--profile" {
@@ -1896,6 +2024,7 @@ impl Browser {
             self.open("", false, true);
         }
         self.apply_keep_awake();
+        self.apply_space_look();
         self.close_left_alone();
         self.render();
     }

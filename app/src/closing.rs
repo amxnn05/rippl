@@ -35,7 +35,7 @@ impl Browser {
     pub(crate) fn close_left_alone(&self) {
         let Some(after) = self.config.borrow().close_after else { return };
         let on_screen = self.on_screen();
-        let pairs: Vec<(TabId, TabId)> = self.partner.borrow().iter().map(|(a, b)| (*a, *b)).collect();
+        let pairs = self.splits.borrow().clone();
         let due = {
             let list = &self.tabs.borrow().list;
             tabs::due_for_closing(list, &on_screen, &pairs, rippl_core::places::now(), after)
@@ -61,11 +61,11 @@ impl Browser {
     }
 
     /// Closes `id` into the archive, if it is still due (you may have gone
-    /// back to it while its page was asked), with its split partner.
+    /// back to it while its page was asked), with the rest of its split.
     fn retire(&self, id: TabId) {
         let Some(after) = self.config.borrow().close_after else { return };
         let on_screen = self.on_screen();
-        let partner = self.partner.borrow().get(&id).copied();
+        let partners: Vec<TabId> = self.split_of(id).unwrap_or_default().into_iter().filter(|t| *t != id).collect();
         let still = |t: TabId| {
             let tabs = self.tabs.borrow();
             tabs.get(t).is_some_and(|tab| {
@@ -73,10 +73,10 @@ impl Browser {
                     && tabs::stays_open(tab, &on_screen).is_none()
             })
         };
-        if !still(id) || partner.is_some_and(|p| !still(p)) {
+        if !still(id) || partners.iter().any(|p| !still(*p)) {
             return;
         }
-        for t in std::iter::once(id).chain(partner) {
+        for t in std::iter::once(id).chain(partners) {
             let (url, title) = match self.tabs.borrow().get(t) {
                 Some(tab) => (tab.url.clone(), tab.title.clone()),
                 None => continue,

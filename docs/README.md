@@ -31,7 +31,8 @@ development phase did.
 | Feature batch 1: site card, keep awake, pop-ups, duplicate, typos, site search, print | done | [batch-1.md](phases/batch-1.md) |
 | Feature batch 2: spaces, profiles, tab groups (and dark mode fixed) | done | [batch-2.md](phases/batch-2.md) |
 | Feature batch 3: uBlock's lists, glass, dark pages, site CSS, capture, icons, new tab, YouTube ads, peek, unread, player, video keys, archives | done | [batch-3.md](phases/batch-3.md) |
-| Feature batch 4 (first part): autoplay, autoscroll, tabs that close themselves, archive, tab switcher, bookmarks bar, icon column, tabs on top, screen-rate pages | first part done | [batch-4.md](phases/batch-4.md) |
+| Feature batch 4: screen-rate pages, autoplay, autoscroll, closing tabs, archive, tab switcher, bookmarks bar, icon column, top tabs, 4-page split, shortcuts, space colours, new-tab walls, pin folders, windows | done | [batch-4.md](phases/batch-4.md) |
+| Feature batch 5 | next | [features.md](features.md) |
 | 9. Ship: desktop entry, default browser, packages | planned | [roadmap.md](roadmap.md) |
 
 ## Keeping these docs current

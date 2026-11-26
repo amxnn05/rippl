@@ -54,6 +54,8 @@ pub struct Tab {
     /// The space it belongs to, and its group there, if any.
     pub space: SpaceId,
     pub group: Option<GroupId>,
+    /// The pin folder a pinned tab is in, by name.
+    pub pin_folder: Option<String>,
     /// Last time it was on screen.
     pub touched: Instant,
     /// The same, in unix seconds, kept in the session: tabs that close
@@ -79,6 +81,7 @@ impl Tab {
             keep_awake: false,
             space: 0,
             group: None,
+            pin_folder: None,
             touched: Instant::now(),
             left: crate::places::now(),
             memory: None,
@@ -158,18 +161,16 @@ pub fn stays_open(tab: &Tab, on_screen: &[TabId]) -> Option<&'static str> {
 }
 
 /// The tabs left alone at least `after` by `now` (unix seconds), that may
-/// close themselves. A split pair (`pairs`) goes whole or not at all.
-pub fn due_for_closing(tabs: &[Tab], on_screen: &[TabId], pairs: &[(TabId, TabId)], now: i64, after: Duration) -> Vec<TabId> {
+/// close themselves. A split (`splits`, two to four tabs) goes whole or
+/// not at all.
+pub fn due_for_closing(tabs: &[Tab], on_screen: &[TabId], splits: &[Vec<TabId>], now: i64, after: Duration) -> Vec<TabId> {
     let since = now - after.as_secs() as i64;
     let due: Vec<TabId> =
         tabs.iter().filter(|t| t.left <= since && stays_open(t, on_screen).is_none()).map(|t| t.id).collect();
     due.iter()
         .copied()
         .filter(|id| {
-            pairs
-                .iter()
-                .find(|(a, b)| a == id || b == id)
-                .is_none_or(|(a, b)| due.contains(a) && due.contains(b))
+            splits.iter().find(|s| s.contains(id)).is_none_or(|s| s.iter().all(|t| due.contains(t)))
         })
         .collect()
 }
@@ -183,6 +184,13 @@ pub type GroupId = u32;
 pub struct Space {
     pub id: SpaceId,
     pub name: String,
+    /// Its colour, or two for a gradient ("#rrggbb"); none: no wash.
+    pub colours: Vec<String>,
+}
+
+/// A colour as rippl keeps them: "#rrggbb", lower case.
+pub fn colour_ok(c: &str) -> bool {
+    c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|x| x.is_ascii_hexdigit())
 }
 
 /// A named, foldable section of ordinary tabs in one space.
@@ -219,7 +227,7 @@ impl Default for Tabs {
             list: Vec::new(),
             front: None,
             space: 0,
-            spaces: vec![Space { id: 0, name: "Space 1".into() }],
+            spaces: vec![Space { id: 0, name: "Space 1".into(), colours: Vec::new() }],
             fronts: Default::default(),
             groups: Vec::new(),
             next: 0,
@@ -351,6 +359,7 @@ impl Tabs {
         let mut tab = self.list.remove(i);
         tab.pinned = pinned;
         tab.group = None;
+        tab.pin_folder = None;
         let space = tab.space;
         let at = match self.list.iter().rposition(|t| t.space == space && t.pinned) {
             Some(p) => p + 1,
@@ -358,6 +367,36 @@ impl Tabs {
         };
         self.list.insert(at, tab);
         self.tidy_groups();
+    }
+
+    /// Puts pinned `id` into the pin folder `name` (`None`: out of it).
+    /// A folder is no more than the name its pins share in a space.
+    pub fn set_pin_folder(&mut self, id: TabId, name: Option<&str>) {
+        if let Some(t) = self.get_mut(id).filter(|t| t.pinned) {
+            t.pin_folder = name.map(str::trim).filter(|n| !n.is_empty()).map(String::from);
+        }
+    }
+
+    /// Renames a pin folder of `space`.
+    pub fn rename_pin_folder(&mut self, space: SpaceId, old: &str, new: &str) {
+        let new = new.trim();
+        if new.is_empty() {
+            return;
+        }
+        for t in self.list.iter_mut().filter(|t| t.space == space && t.pin_folder.as_deref() == Some(old)) {
+            t.pin_folder = Some(new.to_string());
+        }
+    }
+
+    /// The pin folders of `space`, in the order of their first pin.
+    pub fn pin_folders(&self, space: SpaceId) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for f in self.list.iter().filter(|t| t.space == space && t.pinned).filter_map(|t| t.pin_folder.clone()) {
+            if !out.contains(&f) {
+                out.push(f);
+            }
+        }
+        out
     }
 
     /// Moves `id` to position `index` among its space's tabs (clamped),
@@ -407,7 +446,7 @@ impl Tabs {
         self.next_space += 1;
         let name =
             if name.trim().is_empty() { format!("Space {}", self.spaces.len() + 1) } else { name.trim().to_string() };
-        self.spaces.push(Space { id, name });
+        self.spaces.push(Space { id, name, colours: Vec::new() });
         id
     }
 
@@ -428,6 +467,19 @@ impl Tabs {
             self.switch_space(first);
         }
         doomed
+    }
+
+    /// A space's colour (one), gradient (two), or none (empty).
+    pub fn colour_space(&mut self, space: SpaceId, colours: &[String]) {
+        if let Some(s) = self.spaces.iter_mut().find(|s| s.id == space) {
+            s.colours = colours.iter().filter(|c| colour_ok(c)).take(2).map(|c| c.to_lowercase()).collect();
+        }
+    }
+
+    /// The space after (or before) the one on screen, if there is one.
+    pub fn neighbour_space(&self, step: isize) -> Option<SpaceId> {
+        let at = self.spaces.iter().position(|s| s.id == self.space)? as isize + step;
+        usize::try_from(at).ok().and_then(|i| self.spaces.get(i)).map(|s| s.id)
     }
 
     pub fn rename_space(&mut self, space: SpaceId, name: &str) {
@@ -570,6 +622,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn pin_folders_by_name() {
+        let mut tabs = Tabs::default();
+        let a = tabs.open("https://a.com/");
+        let b = tabs.open("https://b.com/");
+        let c = tabs.open("https://c.com/");
+        for id in [a, b, c] {
+            tabs.set_pinned(id, true);
+        }
+        tabs.set_pin_folder(a, Some("Work"));
+        tabs.set_pin_folder(c, Some("Work"));
+        tabs.set_pin_folder(b, Some("  "));
+        assert_eq!(tabs.pin_folders(0), vec!["Work".to_string()]);
+        assert_eq!(tabs.get(b).unwrap().pin_folder, None);
+        tabs.rename_pin_folder(0, "Work", "Jobs");
+        assert_eq!(tabs.get(c).unwrap().pin_folder.as_deref(), Some("Jobs"));
+        tabs.set_pinned(a, false);
+        assert_eq!(tabs.get(a).unwrap().pin_folder, None, "unpinned: out of its folder");
+    }
+
+    #[test]
     fn tabs_left_alone_close() {
         let mut list: Vec<Tab> = (1..=7).map(|i| Tab::new(i, format!("https://s{i}.com/"))).collect();
         for t in &mut list {
@@ -584,7 +656,7 @@ mod tests {
         assert_eq!(due_for_closing(&list, &[], &[], 5000, after), vec![1, 6]);
         assert_eq!(due_for_closing(&list, &[1], &[], 5000, after), vec![6]);
         // Half of a pair still wanted: both stay.
-        assert_eq!(due_for_closing(&list, &[], &[(6, 7)], 5000, after), vec![1]);
+        assert_eq!(due_for_closing(&list, &[], &[vec![6, 7]], 5000, after), vec![1]);
         assert!(due_for_closing(&list, &[], &[], 2000, after).is_empty());
     }
 

@@ -70,7 +70,8 @@ pub fn start(browser: &Rc<Browser>) {
             let (tx, rx) = mpsc::channel();
             let command = line.trim().to_string();
             glib::MainContext::default().invoke(move || {
-                BROWSER.with(|b| match b.borrow().upgrade() {
+                // The window in front, or the one it started with.
+                BROWSER.with(|b| match crate::windows::front().or_else(|| b.borrow().upgrade()) {
                     Some(browser) => browser.command_with(&command, Box::new(move |reply| {
                         let _ = tx.send(reply);
                     })),

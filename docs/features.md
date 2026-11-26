@@ -28,7 +28,7 @@ the header of each of its source files, with rippl's status for each.
 | Glass window | ✅ `glass = on` (off by default): the compositor's blur through `ext-background-effect` |
 | Liquid Glass | 🍎 |
 | Traffic lights, title bar | 🍎; rippl hides the title bar on tiling compositors |
-| Blank-tab walls, stickers, themes | 🔨 batch 4 |
+| Blank-tab walls, stickers, themes | ✅ `home_theme`: 3 of the 10 walls, solid, gradient, image; the other walls, stickers and a themes page 🔨 |
 | The new tab: field in the middle of the page | ✅ |
 | Home grid of bookmarks on a new tab | ✅ `home_grid = on` |
 
@@ -42,15 +42,15 @@ the header of each of its source files, with rippl's status for each.
 | Keep a site awake (site card) | ✅ |
 | Reopen closed tab with history and scroll (⇧⌘T) | ✅ Ctrl+Shift+T |
 | Pinned tabs | ✅ Ctrl+Shift+P |
-| Pin folders, live folders from feeds | 🔨 batch 4 (pins as rows first) |
+| Pin folders, live folders from feeds | ✅ pin folders; live folders from feeds 🔨 |
 | Tab groups | ✅ fold, rename, ungroup |
-| Split view, up to 4 pages | ✅ 2 pages; 3–4 🔨 batch 4 |
+| Split view, up to 4 pages | ✅ 2–4 pages (3 across, 2×2) |
 | Spaces: sets of tabs, each with its own sign-ins | ✅ Alt+1–9, own store per space |
-| Space swipes and colours | 🔨 batch 4 |
+| Space swipes and colours | ✅ colours and two-colour gradients; two-finger swipe on the column |
 | Profiles | ✅ `rippl --profile NAME`, a window each |
 | Profiles in one window | 🔨 later |
 | Send links to a space | 🔨 Phase 9 (with links from other apps) |
-| Several windows, same tabs in every window | 🔨 batch 4 |
+| Several windows, same tabs in every window | ✅ Ctrl+N, each restored; twins 🔨 |
 | ⌃Tab tab switcher with pictures | ✅ Ctrl+Tab (keys on a card, ⌃W/⌃R, 🔨) |
 | ⌘K switch to a tab | ✅ Ctrl+K: the field finds open tabs |
 | ⌘1–⌘9 | ✅ Ctrl+1–9 |
@@ -74,7 +74,7 @@ the header of each of its source files, with rippl's status for each.
 | Completion from history, typo tolerance | ✅ |
 | Site keywords, "yt cats" | ✅ built-in set and your own (`keyword.<word>` in the config) |
 | Search a site from the field | ✅ as a row; OpenSearch discovery 🔨 later |
-| Commands in the field | ✅ rippl's pages by name; menu commands 🔨 with batch 4 shortcuts |
+| Commands in the field | ✅ rippl's pages by name; menu commands 🔨 |
 | Search engine suggestions, off by default | ✅ off by default |
 | Address always in sight | ✅ the field |
 | Where a link goes, at the foot of the page | ✅ |

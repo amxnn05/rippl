@@ -1,43 +1,67 @@
-//! Split view: two tabs side by side, a divider between them.
+//! Split view: up to four tabs on screen at once (the 
+//! and ), dividers between them.
 //!
 //! - Ctrl+Alt+S splits the tab in front with the tab you were on before
-//!   it, or separates a split. Alt-click on a tab in the column splits it
-//!   with the one in front.
+//!   it, or takes it out of its split. Alt-click on a tab in the column
+//!   (or "Put beside this tab" in its menu) adds it to the split in front,
+//!   up to four.
+//! - Two and three pages stand side by side; four make a two-by-two grid.
+//!   The dividers drag.
 //! - The pane you click into becomes the tab in front: shortcuts, the
 //!   field, find and reading mode act on it. Ctrl+Alt+←/→ move between
 //!   the panes.
-//! - Both pages are on screen, so neither sleeps while shown.
-//! - Selecting a tab of the pair shows the pair; selecting any other tab
-//!   shows it alone, and the pair comes back when you return to either.
+//! - All of them are on screen, so none sleeps while shown.
+//! - Selecting a tab of a split shows the split; selecting any other tab
+//!   shows it alone, and the split comes back when you return to one of it.
 //!
-//! A view lives in the stage (one page at a time) or in the paned (two),
+//! A view lives in the stage (one page at a time) or in the split area,
 //! never both: `place` and `detach` are the only ways views move.
 
 use rippl_core::tabs::{Life, TabId};
 use webkit6::prelude::*;
-use webkit6::{gtk, WebView};
+use webkit6::{glib, gtk, WebView};
 
 use crate::browser::Browser;
 
+/// The most pages one split shows.
+pub(crate) const MOST: usize = 4;
+
 impl Browser {
-    /// Shows tab `id` (already awake, or blank): alone, or beside its
-    /// partner if it has one.
+    /// The split `id` is in, in column order, if any.
+    pub(crate) fn split_of(&self, id: TabId) -> Option<Vec<TabId>> {
+        let found = self.splits.borrow().iter().find(|s| s.contains(&id)).cloned()?;
+        let tabs = self.tabs.borrow();
+        let mut ordered = found;
+        ordered.sort_by_key(|t| tabs.index(*t).unwrap_or(usize::MAX));
+        Some(ordered)
+    }
+
+    /// Whether `id` is in a split.
+    pub(crate) fn in_split(&self, id: TabId) -> bool {
+        self.splits.borrow().iter().any(|s| s.contains(&id))
+    }
+
+    /// Shows tab `id` (already awake, or blank): alone, or with its split.
     pub(crate) fn place(&self, id: TabId) {
         let view = self.views.borrow().get(&id).cloned();
-        let partner = self.partner.borrow().get(&id).copied();
         let Some(view) = view else {
             self.unsplit_layout();
             self.stage.set_visible_child(&self.blank);
             self.field.grab_focus();
             return;
         };
-        if let Some(p) = partner {
-            let asleep = self.tabs.borrow().get(p).is_some_and(|t| t.life != Life::Awake && !t.url.is_empty());
-            if asleep {
-                self.wake_for_split(p);
+        if let Some(members) = self.split_of(id) {
+            for m in &members {
+                let asleep = self.tabs.borrow().get(*m).is_some_and(|t| t.life != Life::Awake && !t.url.is_empty());
+                if asleep {
+                    self.wake_for_split(*m);
+                }
             }
-            if let Some(other) = self.views.borrow().get(&p).cloned() {
-                self.show_pair(id, &view, p, &other);
+            let views: Vec<(TabId, WebView)> =
+                members.iter().filter_map(|m| self.views.borrow().get(m).cloned().map(|v| (*m, v))).collect();
+            if views.len() >= 2 {
+                self.show_split(&views);
+                self.mark_pane(id);
                 view.grab_focus();
                 return;
             }
@@ -47,46 +71,77 @@ impl Browser {
         view.grab_focus();
     }
 
-    fn show_pair(&self, a: TabId, va: &WebView, b: TabId, vb: &WebView) {
-        // Left is whichever comes first in the column.
-        let (ia, ib) = {
-            let tabs = self.tabs.borrow();
-            (tabs.index(a).unwrap_or(0), tabs.index(b).unwrap_or(0))
-        };
-        let (left, right) = if ia <= ib { ((a, va), (b, vb)) } else { ((b, vb), (a, va)) };
-        let shown = *self.shown_split.borrow();
-        if shown != Some((left.0, right.0)) {
-            self.unsplit_layout();
-            self.detach(left.1);
-            self.detach(right.1);
-            self.paned.set_start_child(Some(left.1));
-            self.paned.set_end_child(Some(right.1));
-            let width = self.paned.width();
-            if width > 0 {
-                self.paned.set_position(width / 2);
-            }
-            *self.shown_split.borrow_mut() = Some((left.0, right.0));
+    /// Lays `views` out in the split area: across, or two by two.
+    fn show_split(&self, views: &[(TabId, WebView)]) {
+        let ids: Vec<TabId> = views.iter().map(|(t, _)| *t).collect();
+        if self.shown_split.borrow().as_ref() == Some(&ids) {
+            self.stage.set_visible_child(&self.split_area);
+            return;
         }
-        self.stage.set_visible_child(&self.paned);
-        self.mark_pane(a);
+        self.unsplit_layout();
+        for (_, v) in views {
+            self.detach(v);
+        }
+        let pane = |o: gtk::Orientation, a: &gtk::Widget, b: &gtk::Widget| {
+            let p = gtk::Paned::builder()
+                .orientation(o)
+                .wide_handle(true)
+                .shrink_start_child(false)
+                .shrink_end_child(false)
+                .resize_start_child(true)
+                .resize_end_child(true)
+                .start_child(a)
+                .end_child(b)
+                .build();
+            p.add_css_class("split");
+            p
+        };
+        let w = |i: usize| views[i].1.clone().upcast::<gtk::Widget>();
+        let h = gtk::Orientation::Horizontal;
+        let root = match views.len() {
+            2 => pane(h, &w(0), &w(1)),
+            3 => {
+                let right = pane(h, &w(1), &w(2));
+                pane(h, &w(0), right.upcast_ref())
+            }
+            _ => {
+                let top = pane(h, &w(0), &w(1));
+                let bottom = pane(h, &w(2), &w(3));
+                pane(gtk::Orientation::Vertical, top.upcast_ref(), bottom.upcast_ref())
+            }
+        };
+        root.set_hexpand(true);
+        root.set_vexpand(true);
+        self.split_area.append(&root);
+        *self.shown_split.borrow_mut() = Some(ids);
+        self.stage.set_visible_child(&self.split_area);
+        // Even shares, once there is a size to share.
+        let root = root.clone();
+        glib::idle_add_local_once(move || even(&root));
     }
 
     /// Outlines the pane that has the keyboard.
     pub(crate) fn mark_pane(&self, front: TabId) {
-        let Some((l, r)) = *self.shown_split.borrow() else { return };
-        for id in [l, r] {
+        let Some(shown) = self.shown_split.borrow().clone() else { return };
+        for id in shown {
             if let Some(v) = self.views.borrow().get(&id) {
                 if id == front { v.add_css_class("pane-front") } else { v.remove_css_class("pane-front") }
             }
         }
     }
 
-    /// Puts a shown pair back into the stage, one page each.
+    /// Puts a shown split back into the stage, one page each.
     pub(crate) fn unsplit_layout(&self) {
-        let Some((l, r)) = self.shown_split.borrow_mut().take() else { return };
-        self.paned.set_start_child(None::<&gtk::Widget>);
-        self.paned.set_end_child(None::<&gtk::Widget>);
-        for id in [l, r] {
+        let Some(shown) = self.shown_split.borrow_mut().take() else { return };
+        for id in &shown {
+            if let Some(v) = self.views.borrow().get(id).cloned() {
+                self.detach(&v);
+            }
+        }
+        while let Some(c) = self.split_area.first_child() {
+            self.split_area.remove(&c);
+        }
+        for id in shown {
             if let Some(v) = self.views.borrow().get(&id).cloned() {
                 v.remove_css_class("pane-front");
                 if v.parent().is_none() {
@@ -99,46 +154,59 @@ impl Browser {
     /// Takes a view off wherever it is shown.
     pub(crate) fn detach(&self, view: &WebView) {
         let Some(parent) = view.parent() else { return };
-        if parent == *self.paned.upcast_ref::<gtk::Widget>() {
-            if self.paned.start_child().as_ref() == Some(view.upcast_ref()) {
-                self.paned.set_start_child(None::<&gtk::Widget>);
+        if let Some(p) = parent.downcast_ref::<gtk::Paned>() {
+            if p.start_child().as_ref() == Some(view.upcast_ref()) {
+                p.set_start_child(None::<&gtk::Widget>);
             } else {
-                self.paned.set_end_child(None::<&gtk::Widget>);
+                p.set_end_child(None::<&gtk::Widget>);
             }
-        } else {
+        } else if parent == *self.stage.upcast_ref::<gtk::Widget>() {
             self.stage.remove(view);
+        } else {
+            view.unparent();
         }
     }
 
-    /// The tabs on screen: the one in front, and its partner when shown.
+    /// The tabs on screen: the one in front, and its split when shown.
     pub(crate) fn on_screen(&self) -> Vec<TabId> {
         let mut ids: Vec<TabId> = self.front().into_iter().collect();
-        if let Some((l, r)) = *self.shown_split.borrow() {
-            ids.extend([l, r]);
+        if let Some(shown) = self.shown_split.borrow().as_ref() {
+            ids.extend(shown.iter().copied());
         }
         ids
     }
 
-    /// Splits the tab in front with `other`.
+    /// Puts `other` beside the tab in front: into its split (up to four),
+    /// or a new pair.
     pub(crate) fn split_with(&self, other: TabId) {
         let Some(front) = self.front() else { return };
         if front == other || self.tabs.borrow().get(other).is_none_or(|t| t.url.is_empty()) {
             return;
         }
-        self.separate(front);
+        if self.split_of(front).is_some_and(|s| s.contains(&other)) {
+            return;
+        }
+        let full = self.split_of(front).is_some_and(|s| s.len() >= MOST);
+        if full {
+            self.notice("A split shows four pages at most");
+            return;
+        }
         self.separate(other);
-        let mut partner = self.partner.borrow_mut();
-        partner.insert(front, other);
-        partner.insert(other, front);
-        drop(partner);
+        let mut splits = self.splits.borrow_mut();
+        match splits.iter_mut().find(|s| s.contains(&front)) {
+            Some(s) => s.push(other),
+            None => splits.push(vec![front, other]),
+        }
+        drop(splits);
+        self.unsplit_layout();
         self.select(front);
     }
 
-    /// Ctrl+Alt+S: separate the split in front, or split the front tab
-    /// with the tab used before it.
+    /// Ctrl+Alt+S: take the tab in front out of its split, or split it with
+    /// the tab used before it.
     pub(crate) fn toggle_split(&self) {
         let Some(front) = self.front() else { return };
-        if self.partner.borrow().contains_key(&front) {
+        if self.in_split(front) {
             self.separate(front);
             self.select(front);
             return;
@@ -147,7 +215,7 @@ impl Browser {
             let tabs = self.tabs.borrow();
             tabs.list
                 .iter()
-                .filter(|t| t.id != front && !t.url.is_empty())
+                .filter(|t| t.id != front && !t.url.is_empty() && t.space == tabs.space)
                 .max_by_key(|t| t.touched)
                 .map(|t| t.id)
         };
@@ -157,23 +225,28 @@ impl Browser {
         }
     }
 
-    /// Ends `id`'s pair, if it is in one.
+    /// Takes `id` out of its split; a split left with one page ends.
     pub(crate) fn separate(&self, id: TabId) {
-        let other = self.partner.borrow_mut().remove(&id);
-        if let Some(o) = other {
-            self.partner.borrow_mut().remove(&o);
-            let shown = *self.shown_split.borrow();
-            if shown.is_some_and(|(l, r)| [l, r].contains(&id)) {
-                self.unsplit_layout();
-            }
+        if !self.in_split(id) {
+            return;
         }
+        if self.shown_split.borrow().as_ref().is_some_and(|s| s.contains(&id)) {
+            self.unsplit_layout();
+        }
+        let mut splits = self.splits.borrow_mut();
+        for s in splits.iter_mut() {
+            s.retain(|t| *t != id);
+        }
+        splits.retain(|s| s.len() >= 2);
     }
 
-    /// Ctrl+Alt+←/→: the keyboard to the left or right pane.
+    /// Ctrl+Alt+←/→: the keyboard to the pane before or after.
     pub(crate) fn focus_pane(&self, right: bool) {
-        let Some((l, r)) = *self.shown_split.borrow() else { return };
-        let id = if right { r } else { l };
-        if let Some(v) = self.views.borrow().get(&id).cloned() {
+        let Some(shown) = self.shown_split.borrow().clone() else { return };
+        let at = self.front().and_then(|f| shown.iter().position(|t| *t == f)).unwrap_or(0);
+        let n = shown.len();
+        let next = if right { (at + 1) % n } else { (at + n - 1) % n };
+        if let Some(v) = self.views.borrow().get(&shown[next]).cloned() {
             v.grab_focus();
         }
     }
@@ -181,8 +254,8 @@ impl Browser {
     /// A pane got the keyboard (a click in it): its tab is now in front,
     /// without moving anything.
     pub(crate) fn pane_focused(&self, id: TabId) {
-        let shown = *self.shown_split.borrow();
-        if !shown.is_some_and(|(l, r)| [l, r].contains(&id)) || self.front() == Some(id) {
+        let shown = self.shown_split.borrow().clone();
+        if !shown.is_some_and(|s| s.contains(&id)) || self.front() == Some(id) {
             return;
         }
         self.tabs.borrow_mut().select(id);
@@ -191,5 +264,23 @@ impl Browser {
         self.show_question();
         self.show_save_question();
         self.render();
+    }
+}
+
+/// Even shares for every divider under `root`: each pane of a row the
+/// same width (three across: a third, then half of the rest).
+fn even(root: &gtk::Paned) {
+    let size = if root.orientation() == gtk::Orientation::Horizontal { root.width() } else { root.height() };
+    if size <= 0 {
+        return;
+    }
+    let ends = |w: &gtk::Widget| -> i32 { w.downcast_ref::<gtk::Paned>().filter(|p| p.orientation() == root.orientation()).map_or(1, |_| 2) };
+    let after = root.end_child().map_or(1, |c| ends(&c));
+    root.set_position(size / (after + 1));
+    for child in [root.start_child(), root.end_child()].into_iter().flatten() {
+        if let Some(p) = child.downcast_ref::<gtk::Paned>() {
+            let p = p.clone();
+            glib::idle_add_local_once(move || even(&p));
+        }
     }
 }

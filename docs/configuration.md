@@ -81,6 +81,15 @@ tabs = side
 # The column with titles (full, default) or as icons only (icons)
 column = full
 
+# Behind the new tab's field: off (default), a painted wall (open-road, mountain-lake,
+# northern-lights), solid or gradient (of home_colour), or image (home_image)
+home_theme = off
+home_colour = #4285f5
+home_image = /home/you/Pictures/wall.jpg
+
+# Your own keys for a command (rippl://settings lists them all); none for no keys
+shortcut.new-tab = <Ctrl>t, <Ctrl>n
+
 # Suggestions from the search engine while you type (off, default).
 # On, each keystroke is sent to the engine (DuckDuckGo and Brave offer them).
 suggestions = off
@@ -155,7 +164,8 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 | `F9`, `Ctrl+Alt+R` | Reading mode on/off |
 | `Ctrl+Shift+H` | Hide something on this site (click it; `Esc` cancels) |
 | `Ctrl+Shift+U` | Show everything hidden on this site again |
-| `Ctrl+Alt+S` | Split view: this tab beside the previous one, or separate them |
+| `Ctrl+Alt+S` | Split view: this tab beside the previous one, or take it out of its split |
+| Alt-click a tab, its menu's *Put beside this tab* | Add it to the split in front (up to four: 3 across, 2×2) |
 | `Ctrl+Shift+T` | Reopen the last closed tab, with its history and scroll |
 | Click the tab you're on, `Ctrl+I` | Site card: connection, copy, print, zoom, ad blocking, keep awake, pop-ups, permissions |
 | Right-click a tab | Duplicate, Pin, Put beside this tab, Copy address, Reload, Close, Close other tabs |
@@ -164,9 +174,11 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 | `Ctrl+Shift+S` | Capture the whole page: PNG in ~/Pictures/rippl, and on the clipboard |
 | `Ctrl+Alt+A` | Save the page as a web archive (.mhtml) in Downloads |
 | `Shift+click` a link | Peek at it; `Esc` puts it away, `Ctrl+Return` keeps it as a tab |
-| `Alt+1`–`Alt+9` | Go to that space |
+| `Alt+1`–`Alt+9`, two fingers sideways on the column | Go to that space / the next or previous |
+| `Ctrl+N` | New window (its own tabs; shares sign-ins, history, settings) |
 | `Ctrl+Alt+T`, **+** at the column's foot | New space (its own tabs and sign-ins) |
-| Right-click a space's button | Rename it, or delete it with its tabs and sign-ins |
+| Right-click a space's button | Rename it, colour it (or a gradient), or delete it with its tabs and sign-ins |
+| Right-click a pin | Put it in a pin folder, or take it out |
 | Click / right-click a group's heading | Fold or unfold / rename or ungroup |
 | `Ctrl+Shift+C` | Copy the address, without tracking parameters |
 | `Ctrl+Shift+V` | Paste and go: open what's on the clipboard |

@@ -14,6 +14,8 @@
 //! tab 0 3 1 https://docs.rs/ Docs.rs
 //! ```
 //!
+//! `colour <space> <#rrggbb> [<#rrggbb>]` (a space's colour, or gradient),
+//! `pinfolder <tab index> <name>` (a pinned tab's folder),
 //! `left <tab index> <unix seconds>` (when each tab was last on screen,
 //! for tabs that close themselves; older files have none, and their tabs
 //! count from the restore),
@@ -37,6 +39,8 @@ pub struct Saved {
     pub group: Option<u32>,
     /// When it was last on screen, unix seconds.
     pub left: Option<i64>,
+    /// Its pin folder, if pinned into one.
+    pub pin_folder: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -54,9 +58,13 @@ fn flat(s: &str) -> String {
 }
 
 impl Session {
-    /// The tabs worth keeping from `tabs`: everything but private tabs.
+    /// The tabs worth keeping from `tabs`: everything but private and
+    /// blank tabs.
     pub fn of(tabs: &Tabs) -> Session {
-        let kept: Vec<&Tab> = tabs.list.iter().filter(|t| !t.private).collect();
+        // Blank tabs aren't kept either: read back, they'd be skipped, and
+        // every index after them (fronts, times, folders) would point at the
+        // wrong tab.
+        let kept: Vec<&Tab> = tabs.list.iter().filter(|t| !t.private && !t.url.is_empty()).collect();
         let mut fronts = Vec::new();
         let mut all_fronts: Vec<(SpaceId, TabId)> = tabs.fronts.iter().map(|(s, t)| (*s, *t)).collect();
         if let Some(f) = tabs.front {
@@ -79,6 +87,7 @@ impl Session {
                     space: t.space,
                     group: t.group,
                     left: Some(t.left),
+                    pin_folder: t.pin_folder.clone(),
                 })
                 .collect(),
             spaces: tabs.spaces.clone(),
@@ -92,6 +101,9 @@ impl Session {
         let mut out = format!("{HEADER}\n");
         for s in &self.spaces {
             out.push_str(&format!("space {} {}\n", s.id, flat(&s.name)));
+            if !s.colours.is_empty() {
+                out.push_str(&format!("colour {} {}\n", s.id, s.colours.join(" ")));
+            }
         }
         out.push_str(&format!("current {}\n", self.current));
         for g in &self.groups {
@@ -107,6 +119,9 @@ impl Session {
         for (i, t) in self.tabs.iter().enumerate() {
             if let Some(left) = t.left {
                 out.push_str(&format!("left {i} {left}\n"));
+            }
+            if let Some(f) = &t.pin_folder {
+                out.push_str(&format!("pinfolder {i} {}\n", flat(f)));
             }
         }
         out
@@ -125,6 +140,7 @@ impl Session {
         let mut session = Session::default();
         let mut v1_front = None;
         let mut lefts = Vec::new();
+        let mut folders: Vec<(usize, String)> = Vec::new();
         for line in lines {
             let (kind, rest) = line.split_once(' ').unwrap_or((line, ""));
             match kind {
@@ -132,7 +148,16 @@ impl Session {
                     if let Some((id, name)) = rest.split_once(' ')
                         && let Ok(id) = id.parse()
                     {
-                        session.spaces.push(Space { id, name: name.to_string() });
+                        session.spaces.push(Space { id, name: name.to_string(), colours: Vec::new() });
+                    }
+                }
+                "colour" => {
+                    if let Some((id, colours)) = rest.split_once(' ')
+                        && let Ok(id) = id.parse::<SpaceId>()
+                        && let Some(space) = session.spaces.iter_mut().find(|s| s.id == id)
+                    {
+                        space.colours =
+                            colours.split_whitespace().filter(|c| crate::tabs::colour_ok(c)).take(2).map(String::from).collect();
                     }
                 }
                 "current" => session.current = rest.trim().parse().unwrap_or(0),
@@ -159,7 +184,7 @@ impl Session {
                         continue;
                     }
                     let title = parts.next().unwrap_or("").to_string();
-                    session.tabs.push(Saved { url: url.into(), title, pinned: pin == "1", space: 0, group: None, left: None });
+                    session.tabs.push(Saved { url: url.into(), title, pinned: pin == "1", space: 0, group: None, left: None, pin_folder: None });
                 }
                 "tab" => {
                     let mut p = rest.splitn(5, ' ');
@@ -178,8 +203,12 @@ impl Session {
                         space,
                         group: group.parse().ok(),
                         left: None,
+                        pin_folder: None,
                     });
                 }
+                "pinfolder" => folders.extend(
+                    rest.split_once(' ').and_then(|(i, f)| Some((i.parse::<usize>().ok()?, f.trim().to_string()))),
+                ),
                 "left" => lefts.extend(
                     rest.split_once(' ').and_then(|(i, l)| Some((i.parse::<usize>().ok()?, l.trim().parse::<i64>().ok()?))),
                 ),
@@ -188,6 +217,11 @@ impl Session {
         }
         if let Some(f) = v1_front {
             session.fronts.push((0, f));
+        }
+        for (i, f) in folders {
+            if let Some(t) = session.tabs.get_mut(i).filter(|t| t.pinned && !f.is_empty()) {
+                t.pin_folder = Some(f);
+            }
         }
         for (i, left) in lefts {
             if let Some(t) = session.tabs.get_mut(i) {
@@ -227,6 +261,7 @@ impl Session {
                 if let Some(left) = saved.left {
                     t.left = left;
                 }
+                t.pin_folder = saved.pin_folder.clone().filter(|_| saved.pinned);
             }
             ids.push(id);
         }
@@ -261,7 +296,9 @@ mod tests {
         let b = tabs.open("https://b.com/");
         tabs.get_mut(b).unwrap().title = "B\nsite".into();
         tabs.set_pinned(a, true);
+        tabs.set_pin_folder(a, Some("Reading list"));
         let work = tabs.add_space("Work");
+        tabs.colour_space(work, &["#4285F5".into(), "#e65466".into()]);
         tabs.switch_space(work);
         let w = tabs.open("https://jira.com/");
         tabs.select(w);
@@ -272,8 +309,11 @@ mod tests {
         tabs.select(b);
         tabs.switch_space(work);
 
+        let blank = tabs.open("");
+        let _ = blank;
         let text = Session::of(&tabs).write();
         assert!(!text.contains("secret"));
+        assert!(!text.contains("New tab"), "blank tabs aren't kept");
         let back = Session::read(&text);
         assert_eq!(back.spaces.len(), 2);
         assert_eq!(back.current, work);
@@ -282,6 +322,8 @@ mod tests {
         let mut fresh = Tabs::new();
         let front = back.restore_into(&mut fresh).unwrap();
         assert_eq!(fresh.space, work);
+        assert_eq!(fresh.list.iter().find(|t| t.pinned).unwrap().pin_folder.as_deref(), Some("Reading list"));
+        assert_eq!(fresh.spaces.iter().find(|s| s.id == work).unwrap().colours, vec!["#4285f5", "#e65466"]);
         assert_eq!(fresh.get(front).unwrap().url, "https://jira.com/");
         assert_eq!(fresh.groups.len(), 1);
         assert_eq!(fresh.here().count(), 2);

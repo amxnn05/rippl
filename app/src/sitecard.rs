@@ -28,7 +28,7 @@ pub const AWAKE: &str = "awake";
 type MenuItem = (&'static str, fn(&Browser, TabId));
 
 /// A menu line built at the time: its words, and what it does.
-type MenuAction = (String, std::rc::Rc<dyn Fn(&Browser, TabId)>);
+pub(crate) type MenuAction = (String, std::rc::Rc<dyn Fn(&Browser, TabId)>);
 pub const POPUPS: &str = "popups";
 
 impl Browser {
@@ -363,6 +363,7 @@ impl Browser {
             ),
             ("Put beside this tab".into(), std::rc::Rc::new(|b: &Browser, id| b.split_with(id))),
         ];
+        items.extend(self.pin_folder_items(id));
         if !pinned {
             items.push(("Add to a new group".into(), std::rc::Rc::new(|b: &Browser, id| {
                 b.tabs.borrow_mut().new_group(id, "");

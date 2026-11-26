@@ -62,7 +62,7 @@ app/src/
   internal_pages.rs       serves rippl://history|bookmarks|passwords|settings, token-checked buttons
   keyring.rs              the Secret Service through libsecret (or memory, for tests)
   signin.rs               form watching, the save question, the account list, filling
-  split.rs                split view: place/detach views, pairs, pane focus
+  split.rs                split view, 2–4 pages: place/detach views, nested panes, pane focus
   look.rs                 the design: palette, column rows, letters, pins, CSS
   closed.rs               reopen closed tabs, copy clean address, paste and go
   sitecard.rs             site card, tab menu, duplicate, print, blocked pop-ups
@@ -79,6 +79,11 @@ app/src/
   switcher.rs             Ctrl+Tab: the tabs as pictures, latest first
   bookmarks_bar.rs        the bookmarks bar, with a » for what doesn't fit
   chrome.rs               tabs on the side, as icons, or across the top; the strip above the page
+  shortcuts.rs            your own keys for commands
+  space_look.rs           spaces' colours and the swipe between spaces
+  home_theme.rs           the new tab's background: the painted walls (cairo), colours, image
+  pin_folders.rs          folders among the pins
+  windows.rs              several windows sharing one engine; their sessions
   pressure.rs             Linux PSI reading; malloc_trim
   control.rs              Unix socket for tests and measurement (opt-in)
 

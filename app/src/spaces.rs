@@ -28,6 +28,7 @@ impl Browser {
         }
         self.unsplit_layout();
         let front = self.tabs.borrow_mut().switch_space(space);
+        self.apply_space_look();
         match front {
             Some(id) => self.select(id),
             None => {
@@ -122,6 +123,9 @@ impl Browser {
             let letter = space.name.chars().find(|c| c.is_alphanumeric()).map(|c| c.to_uppercase().to_string());
             let button = gtk::Button::with_label(&letter.unwrap_or_else(|| (n + 1).to_string()));
             button.add_css_class("space");
+            if let Some(c) = space.colours.first() {
+                button.add_css_class(&format!("tint-{}", &c[1..]));
+            }
             if space.id == tabs.space {
                 button.add_css_class("here");
             }
@@ -184,6 +188,7 @@ impl Browser {
             b.render();
         });
         menu.append(&entry);
+        self.colour_rows(space, &menu);
         if many {
             let delete = gtk::Button::with_label(&format!(
                 "Delete space, its {count} tab{} and its sign-ins",

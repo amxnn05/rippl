@@ -294,6 +294,8 @@ pub struct SettingsView<'a> {
     pub shield_off: &'a [String],
     pub hidden: &'a [(String, Vec<String>)],
     pub config: &'a [Setting],
+    /// Each command's keys (`shortcut.<name>`), changed as the rest are.
+    pub shortcuts: &'a [Setting],
     pub config_path: &'a str,
     /// The result of the last change, if any.
     pub note: &'a str,
@@ -341,7 +343,7 @@ pub fn settings(v: &SettingsView, token: &str) -> String {
     if !v.note.is_empty() {
         body.push_str(&format!(r#"<p class="tag">{}</p>"#, escape(v.note)));
     }
-    for s in v.config {
+    let row = |s: &Setting| -> String {
         let control = if s.choices.is_empty() {
             format!(r#"<input class="value" data-set="{k}" value="{v}">"#, k = escape(&s.key), v = escape(&s.value))
         } else {
@@ -362,11 +364,20 @@ pub fn settings(v: &SettingsView, token: &str) -> String {
             format!(r#"<select data-set="{}">{options}</select>"#, escape(&s.key))
         };
         let note = if s.note.is_empty() { String::new() } else { format!(r#"<div class="note">{}</div>"#, escape(&s.note)) };
-        body.push_str(&format!(
+        format!(
             r#"<div class="row"><div class="main">{label} <code class="note">{key}</code>{note}</div>{control}</div>"#,
             label = escape(&s.label),
             key = escape(&s.key),
-        ));
+        )
+    };
+    for s in v.config {
+        body.push_str(&row(s));
+    }
+    if !v.shortcuts.is_empty() {
+        body.push_str(r#"<h2>Keyboard shortcuts</h2><p class="note">Keys as GTK writes them, several with commas: <code>&lt;Ctrl&gt;j, F2</code>. <code>none</code> takes a command's keys away; empty puts its own back.</p>"#);
+        for s in v.shortcuts {
+            body.push_str(&row(s));
+        }
     }
     frame("settings", "Settings", token, &body)
 }

@@ -18,7 +18,7 @@
 //! for `prefers-color-scheme`. Nothing else in rippl knows which it is.
 
 use rippl_core::address::monogram;
-use rippl_core::tabs::Life;
+use rippl_core::tabs::{Life, TabId};
 use webkit6::prelude::*;
 use webkit6::{gdk, gio, glib, gtk};
 
@@ -156,6 +156,22 @@ window.rippl .top-knob { min-width: 30px; min-height: 30px; padding: 0; border-r
   background: none; box-shadow: none; color: var(--muted); }
 window.rippl .top-knob:hover { background: var(--hover); color: var(--ink); }
 window.rippl .top-offers { margin: 4px 0 0 4px; }
+/* A space's colour choices (space_look.rs). */
+window.rippl .space.tint-4285f5 { color: #4285f5; }
+window.rippl .space.tint-33a873 { color: #33a873; }
+window.rippl .space.tint-f59e33 { color: #f59e33; }
+window.rippl .space.tint-e65466 { color: #e65466; }
+window.rippl .space.tint-9e66e6 { color: #9e66e6; }
+window.rippl .swatch { min-width: 20px; min-height: 20px; padding: 0; border-radius: 10px; border: none;
+  box-shadow: inset 0 0 0 1px var(--hairline); background: var(--tile); color: var(--muted); -gtk-icon-size: 10px; }
+window.rippl .swatch.chosen { box-shadow: 0 0 0 2px var(--ink); }
+window.rippl .swatch-title { font-size: 11px; color: var(--muted); }
+window.rippl .swatch.swatch-4285f5 { background: #4285f5; }
+window.rippl .swatch.swatch-33a873 { background: #33a873; }
+window.rippl .swatch.swatch-f59e33 { background: #f59e33; }
+window.rippl .swatch.swatch-e65466 { background: #e65466; }
+window.rippl .swatch.swatch-9e66e6 { background: #9e66e6; }
+window.rippl .pin.pin-folder { color: var(--muted); -gtk-icon-size: 14px; }
 window.rippl .switcher-dim { background: rgba(0,0,0,0.22); }
 window.rippl .switcher { background: var(--ground); border-radius: 14px; padding: 18px;
   box-shadow: 0 0 0 1px var(--hairline), 0 10px 30px rgba(0,0,0,0.25); }
@@ -177,7 +193,7 @@ window.rippl .player:hover { background: var(--hover); color: var(--ink); }
 window.rippl .player-button { min-width: 15px; min-height: 15px; padding: 0; border-radius: 8px; border: none;
   background: transparent; color: var(--muted); box-shadow: none; -gtk-icon-size: 9px; }
 window.rippl .player-button:hover { background: var(--wash); }
-window.rippl paned.split > separator { background: var(--hairline); min-width: 6px; }
+window.rippl paned.split > separator { background: var(--hairline); min-width: 6px; min-height: 6px; }
 window.rippl webview.pane-front { box-shadow: inset 0 2px 0 var(--accent); }
 
 /* What the field offers while you type. */
@@ -254,6 +270,8 @@ impl Browser {
         } else {
             self.window.remove_css_class("dark");
         }
+        self.apply_space_look();
+        self.apply_home_theme();
         if self.config.borrow().glass {
             self.window.add_css_class("glass");
         } else {
@@ -379,10 +397,10 @@ impl Browser {
             self.pins.remove(&child);
         }
         let tabs = self.tabs.borrow();
-        let partner = self.partner.borrow();
         let mut any_pin = false;
         let mut pin_at = 0;
         let mut in_group: Option<rippl_core::tabs::GroupId> = None;
+        let mut folders_drawn: Vec<String> = Vec::new();
         // Only the space on screen; a group's tabs under its heading.
         for tab in tabs.here() {
             let id = tab.id;
@@ -398,6 +416,22 @@ impl Browser {
                 continue;
             }
             let live = Some(id) == tabs.front;
+            // A pin in a folder: the folder's square, once, where its
+            // first pin would be.
+            if tab.pinned && let Some(folder) = &tab.pin_folder {
+                any_pin = true;
+                if !folders_drawn.contains(folder) {
+                    folders_drawn.push(folder.clone());
+                    let members: Vec<TabId> =
+                        tabs.here().filter(|t| t.pinned && t.pin_folder.as_ref() == Some(folder)).map(|t| t.id).collect();
+                    let holds_front = tabs.front.is_some_and(|f| members.contains(&f));
+                    let square = self.pin_folder_square(folder, &members, holds_front);
+                    let across = if icons { 1 } else { 6 };
+                    self.pins.attach(&square, pin_at % across, pin_at / across, 1, 1);
+                    pin_at += 1;
+                }
+                continue;
+            }
             if tab.pinned {
                 any_pin = true;
                 let pin = gtk::Button::new();
@@ -491,7 +525,7 @@ impl Browser {
             if tab.group.is_some() {
                 row.add_css_class("in-group");
             }
-            if partner.contains_key(&id) {
+            if self.in_split(id) {
                 row.add_css_class("split");
                 row.set_tooltip_text(Some(&format!("{} · side by side (Ctrl+Alt+S separates)", tab.url)));
             }
@@ -507,7 +541,6 @@ impl Browser {
         self.pins.set_visible(any_pin);
         self.render_player();
         drop(tabs);
-        drop(partner);
         self.render_spaces();
     }
 

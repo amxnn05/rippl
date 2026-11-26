@@ -256,7 +256,7 @@ impl Browser {
             if tab.life != Life::Awake && !tab.url.is_empty() {
                 tile.add_css_class("asleep");
             }
-            if self.partner.borrow().contains_key(&id) {
+            if self.in_split(id) {
                 tile.add_css_class("split");
             }
             self.on_click(&tile, id);

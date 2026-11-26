@@ -42,15 +42,28 @@ fn other_browsers() -> Vec<import::Source> {
 
 impl Browser {
     pub(crate) fn wire_internal_pages(&self) {
+        // Once for the engine every window shares; a page is served by the
+        // window its tab is in.
+        if !self.primary {
+            return;
+        }
         let context = &self.engine.context;
         if let Some(security) = context.security_manager() {
             security.register_uri_scheme_as_local("rippl");
             security.register_uri_scheme_as_display_isolated("rippl");
             security.register_uri_scheme_as_secure("rippl");
         }
-        let weak = self.weak();
         context.register_uri_scheme("rippl", move |request| {
-            let Some(b) = weak.upgrade() else { return };
+            let asker = request.web_view();
+            let windows = crate::windows::all();
+            let Some(b) = windows
+                .iter()
+                .find(|w| asker.as_ref().is_some_and(|v| w.views.borrow().values().any(|x| x == v)))
+                .or_else(|| windows.first())
+                .cloned()
+            else {
+                return;
+            };
             let url = request.uri().map(|u| u.to_string()).unwrap_or_default();
             // Passwords come from the keyring, which answers later.
             if pages::page_name(&url) == "passwords" {
@@ -104,6 +117,7 @@ impl Browser {
                 let shield_off = self.shield.allowed_list();
                 let hidden = self.places.hidden().unwrap_or_default();
                 let config = self.config.borrow().rows();
+                let shortcuts = self.shortcut_rows();
                 let path = crate::config::path();
                 pages::settings(
                     &SettingsView {
@@ -111,6 +125,7 @@ impl Browser {
                         shield_off: &shield_off,
                         hidden: &hidden,
                         config: &config,
+                        shortcuts: &shortcuts,
                         config_path: &path.to_string_lossy(),
                         note: &note,
                     },
@@ -212,6 +227,8 @@ impl Browser {
             "home_grid" => self.fill_home_grid(),
             "bookmarks_bar" => self.fill_bookmarks_bar(),
             "tabs" | "column" => self.apply_chrome(),
+            k if k.starts_with("shortcut.") => self.apply_shortcut(&k["shortcut.".len()..]),
+            "home_theme" | "home_colour" | "home_image" => self.apply_home_theme(),
             "frame_rate" => {
                 self.engine.set_full_rate(config.full_rate);
                 return Ok("Saved. Pages loaded from now on use it; reload a page to change it there.".into());

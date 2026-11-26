@@ -42,6 +42,12 @@
 //! tab_switcher = on
 //! # tabs down the side (side, default) or across the top
 //! tabs = side
+//! # behind the new tab's field: off (default), a painted wall (open-road,
+//! # mountain-lake, northern-lights), solid, gradient (of home_colour), or
+//! # image (home_image)
+//! home_theme = off
+//! home_colour = #4285f5
+//! home_image = /home/you/Pictures/wall.jpg
 //! # pages, their animations and smooth scrolling at the screen's own rate
 //! # (display, default: 144 on a 144 Hz screen) or near 60 (60, saves power)
 //! frame_rate = display
@@ -58,6 +64,8 @@
 //! # suggestions from the search engine while typing (off, default: it
 //! # sends each keystroke to the engine)
 //! suggestions = off
+//! # your own keys for a command (rippl://settings lists them all), or none
+//! shortcut.new-tab = <Ctrl>t, <Ctrl>n
 //! # your own site keywords: "keyword.<word> = <address with %s>"
 //! keyword.npm = https://www.npmjs.com/search?q=%s
 //! ```
@@ -102,12 +110,17 @@ pub struct Config {
     pub tab_switcher: bool,
     /// Pages at the screen's refresh rate rather than near 60.
     pub full_rate: bool,
+    pub home_theme: String,
+    pub home_colour: String,
+    pub home_image: String,
     pub sleep_after: Duration,
     pub history: bool,
     pub theme: Theme,
     pub https_only: bool,
     pub gpc: bool,
     pub suggestions: bool,
+    /// Your keys for commands: (command, value), `shortcut.<command>`.
+    pub shortcuts: Vec<(String, String)>,
     /// Site keywords: the built-in ones, then yours (which win).
     pub keywords: Vec<(String, String)>,
 }
@@ -168,6 +181,9 @@ impl Default for Config {
             top_tabs: false,
             tab_switcher: true,
             full_rate: true,
+            home_theme: "off".into(),
+            home_colour: "#4285f5".into(),
+            home_image: String::new(),
             sleep_after: Duration::from_secs(30 * 60),
             history: true,
             theme: Theme::System,
@@ -175,6 +191,7 @@ impl Default for Config {
             gpc: true,
             suggestions: false,
             keywords: address::default_keywords(),
+            shortcuts: Vec::new(),
         }
     }
 }
@@ -214,6 +231,19 @@ impl Config {
             "video_keys" => self.video_keys = on(value).ok_or_else(bad)?,
             "peek" => self.peek = on(value).ok_or_else(bad)?,
             "player" => self.player = on(value).ok_or_else(bad)?,
+            "home_theme" => {
+                if !crate::home_theme::THEMES.contains(&value) {
+                    return Err(bad());
+                }
+                self.home_theme = value.to_string();
+            }
+            "home_colour" => {
+                if !rippl_core::tabs::colour_ok(value) {
+                    return Err(bad());
+                }
+                self.home_colour = value.to_lowercase();
+            }
+            "home_image" => self.home_image = value.to_string(),
             "frame_rate" => {
                 self.full_rate = match value {
                     "display" => true,
@@ -250,6 +280,14 @@ impl Config {
             "https_only" => self.https_only = on(value).ok_or_else(bad)?,
             "gpc" => self.gpc = on(value).ok_or_else(bad)?,
             "suggestions" => self.suggestions = on(value).ok_or_else(bad)?,
+            k if k.starts_with("shortcut.") => {
+                let name = k["shortcut.".len()..].trim().to_string();
+                self.shortcuts.retain(|(n, _)| *n != name);
+                if !value.is_empty() {
+                    crate::shortcuts::parse(value)?;
+                    self.shortcuts.push((name, value.to_string()));
+                }
+            }
             k if k.starts_with("keyword.") => {
                 let word = k["keyword.".len()..].trim().to_lowercase();
                 if word.is_empty() || word.contains(char::is_whitespace) || !address::keyword_template_ok(value) {
@@ -331,6 +369,9 @@ impl Config {
             choice("bookmarks_bar", "Bookmarks bar above the page", onoff(self.bookmarks_bar), &["on", "off"], ""),
             choice("tabs", "Tabs", if self.top_tabs { "top" } else { "side" }.into(), &["side", "top"], "Down the side, or across the top"),
             choice("column", "The column", if self.icon_column { "icons" } else { "full" }.into(), &["full", "icons"], "With titles, or icons only"),
+            choice("home_theme", "New tab background", self.home_theme.clone(), &crate::home_theme::THEMES, "Painted walls are the; solid and gradient use the colour below; image uses the file below"),
+            choice("home_colour", "New tab colour", self.home_colour.clone(), &[], "#rrggbb, for solid and gradient"),
+            choice("home_image", "New tab image", self.home_image.clone(), &[], "A picture's full path, for image"),
             choice("home_grid", "New tab: the sites in the bookmark folder Home", onoff(self.home_grid), &["on", "off"], "Four to a row, sixteen at most"),
             choice("history", "Keep history", onoff(self.history), &["on", "off"], ""),
             choice(

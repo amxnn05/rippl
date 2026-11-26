@@ -2,23 +2,27 @@
 //! rest: comments, blank lines and the other settings stay as they were.
 
 /// `text` with `key` set to `value`: the first active `key = …` line is
-/// replaced, or, if there is none, `key = value` is added at the end.
+/// replaced, or, if there is none, `key = value` is added at the end. An
+/// empty `value` takes the key's lines out (its default back).
 pub fn set(text: &str, key: &str, value: &str) -> String {
     let mut done = false;
+    let forget = value.is_empty();
     let mut out: Vec<String> = text
         .lines()
-        .map(|line| {
+        .filter_map(|line| {
             let active = !line.trim_start().starts_with('#');
             let this_key = line.split_once('=').map(|(k, _)| k.trim());
-            if !done && active && this_key == Some(key) {
+            if active && this_key == Some(key) && (forget || done) {
+                None
+            } else if active && this_key == Some(key) {
                 done = true;
-                format!("{key} = {value}")
+                Some(format!("{key} = {value}"))
             } else {
-                line.to_string()
+                Some(line.to_string())
             }
         })
         .collect();
-    if !done {
+    if !done && !forget {
         out.push(format!("{key} = {value}"));
     }
     let mut joined = out.join("\n");
@@ -34,6 +38,11 @@ mod tests {
     fn replaces_in_place_and_keeps_the_rest() {
         let text = "# my settings\nsearch = duckduckgo\n\n# search = brave\nshield = on\n";
         assert_eq!(set(text, "search", "brave"), "# my settings\nsearch = brave\n\n# search = brave\nshield = on\n");
+    }
+
+    #[test]
+    fn empty_takes_the_line_out() {
+        assert_eq!(set("shield = on\nshortcut.print = none\n", "shortcut.print", ""), "shield = on\n");
     }
 
     #[test]

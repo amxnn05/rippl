@@ -1,12 +1,12 @@
-# Feature batch 4: autoplay, autoscroll, tabs that close themselves, the tab switcher, the bookmarks bar, icons-only and top tabs, pages at the screen's rate
+# Feature batch 4: screen-rate pages, autoplay, autoscroll, closing tabs, the tab switcher, bookmarks bar, icons-only and top tabs, 4-page split, shortcuts, space colours, new-tab walls, pin folders, windows
 
-**Status:** first part done (2026-11-26). Plan: [features.md](../features.md).
+**Status:** done (2026-11-26). Plan: [features.md](../features.md).
 
 - **First part (this):** autoplay choice, middle-button autoscroll, tabs that close themselves
   and the archive, the Ctrl+Tab switcher, the bookmarks bar, the column as icons only, tabs
   across the top, and pages at the screen's own refresh rate.
-- **Second part (next):** new-tab walls and themes, pin folders, 3–4 page split, space colours and
-  swipes, several windows, your own shortcuts.
+- **Second part:** split view up to four pages, your own shortcuts, space colours and swipes,
+  new-tab walls and themes, pin folders, several windows.
 
 ## Pages at the screen's refresh rate (`frame_rate`)
 
@@ -115,12 +115,91 @@ are in the column only (spaces stay on Alt+1–9).
 - Scrolling with a real wheel at 144 Hz: measured through scripted scrolling and the window's
   paint count, not a physical wheel.
 
+# Second part
+
+## Split view, up to four pages
+
+the PaneStage: two and three pages stand side by side, four make a two-by-two grid, with
+dragging dividers (nested `GtkPaned`s, even shares at first). Alt-click a tab, or **Put beside
+this tab** in its menu, adds it to the split in front, up to four. Ctrl+Alt+S takes the tab in
+front out (a split left with one page ends); Ctrl+Alt+←/→ walk the panes. A split of 2–4 tabs is
+`Browser::splits`; tabs that close themselves treat a split as one (all or none).
+
+Tested: 2, 3 across, 2×2; taking the front out of four left three; closing one of three left a
+pair.
+
+## Your own shortcuts
+
+`shortcut.<command> = <Ctrl>j, F2` (GTK's names, comma-separated; `none` for no keys; an empty
+value, which removes the line, gives the command its own keys back). rippl://settings lists every
+command under **Keyboard shortcuts**, with its keys, editable there, applied at once. A key GTK
+doesn't know is refused with a message. Tested: added Ctrl+N to new tab, took Print's keys away,
+refused `<Ctrl>banana`, cleared both (lines gone from the file).
+
+## Space colours, and swiping between spaces
+
+A space's menu (right-click its button at the column's foot) has the five colours, and a
+second one to run a gradient into. The window's ground (the column, the strip, the bookmarks bar,
+around the page's card, never the page) takes 7% of it in the light look and 11% in the dark, as
+the; its button at the foot takes the colour. Kept in the session (`colour <space> #… [#…]`).
+
+Two fingers sideways on the column (or a sideways wheel) go to the next or previous space, one a
+stroke. **Not tested**: it needs a real touchpad.
+
+## New tab backgrounds
+
+`home_theme = off | open-road | mountain-lake | northern-lights | solid | gradient | image`, with
+`home_colour` and `home_image`. The three walls are the HomeWalls paintings, ported to cairo
+(seeded, so always the same; the dark look takes the pigments down, the night scene less; the
+aurora's blur is drawn as five faint offset passes). Each is painted once at 1920×1200 into
+`~/.cache/rippl/walls/` (80–200 KB) and shown as the page's background: nothing redraws. the
+other seven walls and its stickers are not ported yet.
+
+## Pin folders
+
+the PinFolders: a pin's menu puts it **in a new folder**, **in “…”** (one there is), or
+**out of** its own. A folder stands among the pins as one square, where its first pin would be;
+a click opens it: its name (to change) and its pins (click to go, right-click for the pin's
+menu). Per space; unpinning takes a tab out. Kept in the session (`pinfolder <index> <name>`).
+Its menu hangs from the pins' grid, as the column redraws (and its squares are made anew) often.
+
+## Several windows
+
+the Windows: **Ctrl+N** opens another window with tabs of its own. Every window shares one
+engine (sign-ins, cache), Shield, history and bookmarks, passwords and settings; the first window
+sets them up, the rest borrow them, so a second window costs a window, not a browser.
+
+- Each window keeps its own session (`session`, `session-2`, …) and all come back after a
+  restart.
+- Closing one of several closes its tabs (Ctrl+Shift+T in the window left brings them back) and
+  its session file; the last window, or stopping rippl, keeps everything.
+- What is registered once per engine (rippl:// pages, the sign-in and hide-element message
+  handlers, page scripts) is set up by the first window and serves every window: a rippl:// page
+  is answered by the window its tab is in, a sign-in message goes to each window, which acts only
+  on its own tab.
+- The control socket speaks to the window in front (`windows`, `window new`, `window close`).
+- Downloads are listed in the first window. the twins (the same tabs in every window) are not
+  done.
+
+Tested: a second window opened, loaded a page and rippl://history; SIGTERM saved both; a restart
+brought both back; closing the first left the second serving rippl:// pages and pages.
+
+## A fix on the way
+
+Blank tabs were written to the session but skipped when read back, so the indices after them
+(the front tab, and now times and folders) could point at the wrong tab. Blank tabs are no longer
+written.
+
 ## Tests
 
-79 (75 core, 4 app): new for closing (`tabs_left_alone_close`), the archive
-(`archive_keeps_newest_once`), the session's times (round trip), and the new settings.
+81 (77 core, 4 app): new for closing (`tabs_left_alone_close`), the archive
+(`archive_keeps_newest_once`), pin folders (`pin_folders_by_name`), the session (times, pin
+folders, space colours, blank tabs left out), a setting's line removed (`empty_takes_the_line_out`),
+and the new settings.
 
 ## For testing
 
 The control socket gained `set <key> <value>`, `switcher [next|go|esc]`, `bar [more]`,
-`archived [words]`, `frames` (the window's frame clock) and `paints` (paints in a second).
+`archived [words]`, `frames` (the window's frame clock), `paints` (paints in a second),
+`open` with nothing (a new tab), `space colour <id> [#… [#…]]`, `pinfolder <n> [name]`,
+`pinfolder open <name>`, `windows`, `window new|close`.
