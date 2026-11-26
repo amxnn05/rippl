@@ -103,6 +103,14 @@ impl Browser {
                 };
                 pages::history(&places, &q, now(), &self.token)
             }
+            "welcome" => {
+                let state = match crate::desktop::default_browser() {
+                    crate::desktop::Default::Yes => "yes",
+                    crate::desktop::Default::No => "no",
+                    crate::desktop::Default::NotInstalled => "not installed",
+                };
+                pages::welcome(state, &self.token)
+            }
             "archive" => {
                 let closing = self.config.borrow().close_after.is_some();
                 pages::archive(&self.places.archived(&q).unwrap_or_default(), &q, closing, now(), &self.token)
@@ -136,6 +144,11 @@ impl Browser {
                         config: &config,
                         shortcuts: &shortcuts,
                         about: &about,
+                        default_browser: match crate::desktop::default_browser() {
+                            crate::desktop::Default::Yes => "yes",
+                            crate::desktop::Default::No => "no",
+                            crate::desktop::Default::NotInstalled => "not installed",
+                        },
                         rail_in_column: {
                             let c = self.config.borrow();
                             !c.top_tabs && !c.icon_column
@@ -224,6 +237,22 @@ impl Browser {
             }
             ("settings", "record-stop") => {
                 self.restore_shortcuts();
+                Ok(String::new())
+            }
+            ("settings", "make-default") | ("welcome", "make-default") => crate::desktop::make_default(),
+            ("welcome", "start") => {
+                // Done with it: the welcome tab becomes a new one.
+                let weak = self.weak();
+                glib::idle_add_local_once(move || {
+                    if let Some(b) = weak.upgrade() {
+                        if let Some(id) = b.front() {
+                            b.close(id);
+                        }
+                        if b.tabs.borrow().here().count() == 0 {
+                            b.open("", false, true);
+                        }
+                    }
+                });
                 Ok(String::new())
             }
             ("settings", "clear-history") => {

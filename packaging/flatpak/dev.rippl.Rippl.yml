@@ -1,0 +1,44 @@
+# Flatpak manifest. GNOME's runtime has WebKitGTK 6.0 in it.
+#
+#   python3 flatpak-cargo-generator.py ../../Cargo.lock -o cargo-sources.json
+#   flatpak-builder --user --install --force-clean build dev.rippl.Rippl.yml
+#
+# (flatpak-cargo-generator.py is from github.com/flatpak/flatpak-builder-tools:
+# a Flatpak build has no network, so the crates come as sources.)
+id: dev.rippl.Rippl
+runtime: org.gnome.Platform
+runtime-version: '49'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: rippl
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri
+  # Saved passwords in the keyring; links and files handed to other apps.
+  - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.freedesktop.portal.*
+  # Media keys (WebKit's own MPRIS player).
+  - --own-name=org.mpris.MediaPlayer2.dev.rippl.Rippl.*
+  # Downloads, captures, and certificates you put in rippl's folder.
+  - --filesystem=xdg-download
+  - --filesystem=xdg-pictures/rippl:create
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/rippl/cargo
+modules:
+  - name: rippl
+    buildsystem: simple
+    build-commands:
+      - cargo --offline fetch --manifest-path Cargo.toml
+      - cargo --offline build --release
+      - RIPPL_SKIP_BUILD=1 sh scripts/install.sh /app
+    sources:
+      - type: dir
+        path: ../..
+      - cargo-sources.json

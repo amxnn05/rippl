@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.rippl.Rippl</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>rippl</name>
+  <summary>A small, fast, quiet web browser</summary>
+  <developer id="dev.rippl">
+    <name>amxnn05</name>
+  </developer>
+  <description>
+    <p>
+      rippl is a web browser for Linux on WebKit that stays small: tabs you aren't looking at sleep
+      and give their memory back, ads and trackers are blocked before a page loads, and nothing you
+      do is sent anywhere you didn't send it.
+    </p>
+    <ul>
+      <li>Tabs down the side, in spaces with their own sign-ins, pins and folders, split view</li>
+      <li>Ad and tracker blocking with EasyList and uBlock Origin's lists, YouTube included</li>
+      <li>Passwords in your system keyring, history and bookmarks on this computer only</li>
+      <li>Reading mode, peek at links, Ctrl+Tab switcher, your own shortcuts</li>
+      <li>Optional: an AI assistant and translation with a model running on this computer</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">dev.rippl.Rippl.desktop</launchable>
+  <url type="homepage">https://github.com/amxnn05/rippl</url>
+  <url type="bugtracker">https://github.com/amxnn05/rippl/issues</url>
+  <content_rating type="oars-1.1"/>
+  <categories>
+    <category>Network</category>
+    <category>WebBrowser</category>
+  </categories>
+  <provides>
+    <binary>rippl</binary>
+  </provides>
+  <releases>
+    <release version="0.1.0" date="2026-11-26"/>
+  </releases>
+</component>

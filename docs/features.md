@@ -58,7 +58,7 @@ the header of each of its source files, with rippl's status for each.
 | Duplicate tab (⌘D) | ✅ Ctrl+Shift+D, tab menu |
 | Tab menu (right-click a tab) | ✅ |
 | Peek at a link in a panel | ✅ Shift+click |
-| Little window for links from other apps | 🔨 with Phase 9 (default browser) |
+| Little window for links from other apps | ✅ default browser; links from other apps open as tabs (a little window 🔨) |
 | Choose the space a link opens in | 🔨 Phase 9 |
 | Private tabs (⇧⌘N) | ✅ Ctrl+Shift+N |
 | Unread counts from titles | ✅ on pins |
@@ -168,7 +168,7 @@ the header of each of its source files, with rippl's status for each.
 |---|---|
 | Settings as a page, searchable | ✅ rippl://settings (search 🔨) |
 | Your own keyboard shortcuts | 🔨 batch 4 |
-| Welcome on first launch | 🔨 Phase 9 |
+| Welcome on first launch | ✅ rippl://welcome |
 | What's new | 🔨 Phase 9 |
 | Updater | 🍎 — packages update through the distribution |
 | Default browser, links from other apps | 🔨 Phase 9 |

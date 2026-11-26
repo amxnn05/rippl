@@ -66,6 +66,40 @@ pub(crate) fn start(app: &gtk::Application) -> Rc<Browser> {
     first
 }
 
+/// rippl started again while it runs: a link from another app (opened in
+/// a new tab of the window in front), `--new-window`, `--private-window`;
+/// with nothing, the window in front comes forward.
+pub(crate) fn launched_again(app: &gtk::Application, args: &[String]) {
+    let mut target = front();
+    if args.iter().any(|a| a == "--new-window") {
+        target = open(app).or(target);
+    }
+    let Some(b) = target else { return };
+    if args.iter().any(|a| a == "--private-window") {
+        b.open("", true, true);
+    }
+    let search = b.config.borrow().search.clone();
+    let mut skip = false;
+    let mut first = true;
+    for a in args {
+        if std::mem::take(&mut skip) {
+            continue;
+        }
+        if a == "--profile" {
+            skip = true;
+            continue;
+        }
+        if a.starts_with('-') {
+            continue;
+        }
+        if let rippl_core::address::Destination::Page(url) = rippl_core::address::resolve(a, &search) {
+            b.open(&url, false, first);
+            first = false;
+        }
+    }
+    b.window.present();
+}
+
 /// Ctrl+N: a new window, with a new tab.
 pub(crate) fn open(app: &gtk::Application) -> Option<Rc<Browser>> {
     let taken: Vec<usize> = all().iter().map(|b| b.window_no).collect();

@@ -1,0 +1,46 @@
+# Maintainer: amxnn05
+# rippl from its git repository's craft branch. To build: makepkg -si
+pkgname=rippl-git
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="A small, fast, quiet web browser on WebKitGTK"
+arch=('x86_64' 'aarch64')
+url="https://github.com/amxnn05/rippl"
+license=('MIT')
+depends=('webkitgtk-6.0' 'gtk4' 'libsecret' 'glib2' 'hicolor-icon-theme')
+makedepends=('cargo' 'git')
+optdepends=('ollama: the AI add-on and translation with a model on this computer'
+            'gnome-keyring: a keyring for saved passwords (or KeePassXC, KWallet)')
+provides=('rippl')
+conflicts=('rippl')
+source=("rippl::git+https://github.com/amxnn05/rippl.git#branch=craft")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd rippl
+  printf "0.1.0.r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+  cd rippl
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd rippl
+  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  cargo build --release --frozen
+}
+
+check() {
+  cd rippl
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen -p rippl-core
+}
+
+package() {
+  cd rippl
+  RIPPL_SKIP_BUILD=1 DESTDIR="$pkgdir" sh scripts/install.sh /usr
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE" 2>/dev/null || true
+}

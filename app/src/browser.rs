@@ -2158,6 +2158,15 @@ impl Browser {
         if self.tabs.borrow().list.is_empty() {
             self.open("", false, true);
         }
+        // The first launch ever: the welcome page.
+        let welcomed = engine::data_dir().join("welcomed");
+        if self.primary && !welcomed.exists() && std::env::var_os("RIPPL_CONTROL").is_none() {
+            let _ = std::fs::write(&welcomed, "");
+            self.open("rippl://welcome", false, true);
+        }
+        if self.primary && std::env::args().any(|a| a == "--private-window") {
+            self.open("", true, true);
+        }
         self.apply_keep_awake();
         self.apply_space_look();
         self.close_left_alone();

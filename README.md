@@ -1,3 +1,5 @@
+<p align="center"><img src="data/logo/rippl.svg" width="112" alt="rippl"></p>
+
 # rippl
 
 A small, fast, private web browser for Linux, built on WebKit (WebKitGTK 6.0 + GTK4) and written in Rust.
@@ -49,15 +51,21 @@ upgraded to HTTPS and carries Global Privacy Control ("do not sell or share my d
 cookies are blocked, WebKit's tracking prevention is on, and cross-site pings are blocked. Nothing leaves your
 machine except the pages you open and the filter-list updates. Details: [docs/privacy.md](docs/privacy.md).
 
-## Build
+## Install
 
 ```sh
-sudo pacman -S --needed webkitgtk-6.0 gtk4      # Debian/Ubuntu: libwebkitgtk-6.0-dev libgtk-4-dev
-cargo build --release
-./target/release/rippl [url…]
+sudo pacman -S --needed webkitgtk-6.0 gtk4 libsecret   # Debian/Ubuntu: libwebkitgtk-6.0-dev libgtk-4-dev libsecret-1-dev
+scripts/install.sh            # builds, and installs into ~/.local: the app, its icon, its desktop entry
 ```
 
-`cargo build` also builds `librippl_web_extension.so` beside the binary; rippl finds it there.
+Then open rippl from your launcher, and make it your default browser from its welcome page or
+Settings › General. `scripts/install.sh /usr` (with sudo) installs for everyone;
+`scripts/install.sh --uninstall` takes it away again (your settings and data stay).
+Arch: [packaging/arch/PKGBUILD](packaging/arch/PKGBUILD) (`makepkg -si`). Flatpak:
+[packaging/flatpak](packaging/flatpak/dev.rippl.Rippl.yml).
+
+To run it from the source folder without installing: `cargo build --release && ./target/release/rippl [url…]`
+(the web extension is built beside the binary; rippl finds it there).
 
 `Ctrl+L` address · `Ctrl+T` new tab · `Ctrl+W` close · `Ctrl+Shift+N` private tab · `Ctrl+Tab` tab switcher ·
 `Ctrl+1`–`9` jump · `Alt+←/→` back/forward · `Ctrl+F` find · `Ctrl+D` bookmark · `Ctrl+H` history ·

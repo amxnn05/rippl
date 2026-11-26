@@ -11,6 +11,7 @@ mod closing;
 mod config;
 mod control;
 mod curtain;
+mod desktop;
 mod downloads;
 mod engine;
 mod find;
@@ -87,15 +88,27 @@ fn main() -> glib::ExitCode {
         .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE)
         .build();
 
-    // One window, made once; a second launch just brings it to front.
+    // rippl's icon (data/icons), found by its name in the icon theme; from
+    // a build folder too, before it is installed.
+    app.connect_startup(|_| {
+        gtk::Window::set_default_icon_name("dev.rippl.Rippl");
+        let here = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../data/icons");
+        if here.is_dir()
+            && let Some(display) = gtk::gdk::Display::default()
+        {
+            gtk::IconTheme::for_display(&display).add_search_path(here);
+        }
+    });
+
+    // One app, its windows made once; a later launch (a link from another
+    // app, the desktop's "New Window") is handed to it (windows.rs).
     let window: Rc<RefCell<Option<Rc<browser::Browser>>>> = Rc::default();
-    app.connect_command_line(move |app, _| {
+    app.connect_command_line(move |app, line| {
         let mut slot = window.borrow_mut();
         match slot.as_ref() {
             Some(_) => {
-                if let Some(w) = app.active_window() {
-                    w.present();
-                }
+                let args: Vec<String> = line.arguments().iter().skip(1).map(|a| a.to_string_lossy().into_owned()).collect();
+                windows::launched_again(app, &args);
             }
             None => {
                 let browser = windows::start(app);

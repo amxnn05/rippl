@@ -41,6 +41,8 @@ fn install_extension() -> Option<PathBuf> {
     let candidates = [
         std::env::var_os("RIPPL_EXTENSION").map(PathBuf::from),
         std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join(NAME))),
+        // Installed: <prefix>/bin/rippl and <prefix>/lib/rippl/ (install.sh).
+        std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join("../lib/rippl").join(NAME))),
         Some(PathBuf::from("/usr/lib/rippl").join(NAME)),
     ];
     let source = candidates.into_iter().flatten().find(|p| p.is_file())?;

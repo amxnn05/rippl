@@ -108,7 +108,23 @@ body.page-settings {{ max-width: none; margin: 0; padding: 0;
   background: var(--ground); color: var(--ink); }}
 @media (prefers-color-scheme: dark) {{ body.page-settings {{
   --ground: #1c1c1c; --ink: #ededed; --muted: rgba(255,255,255,.55); --hairline: #333333; --wash: rgba(255,255,255,.087); --hover: rgba(255,255,255,.06); }} }}
-body.page-settings > nav {{ display: none; }}
+body.page-settings > nav, body.page-welcome > nav {{ display: none; }}
+body.page-welcome {{ max-width: 600px; margin: 0 auto; padding: 56px 24px; font: 13px/1.45 "Inter", "Adwaita Sans", system-ui, sans-serif;
+  --ground: #ffffff; --ink: #171717; --muted: rgba(0,0,0,.46); --hairline: #e8e8e8; --wash: rgba(0,0,0,.063); --hover: rgba(0,0,0,.04);
+  background: var(--ground); color: var(--ink); }}
+@media (prefers-color-scheme: dark) {{ body.page-welcome {{
+  --ground: #1c1c1c; --ink: #ededed; --muted: rgba(255,255,255,.55); --hairline: #333333; --wash: rgba(255,255,255,.087); --hover: rgba(255,255,255,.06); }} }}
+.welcome .logo {{ width: 96px; height: 96px; display: block; margin: 0 auto 18px; }}
+.welcome h1 {{ text-align: center; font-size: 24px; margin: 0 0 8px; }}
+.welcome .lede {{ text-align: center; color: var(--muted); margin: 0 auto 28px; max-width: 460px; font-size: 14px; }}
+.welcome .card {{ border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; }}
+.welcome .keys {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; margin: 26px 4px; }}
+.welcome .key {{ display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 12.5px; }}
+.welcome .go {{ text-align: center; }}
+.welcome .button, .welcome button {{ font: 12.5px "Inter", system-ui, sans-serif; color: var(--ink); background: var(--ground); border: 1px solid var(--hairline);
+  border-radius: 7px; padding: 4px 10px; text-decoration: none; cursor: pointer; }}
+.welcome .button.primary {{ background: var(--ink); color: var(--ground); border-color: var(--ink); padding: 8px 18px; font-size: 13.5px; }}
+.done {{ color: var(--muted); font-size: 12px; }}
 .settings {{ display: flex; min-height: 100vh; }}
 body.rail-in-column .settings aside {{ display: none; }}
 .settings aside {{ flex: none; width: 196px; box-sizing: border-box; padding: 8px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
@@ -374,6 +390,65 @@ pub struct SettingsView<'a> {
     pub about: &'a [(String, String)],
     /// The sections are down rippl's column, not in the page.
     pub rail_in_column: bool,
+    /// Whether rippl is the default browser: "yes", "no", or "not
+    /// installed".
+    pub default_browser: &'a str,
+}
+
+/// rippl's logo (data/logo), for its own pages.
+pub const LOGO_SVG: &str = include_str!("../../../data/logo/rippl.svg");
+
+/// The logo as an image address its pages may show (their policy lets in
+/// data: images only).
+pub fn logo_uri() -> String {
+    let mut out = String::from("data:image/svg+xml,");
+    for b in LOGO_SVG.bytes() {
+        match b {
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b' ' | b'=' | b'/' | b':' | b',' => out.push(b as char),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out.replace(' ', "%20")
+}
+
+/// The first page rippl shows: what it is, and the few
+/// things worth doing first.
+pub fn welcome(default_browser: &str, token: &str) -> String {
+    let default = match default_browser {
+        "yes" => r#"<span class="done">rippl is your default browser</span>"#.to_string(),
+        "no" => r#"<button data-do="make-default">Make rippl the default</button>"#.to_string(),
+        _ => r#"<span class="detail">After installing (scripts/install.sh)</span>"#.to_string(),
+    };
+    let step = |glyph: &str, title: &str, detail: &str, control: &str| {
+        format!(
+            r#"<div class="setting"><span class="tile">{glyph}</span><div class="main"><div class="label">{title}</div><div class="detail">{detail}</div></div>{control}</div>"#
+        )
+    };
+    let mut steps = String::new();
+    steps.push_str(&step("◎", "Your default browser", "Links from other apps open here", &default));
+    steps.push_str(&step("⇣", "Bring things over", "Bookmarks, history, open tabs and passwords from Chrome, Firefox, Brave…", r#"<a class="button" href="rippl://bookmarks">Open…</a>"#));
+    steps.push_str(&step("⛨", "Ads and trackers are blocked", "Before a page loads, with EasyList and uBlock Origin's lists. Ctrl+Shift+B turns it off for a site", r#"<span class="done">On</span>"#));
+    steps.push_str(&step("☽", "Tabs sleep when you leave them", "They give their memory back and wake as they were", r#"<span class="done">On</span>"#));
+    steps.push_str(&step("⚙", "Make it yours", "Tabs on top or down the side, themes, your own shortcuts", r#"<a class="button" href="rippl://settings">Settings…</a>"#));
+    let keys = [
+        ("Ctrl+L", "the field: an address or a search"),
+        ("Ctrl+T", "a new tab"),
+        ("Ctrl+Tab", "your tabs as pictures"),
+        ("Ctrl+Alt+S", "two pages side by side"),
+        ("Shift+click", "peek at a link"),
+        ("F9", "reading mode"),
+    ];
+    let mut key_rows = String::new();
+    for (k, what) in keys {
+        key_rows.push_str(&format!(r#"<div class="key"><kbd>{k}</kbd><span>{what}</span></div>"#));
+    }
+    let body = format!(
+        r#"<div class="welcome"><img class="logo" src="{logo}" alt=""><h1>Welcome to rippl</h1><p class="lede">A small, fast, quiet browser. Your tabs go down the side; what you aren't looking at sleeps; nothing you do leaves this computer unless you send it.</p>
+<div class="card">{steps}</div><div class="keys">{key_rows}</div><p class="go"><a class="button primary" href="rippl://welcome?do=start&token={token}">Start browsing</a></p></div>"#,
+        logo = logo_uri(),
+        token = token.chars().filter(char::is_ascii_hexdigit).collect::<String>(),
+    );
+    frame("welcome", "Welcome to rippl", token, &body)
 }
 
 /// The settings' categories Settings window has them: id,
@@ -564,7 +639,19 @@ pub fn settings(v: &SettingsView, token: &str) -> String {
         let (page, section) = place(&s.key);
         add(page, section, setting_row(s));
     }
-    // General: what isn't a setting of its own.
+    // General: the default browser, and what isn't a setting of its own.
+    let default_control = match v.default_browser {
+        "yes" => r#"<span class="detail">rippl is your default</span>"#.to_string(),
+        "no" => r#"<button data-do="make-default">Make default</button>"#.to_string(),
+        _ => r#"<span class="detail">Install rippl first: scripts/install.sh</span>"#.to_string(),
+    };
+    add(
+        "general",
+        "Your browser",
+        format!(
+            r#"<div class="setting" data-words="default browser links other apps"><span class="tile">◎</span><div class="main"><div class="label">Default browser</div><div class="detail">Links from other apps open in rippl</div></div>{default_control}</div>"#
+        ),
+    );
     add(
         "general",
         "Your browser",
