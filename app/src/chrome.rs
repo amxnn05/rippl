@@ -208,7 +208,7 @@ impl Browser {
             let live = Some(id) == tabs.front;
             let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
             let mark: gtk::Widget = match self.icon_for(id, &tab.url).filter(|_| !tab.private && !tab.url.is_empty()) {
-                _ if tab.loading && tab.life == Life::Awake && !tab.url.is_empty() => crate::loader::ring(15).upcast(),
+                _ if tab.pinned && tab.loading && tab.life == Life::Awake && !tab.url.is_empty() => crate::loader::ring(15).upcast(),
                 Some(icon) => {
                     let image = gtk::Image::from_paintable(Some(&icon));
                     image.set_pixel_size(15);
@@ -248,7 +248,15 @@ impl Browser {
                         b.close_animated(id);
                     }
                 });
-                line.append(&close);
+                // Loading: the ring where the × is, the × under the pointer.
+                let slot = gtk::Overlay::builder().child(&close).build();
+                if tab.loading && tab.life == Life::Awake {
+                    let ring = crate::loader::ring(13);
+                    ring.set_can_target(false);
+                    slot.add_overlay(&ring);
+                    tile.add_css_class("loading");
+                }
+                line.append(&slot);
             }
             tile.append(&line);
             if live {

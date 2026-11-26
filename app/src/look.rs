@@ -92,6 +92,10 @@ window.rippl .foot .space:hover { color: var(--ink); background: var(--hover); }
 window.rippl .foot .space.here { color: var(--ink); background: var(--wash); }
 window.rippl .tabs row button.close { opacity: 0; min-height: 18px; min-width: 18px; padding: 0; color: var(--muted); }
 window.rippl .tabs row:hover button.close { opacity: 0.8; }
+/* Loading: the ring in the ×'s place, giving way to it under the pointer. */
+window.rippl .tabs row .loader, window.rippl .top-tab .loader { transition: opacity 140ms ease-out; }
+window.rippl .tabs row.loading:hover .loader, window.rippl .top-tab.loading:hover .loader { opacity: 0; }
+window.rippl .top-tab.loading:not(:hover) .close { opacity: 0; }
 
 /* The site's letter in a faint square. */
 window.rippl .mark { min-width: 15px; min-height: 15px; border-radius: 3px; background: var(--mark);
@@ -500,8 +504,9 @@ impl Browser {
             }
             let row = gtk::ListBoxRow::new();
             let line = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-            if tab.loading && tab.life == Life::Awake && !tab.url.is_empty() {
-                // Loading: the ring, in the icon's place.
+            let loading = tab.loading && tab.life == Life::Awake && !tab.url.is_empty();
+            if loading && icons {
+                // Icons only: no ×, so the ring takes the icon's place.
                 line.append(&crate::loader::ring(15));
             } else if !tab.url.is_empty() {
                 // The site's icon when known, its letter until then.
@@ -544,7 +549,16 @@ impl Browser {
                 row.add_css_class("tile");
             } else {
                 line.append(&label);
-                line.append(&close);
+                // Loading: the ring where the × comes; under the pointer,
+                // the × again.
+                let slot = gtk::Overlay::builder().child(&close).build();
+                if loading {
+                    let ring = crate::loader::ring(13);
+                    ring.set_can_target(false);
+                    slot.add_overlay(&ring);
+                    row.add_css_class("loading");
+                }
+                line.append(&slot);
             }
             row.set_child(Some(&line));
             row.set_tooltip_text(Some(&if icons { format!("{}\n{}", tab.title, tab.url) } else { tab.url.clone() }));
