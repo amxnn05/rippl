@@ -118,6 +118,10 @@ pub struct Browser {
     /// The agent's own tabs, and when it was last said to be at work (agents.rs).
     pub(crate) agent_tabs: crate::agents::AgentTabs,
     pub(crate) agent_said: Cell<i64>,
+    /// Settings' sections in the column (settings_rail.rs), and whether
+    /// "‹ Tabs" put them away for now.
+    pub(crate) rail: crate::settings_rail::Rail,
+    pub(crate) rail_away: Cell<bool>,
     /// The AI add-on's panel (ai.rs).
     pub(crate) ai: crate::ai::Panel,
     /// Ctrl+Tab's cards (switcher.rs).
@@ -211,6 +215,9 @@ impl Browser {
         pins.add_css_class("pins");
         let new_tab = Browser::new_tab_row();
         let rows = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        // Settings' sections, in the tabs' place while Settings is in front.
+        let rail = crate::settings_rail::Rail::new();
+        rows.append(&rail.rail);
         rows.append(&pins);
         rows.append(&list);
         rows.append(&new_tab);
@@ -408,6 +415,8 @@ impl Browser {
             peek_keep,
             peeking: RefCell::new(None),
             switcher,
+            rail,
+            rail_away: Cell::new(false),
             ai,
             agent_tabs: RefCell::new(HashSet::new()),
             agent_said: Cell::new(0),
@@ -493,6 +502,7 @@ impl Browser {
         browser.wire_chrome();
         browser.wire_space_swipe();
         browser.wire_ai();
+        browser.wire_settings_rail();
         gtk::style_context_add_provider_for_display(
             &WidgetExt::display(&browser.window),
             &browser.space_css,
@@ -558,6 +568,9 @@ impl Browser {
     /// Puts `id` in front, waking it if it has no view.
     pub fn select(&self, id: TabId) {
         debug!("select {id}");
+        if self.front() != Some(id) {
+            self.rail_away.set(false);
+        }
         if let Some(old) = self.front().filter(|f| *f != id)
             && let Some(view) = self.views.borrow().get(&old).cloned()
         {
@@ -819,6 +832,9 @@ impl Browser {
                 tab.url = uri.to_string();
             }
             b.reader_followed(id, v);
+            if b.front() == Some(id) {
+                b.place_settings_rail();
+            }
             b.apply_keep_awake();
             b.dirty.set(true);
             if b.front() == Some(id) {
@@ -857,6 +873,9 @@ impl Browser {
                 }
                 LoadEvent::Finished => {
                     b.upgrading.borrow_mut().remove(&id);
+                    if b.front() == Some(id) {
+                        b.place_settings_rail();
+                    }
                 }
                 _ => return,
             }
@@ -1461,6 +1480,7 @@ impl Browser {
             },
             "bar" => self.bar_state(rest.trim() == "more"),
             "sync" => self.sync_now(),
+            "rail" => self.rail_command(rest.trim()),
             // ask [question]: the AI panel's question (empty: summarize);
             // answer: what it says now; translate: as Ctrl+Shift+L.
             "ask" => {

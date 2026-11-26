@@ -110,6 +110,7 @@ body.page-settings {{ max-width: none; margin: 0; padding: 0;
   --ground: #1c1c1c; --ink: #ededed; --muted: rgba(255,255,255,.55); --hairline: #333333; --wash: rgba(255,255,255,.087); --hover: rgba(255,255,255,.06); }} }}
 body.page-settings > nav {{ display: none; }}
 .settings {{ display: flex; min-height: 100vh; }}
+body.rail-in-column .settings aside {{ display: none; }}
 .settings aside {{ flex: none; width: 196px; box-sizing: border-box; padding: 8px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
   background: color-mix(in srgb, var(--wash) 45%, transparent); border-right: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 2px; }}
 .rail-title {{ font-size: 13px; font-weight: 600; padding: 14px 10px 10px; }}
@@ -371,6 +372,8 @@ pub struct SettingsView<'a> {
     pub note: &'a str,
     /// About rippl: (what, value) lines.
     pub about: &'a [(String, String)],
+    /// The sections are down rippl's column, not in the page.
+    pub rail_in_column: bool,
 }
 
 /// The settings' categories Settings window has them: id,
@@ -691,8 +694,9 @@ pub fn settings(v: &SettingsView, token: &str) -> String {
         main.push_str("</section>");
     }
     let note = if v.note.is_empty() { String::new() } else { format!(r#"<p class="toast">{}</p>"#, escape(v.note)) };
+    let early = if v.rail_in_column { "<script>document.body.classList.add('rail-in-column')</script>" } else { "" };
     let body = format!(
-        r#"<div class="settings"><aside><div class="rail-title">Settings</div><label class="find"><span class="lens">⌕</span><input type="search" id="find" placeholder="Find a setting" autocomplete="off"><kbd class="hint">Ctrl+F</kbd></label>{side}</aside><main><div class="column">{note}<section class="cat" id="cat-found"><header id="found-title">Found</header><div class="card" id="found"></div></section>{main}</div></main></div>
+        r#"{early}<div class="settings"><aside><div class="rail-title">Settings</div><label class="find"><span class="lens">⌕</span><input type="search" id="find" placeholder="Find a setting" autocomplete="off"><kbd class="hint">Ctrl+F</kbd></label>{side}</aside><main><div class="column">{note}<section class="cat" id="cat-found"><header id="found-title">Found</header><div class="card" id="found"></div></section>{main}</div></main></div>
 <script>{SETTINGS_SCRIPT}</script>"#
     );
     frame("settings", "Settings", token, &body)
@@ -731,7 +735,7 @@ find.addEventListener("input", () => {
       const copy = row.cloneNode(true);
       const where = document.createElement("div");
       where.className = "where";
-      where.textContent = c.querySelector("h1").textContent + " › " + row.closest(".group").querySelector("h2").textContent;
+      where.textContent = c.querySelector("header").lastChild.textContent + " › " + row.closest(".group").querySelector("h2").lastChild.textContent;
       copy.querySelector(".main").prepend(where);
       found.append(copy);
     }

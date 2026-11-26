@@ -29,6 +29,7 @@ mod pagelook;
 mod permissions;
 mod pressure;
 mod reader;
+mod settings_rail;
 mod shield;
 mod shortcuts;
 mod signin;

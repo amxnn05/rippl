@@ -6,7 +6,14 @@
 
 rippl://settings (Ctrl+, or the gear) is now the Settings tab:
 
-- **The rail** down the left, the page's whole height (196 wide, a faint wash, a hairline beside
+- **The sections are in the column**, where the tabs are, while Settings is the tab in front
+  (settings_rail.rs): **‹ Tabs** at the top (back to your tabs; going to Settings again brings
+  the sections back), "Settings", **Find a setting**, then the sections in the three blocks,
+  the chosen one on a white card. A click shows that section in the page; the page's own rail
+  stands aside (the page says so before it is drawn, so it never flashes). Going to a section
+  from the page moves the column's mark too. With tabs across the top or the column as icons,
+  where there is no column of titles, the page keeps its own rail:
+- **The page's own rail** down the left, the page's whole height (196 wide, a faint wash, a hairline beside
   it): "Settings", a **Find a setting** field (Ctrl+F goes to it on this page; Esc empties it),
   then the sections in the three blocks: General, Appearance, Themes, Tabs, Browsing,
   Spaces & Pins · Passwords, Privacy, AI, Keyboard & Mouse · About. The chosen one sits on a
@@ -25,7 +32,9 @@ rippl://settings (Ctrl+, or the gear) is now the Settings tab:
 - The other rippl pages (History, Bookmarks, Archive, Passwords) keep their links; Settings
    has none above it.
 
-Tested: recording Ctrl+J for New tab wrote `shortcut.new-tab = <Ctrl>j`; "proxy" in Find a setting
+Tested: the column showed the sections in the tabs' place, a section chosen there showed in the
+page, Find a setting there found "Tabs › Memory" for "sleep", and ‹ Tabs gave the tabs back.
+Recording Ctrl+J for New tab wrote `shortcut.new-tab = <Ctrl>j`; "proxy" in Find a setting
 found Privacy › Connection › Proxy.
 
 ## The AI add-on (`ai`)

@@ -179,6 +179,21 @@ window.rippl .ai-title { font-weight: 600; font-size: 13px; }
 window.rippl .ai-answer { background: transparent; color: var(--ink); font-size: 13px; }
 window.rippl .ai-answer text { background: transparent; }
 window.rippl .ai-ask { min-height: 32px; border-radius: 9px; }
+/* Settings' sections in the column (settings_rail.rs) rail. */
+window.rippl .settings-rail { padding: 0 0 8px; }
+window.rippl .rail-back { min-height: 28px; padding: 0 10px; border-radius: 8px; border: none; box-shadow: none;
+  background: transparent; color: var(--muted); font-size: 12.5px; }
+window.rippl .rail-back:hover { background: var(--hover); color: var(--ink); }
+window.rippl .rail-title { font-size: 13px; font-weight: 600; color: var(--ink); padding: 8px 10px 8px; }
+window.rippl .rail-find { min-height: 28px; border-radius: 8px; margin: 0 2px 10px; font-size: 12.5px;
+  background: var(--ground); box-shadow: 0 0 0 1px var(--hairline); color: var(--ink); }
+window.rippl .rail-rule { margin: 7px 10px; background: var(--hairline); min-height: 1px; }
+window.rippl .rail-row { min-height: 30px; padding: 0 10px; border-radius: 8px; border: none; box-shadow: none;
+  background: transparent; color: var(--muted); font-size: 13px; }
+window.rippl .rail-row:hover { background: var(--hover); color: var(--ink); }
+window.rippl .rail-row.here { background: var(--ground); color: var(--ink); font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px var(--hairline); }
+window.rippl .rail-glyph { font-size: 12px; }
 window.rippl .switcher-dim { background: rgba(0,0,0,0.22); }
 window.rippl .switcher { background: var(--ground); border-radius: 14px; padding: 18px;
   box-shadow: 0 0 0 1px var(--hairline), 0 10px 30px rgba(0,0,0,0.25); }
@@ -551,6 +566,7 @@ impl Browser {
             self.list.append(&row);
         }
         self.pins.set_visible(any_pin);
+        self.place_settings_rail();
         self.render_player();
         drop(tabs);
         self.render_spaces();

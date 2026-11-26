@@ -136,6 +136,10 @@ impl Browser {
                         config: &config,
                         shortcuts: &shortcuts,
                         about: &about,
+                        rail_in_column: {
+                            let c = self.config.borrow();
+                            !c.top_tabs && !c.icon_column
+                        },
                         config_path: &path.to_string_lossy(),
                         note: &note,
                     },
