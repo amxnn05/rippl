@@ -877,8 +877,16 @@ impl Browser {
         let weak = self.weak();
         view.connect_is_loading_notify(move |v| {
             let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) else { return };
-            if let Some(tab) = b.tabs.borrow_mut().get_mut(id) {
-                tab.loading = v.is_loading();
+            let changed = match b.tabs.borrow_mut().get_mut(id) {
+                Some(tab) if tab.loading != v.is_loading() => {
+                    tab.loading = v.is_loading();
+                    true
+                }
+                _ => false,
+            };
+            // Its ring comes and goes with it (loader.rs).
+            if changed {
+                b.render();
             }
         });
 

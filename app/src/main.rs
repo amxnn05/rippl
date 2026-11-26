@@ -18,6 +18,7 @@ mod find;
 mod internal_pages;
 mod keyring;
 mod mcp;
+mod loader;
 mod look;
 mod home;
 mod home_theme;

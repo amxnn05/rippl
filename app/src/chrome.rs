@@ -208,6 +208,7 @@ impl Browser {
             let live = Some(id) == tabs.front;
             let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
             let mark: gtk::Widget = match self.icon_for(id, &tab.url).filter(|_| !tab.private && !tab.url.is_empty()) {
+                _ if tab.loading && tab.life == Life::Awake && !tab.url.is_empty() => crate::loader::ring(15).upcast(),
                 Some(icon) => {
                     let image = gtk::Image::from_paintable(Some(&icon));
                     image.set_pixel_size(15);

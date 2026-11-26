@@ -23,6 +23,10 @@ What moves:
 - A **new tab** slides into the column (or the strip on top); one closed with the mouse (×, middle
   click) folds away first. Ctrl+W stays immediate: the keyboard shouldn't wait.
 - Going from tab to tab **cross-fades** (120 ms); **Ctrl+S** slides the column away and back.
+- A **loading tab** shows a thin ring turning in its icon's place (loader.rs): in the column, on
+  pins, in the strip on top; a faint track, a third of a turn in the tab's own ink, one turn per
+  0.8 s off the frame clock, so every loading tab turns together and a redrawn column doesn't
+  make it jump. It goes with the loading, and costs frames only then.
 - The **new tab's field** rises into place; its offers pop.
 - **Elastic edges**: scrolled past its top or bottom, a page gives (a rubber band: each step less,
   96 px at most) and springs back when the wheel rests; never a box inside the page that scrolls

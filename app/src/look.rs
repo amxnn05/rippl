@@ -460,7 +460,12 @@ impl Browser {
                 let pin = gtk::Button::new();
                 // What the page says is waiting, hung from the pin's corner
                 //: a pin shows no title to say it.
-                let face = gtk::Overlay::builder().child(&gtk::Label::new(Some(&monogram(&tab.url, &tab.title)))).build();
+                let mark: gtk::Widget = if tab.loading && tab.life == Life::Awake {
+                    crate::loader::ring(14).upcast()
+                } else {
+                    gtk::Label::new(Some(&monogram(&tab.url, &tab.title))).upcast()
+                };
+                let face = gtk::Overlay::builder().child(&mark).build();
                 if let Some(count) = rippl_core::tabs::unread(&tab.title).filter(|_| tab.life == Life::Awake) {
                     // Centred on the letter's top right corner, a touch
                     // outside it, as an app's count hangs from its icon in
@@ -495,7 +500,10 @@ impl Browser {
             }
             let row = gtk::ListBoxRow::new();
             let line = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-            if !tab.url.is_empty() {
+            if tab.loading && tab.life == Life::Awake && !tab.url.is_empty() {
+                // Loading: the ring, in the icon's place.
+                line.append(&crate::loader::ring(15));
+            } else if !tab.url.is_empty() {
                 // The site's icon when known, its letter until then.
                 match self.icon_for(id, &tab.url).filter(|_| !tab.private) {
                     Some(icon) => {
