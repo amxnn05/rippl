@@ -52,7 +52,11 @@ impl Browser {
     }
 
     pub(crate) fn wire_grab(&self) {
+        // Capture: the entry's text child turns a plain Return into
+        // "activate" and stops it, so in the bubble phase only Shift+Return
+        // ever arrived here (as in omnibox.rs).
         let keys = gtk::EventControllerKey::new();
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak = self.weak();
         keys.connect_key_pressed(move |_, key, _, modifiers| {
             let Some(b) = weak.upgrade() else { return glib::Propagation::Proceed };

@@ -68,6 +68,11 @@ opening a terminal: a shortcut, paste the link, Return.
   alive for the whole `if` body, and the body calls `grab_close`, which borrows again. The id is
   now taken in a statement of its own first. The real × button wasn't affected; the rule in
   `CLAUDE.md` is why it was looked for.
+- **Return did nothing, Shift+Return worked** (reported after the first push). The entry's text
+  child binds a plain Return to its "activate" signal and stops it there, so the bar's key
+  controller, in the bubble phase, only ever saw Shift+Return. The end-to-end tests went through
+  the control socket's `grab`, past the keys, so they missed it. The controller now runs in the
+  capture phase, as the address bar's does.
 - **A test that proved nothing:** the first "quit while downloading" run found no yt-dlp child,
   because the file was already in the folder from an earlier run and yt-dlp had finished at once.
   The test now removes the file first.
