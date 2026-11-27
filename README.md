@@ -8,6 +8,12 @@ A column of tabs, one field, and the page as a card: the look of another browser
 the macOS browser it's modelled on. No account, no telemetry, no server. Ads and trackers are blocked
 inside WebKit before they load, and tabs you aren't using give their memory back.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/preview-dark.png">
+  <img src="docs/images/preview-light.png" alt="rippl's window: a column of tabs with the field and pinned sites above, and the page as a card beside it">
+</picture>
+<p align="center"><sub>The window as drawn on <a href="https://ripplbrowser.web.app">ripplbrowser.web.app</a>.</sub></p>
+
 ## Size and speed
 
 A 1.2 MB binary on the system's WebKitGTK (about 195 MB with WebKitGTK and GTK, against 430–480 MB
