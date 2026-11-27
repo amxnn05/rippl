@@ -198,6 +198,7 @@ impl Browser {
             None => splits.push(vec![front, other]),
         }
         drop(splits);
+        self.dirty.set(true);
         self.unsplit_layout();
         self.select(front);
     }
@@ -238,6 +239,8 @@ impl Browser {
             s.retain(|t| *t != id);
         }
         splits.retain(|s| s.len() >= 2);
+        drop(splits);
+        self.dirty.set(true);
     }
 
     /// Ctrl+Alt+←/→: the keyboard to the pane before or after.

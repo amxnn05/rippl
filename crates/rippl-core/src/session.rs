@@ -15,6 +15,8 @@
 //! ```
 //!
 //! `colour <space> <#rrggbb> [<#rrggbb>]` (a space's colour, or gradient),
+//! `site <group> <host>` (a group made from one site's tabs),
+//! `split <tab index> <tab index> …` (tabs side by side, two to four),
 //! `pinfolder <tab index> <name>` (a pinned tab's folder),
 //! `left <tab index> <unix seconds>` (when each tab was last on screen,
 //! for tabs that close themselves; older files have none, and their tabs
@@ -51,6 +53,8 @@ pub struct Session {
     pub current: SpaceId,
     /// For each space, the index into `tabs` of the tab that was in front.
     pub fronts: Vec<(SpaceId, usize)>,
+    /// Tabs side by side, as indices into `tabs`.
+    pub splits: Vec<Vec<usize>>,
 }
 
 fn flat(s: &str) -> String {
@@ -94,7 +98,22 @@ impl Session {
             groups: tabs.groups.clone(),
             current: tabs.space,
             fronts,
+            splits: Vec::new(),
         }
+    }
+
+    /// `of`, with the window's splits: each kept while two or more of its
+    /// tabs are (a private tab in a split isn't).
+    pub fn of_with_splits(tabs: &Tabs, splits: &[Vec<TabId>]) -> Session {
+        let mut session = Session::of(tabs);
+        let kept: Vec<TabId> = tabs.list.iter().filter(|t| !t.private && !t.url.is_empty()).map(|t| t.id).collect();
+        for split in splits {
+            let at: Vec<usize> = split.iter().filter_map(|id| kept.iter().position(|k| k == id)).collect();
+            if at.len() >= 2 {
+                session.splits.push(at);
+            }
+        }
+        session
     }
 
     pub fn write(&self) -> String {
@@ -108,6 +127,9 @@ impl Session {
         out.push_str(&format!("current {}\n", self.current));
         for g in &self.groups {
             out.push_str(&format!("group {} {} {} {}\n", g.id, g.space, u8::from(g.collapsed), flat(&g.name)));
+            if let Some(site) = &g.site {
+                out.push_str(&format!("site {} {}\n", g.id, flat(site)));
+            }
         }
         for (space, i) in &self.fronts {
             out.push_str(&format!("front {space} {i}\n"));
@@ -123,6 +145,10 @@ impl Session {
             if let Some(f) = &t.pin_folder {
                 out.push_str(&format!("pinfolder {i} {}\n", flat(f)));
             }
+        }
+        for split in &self.splits {
+            let at: Vec<String> = split.iter().map(usize::to_string).collect();
+            out.push_str(&format!("split {}\n", at.join(" ")));
         }
         out
     }
@@ -166,8 +192,21 @@ impl Session {
                     if let (Some(Ok(id)), Some(Ok(space)), Some(c), Some(name)) =
                         (p.next().map(str::parse), p.next().map(str::parse), p.next(), p.next())
                     {
-                        session.groups.push(Group { id, space, collapsed: c == "1", name: name.to_string() });
+                        session.groups.push(Group { id, space, collapsed: c == "1", name: name.to_string(), site: None });
                     }
+                }
+                "site" => {
+                    if let Some((id, site)) = rest.split_once(' ')
+                        && let Ok(id) = id.parse::<u32>()
+                        && let Some(g) = session.groups.iter_mut().find(|g| g.id == id)
+                        && !site.trim().is_empty()
+                    {
+                        g.site = Some(site.trim().to_string());
+                    }
+                }
+                "split" => {
+                    let at: Vec<usize> = rest.split_whitespace().filter_map(|i| i.parse().ok()).collect();
+                    session.splits.push(at);
                 }
                 "front" if v1 => v1_front = rest.trim().parse::<usize>().ok(),
                 "front" => {
@@ -230,6 +269,19 @@ impl Session {
         }
         let n = session.tabs.len();
         session.fronts.retain(|(_, i)| *i < n);
+        // A split is two to four tabs of one space, each in one split only.
+        let mut taken = Vec::new();
+        let tabs = &session.tabs;
+        session.splits.retain_mut(|s| {
+            s.dedup();
+            s.retain(|i| *i < n && !taken.contains(i));
+            let one_space = s.first().is_some_and(|f| s.iter().all(|i| tabs[*i].space == tabs[*f].space));
+            let ok = (2..=4).contains(&s.len()) && one_space;
+            if ok {
+                taken.extend(s.iter().copied());
+            }
+            ok
+        });
         // A tab in a space that wasn't listed goes to the first space.
         let known: Vec<SpaceId> = session.spaces.iter().map(|s| s.id).collect();
         if !known.is_empty() {
@@ -247,6 +299,11 @@ impl Session {
     /// until each is first shown. Returns the id that should come to front
     /// (in the space that was on screen).
     pub fn restore_into(&self, tabs: &mut Tabs) -> Option<TabId> {
+        self.restore_all(tabs).0
+    }
+
+    /// `restore_into`, and the splits as the restored tabs' ids.
+    pub fn restore_all(&self, tabs: &mut Tabs) -> (Option<TabId>, Vec<Vec<TabId>>) {
         tabs.restore_frame(self.spaces.clone(), self.groups.clone(), self.current);
         let mut ids = Vec::new();
         for saved in &self.tabs {
@@ -274,11 +331,14 @@ impl Session {
             }
         }
         let current = tabs.space;
-        self.fronts
+        let front = self
+            .fronts
             .iter()
             .find(|(s, _)| *s == current)
             .map(|(_, i)| ids[*i])
-            .or_else(|| tabs.here().last().map(|t| t.id))
+            .or_else(|| tabs.here().last().map(|t| t.id));
+        let splits = self.splits.iter().map(|s| s.iter().map(|i| ids[*i]).collect()).collect();
+        (front, splits)
     }
 }
 
@@ -331,6 +391,31 @@ mod tests {
         // Space 0 remembers b in front.
         assert_eq!(fresh.switch_space(0).and_then(|f| fresh.get(f).map(|t| t.url.clone())).as_deref(), Some("https://b.com/"));
         assert_eq!(fresh.list.iter().find(|t| t.url == "https://b.com/").unwrap().title, "B site");
+    }
+
+    #[test]
+    fn site_groups_and_splits_come_back() {
+        let mut tabs = Tabs::new();
+        let a = tabs.open("https://a.com/1");
+        let p = tabs.open("https://secret.com/");
+        tabs.get_mut(p).unwrap().private = true;
+        let b = tabs.open("https://a.com/2");
+        let c = tabs.open("https://c.com/");
+        let d = tabs.open("https://d.com/");
+        let crate::tabs::SiteGrouping::Grouped(g, 2) = tabs.group_site(a) else { panic!() };
+        // b+c side by side; a split with the private tab has one kept tab: dropped.
+        let text = Session::of_with_splits(&tabs, &[vec![b, c], vec![p, d]]).write();
+        assert!(text.contains(&format!("site {g} a.com")));
+        let back = Session::read(&text);
+        assert_eq!(back.splits.len(), 1);
+        let mut fresh = Tabs::new();
+        let (_, splits) = back.restore_all(&mut fresh);
+        let urls: Vec<&str> = splits[0].iter().map(|id| fresh.get(*id).unwrap().url.as_str()).collect();
+        assert_eq!(urls, vec!["https://a.com/2", "https://c.com/"]);
+        assert!(fresh.groups[0].site.as_deref() == Some("a.com"));
+        // Damaged lines: out of range, one tab, a tab in two splits.
+        let bad = Session::read("rippl-session 2\nspace 0 One\ntab 0 0 - https://x.com/ x\ntab 0 0 - https://y.com/ y\nsplit 0 9\nsplit 1\nsplit 0 1\nsplit 1 0\n");
+        assert_eq!(bad.splits, vec![vec![0, 1]]);
     }
 
     #[test]

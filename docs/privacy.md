@@ -51,7 +51,7 @@ models do not depend on profiling you. If you want certainty, host SearXNG yours
 
 | Protection | What it does | Where |
 |---|---|---|
-| **Shield** | Blocks ads and trackers (EasyList, EasyPrivacy and uBlock Origin's lists, ~130k rules) inside WebKit's network layer before any request is sent, and hides ad elements before the page draws | `shield.rs`, [phase 3](phases/phase-3-shield.md) |
+| **Shield** | Blocks ads and trackers (EasyList, EasyPrivacy and uBlock Origin's lists, ~130k rules) inside WebKit's network layer before any request is sent, and hides ad elements before the page draws. A site you turn it off for gets views without the filters; a page leaving that site is stopped at its response and loaded again with them, before it can ask for anything | `shield.rs`, [phase 3](phases/phase-3-shield.md), [phase 11](phases/phase-11-polish.md) |
 | **No third-party cookies** | A site embedded in another site's page can't set or read cookies, the classic cross-site tracking cookie. Same as Safari | `engine.rs` `harden()` |
 | **Intelligent Tracking Prevention** | WebKit classifies sites that track across sites and partitions or purges their storage | `engine.rs` `harden()` |
 | **No cross-site pings** | `<a ping>` and beacons sent to another site are blocked by Shield. (WebKitGTK 2.54 ignores its own hyperlink-auditing setting, so Shield is what stops them) | `rippl_core::shield` |

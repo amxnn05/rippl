@@ -14,13 +14,13 @@
 | Feature batches | Batches 1–6 in [features.md](features.md): every features that can exist on Linux | batches 1–3 ✅ ([1](phases/batch-1.md), [2](phases/batch-2.md), [3](phases/batch-3.md)); batch 4 ✅ ([notes](phases/batch-4.md)), 5 ✅ ([notes](phases/batch-5.md)), 6 ✅ ([notes](phases/batch-6.md)); Phase 9 ✅ |
 | 9 | **Ship**: logo, `.desktop` file, AppStream, default browser, links from other apps, install script, Arch `PKGBUILD`, Flatpak, welcome | ✅ done, [notes](phases/phase-9-ship.md) |
 | 10 | **Videos**: Ctrl+Shift+Y, paste a link, Return: yt-dlp downloads it (video or audio) into the downloads list, with pause, resume and cancel | ✅ done, [notes](phases/phase-10-grab.md) |
-| Polish | instant per-site Shield toggle, split pairs in the session, capped HTTP cache | planned |
+| 11 | **Polish**: one site's tabs as one row (Ctrl+Alt+G), videos at their best resolution and frame rate, Shield off for a site at once, splits in the session, capped HTTP cache | ✅ done, [notes](phases/phase-11-polish.md) |
 
 ## Ideas to measure later
 
 - WPE WebKit instead of WebKitGTK, for a lighter UI process.
 - A lighter UI-process renderer on hybrid-GPU laptops (both Vulkan drivers load today).
-- Sharing one web process between same-site tabs (less memory, weaker isolation).
+- Fingerprinting defences of rippl's own (WebKit has some built in).
 - Keeping sleeping-tab state across restarts.
 
 ## Out of scope

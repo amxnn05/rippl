@@ -30,6 +30,9 @@
 //! autoplay = muted
 //! # a click of the middle button on a page scrolls it (off, default)
 //! autoscroll = off
+//! # the web cache on disk is kept under this (512m, default; 128m, 256m,
+//! # 1g, 2g): checked at launch and every 6 hours, biggest sites first
+//! cache = 512m
 //! # tabs left unseen this long close themselves, into rippl://archive
 //! # (never, default; or 12h, 1d, 7d, 30d)
 //! close_after = never
@@ -132,6 +135,8 @@ pub struct Config {
     pub autoscroll: bool,
     /// Tabs left unseen this long close themselves; None: never.
     pub close_after: Option<Duration>,
+    /// The web cache on disk is kept under this many megabytes (cache.rs).
+    pub cache_mb: u64,
     pub bookmarks_bar: bool,
     /// The column as icons only.
     pub icon_column: bool,
@@ -218,6 +223,7 @@ impl Default for Config {
             autoplay: true,
             autoscroll: false,
             close_after: None,
+            cache_mb: rippl_core::cache::DEFAULT_MB,
             bookmarks_bar: false,
             icon_column: false,
             top_tabs: false,
@@ -356,6 +362,7 @@ impl Config {
                 }
             }
             "close_after" => self.close_after = close_after(value).ok_or_else(bad)?,
+            "cache" => self.cache_mb = rippl_core::cache::megabytes(value).ok_or_else(bad)?,
             "column" => {
                 self.icon_column = match value {
                     "full" => false,
@@ -485,6 +492,7 @@ impl Config {
             choice("home_image", "New tab image", self.home_image.clone(), &[], "A picture's full path, for image"),
             choice("home_grid", "New tab: the sites in the bookmark folder Home", onoff(self.home_grid), &["on", "off"], "Four to a row, sixteen at most"),
             choice("history", "Keep history", onoff(self.history), &["on", "off"], ""),
+            choice("cache", "Keep the web cache under", rippl_core::cache::name(self.cache_mb), &rippl_core::cache::CHOICES, "Pages saved on disk to load faster. Checked at launch and every 6 hours; the sites taking the most room are emptied first"),
             choice(
                 "suggestions",
                 "Search engine suggestions while typing",
@@ -521,6 +529,9 @@ mod tests {
         assert!(c.apply("close_after", "3d").is_err());
         assert!(c.apply("autoplay", "never").is_ok() && !c.autoplay);
         assert!(c.apply("tabs", "top").is_ok() && c.top_tabs);
+        assert_eq!(c.cache_mb, 512);
+        assert!(c.apply("cache", "1g").is_ok() && c.cache_mb == 1024);
+        assert!(c.apply("cache", "huge").is_err());
         assert!(c.apply("keyword.evil", "https://%s.evil.com/").is_err());
     }
 }

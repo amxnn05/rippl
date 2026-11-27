@@ -61,15 +61,12 @@ const DUSK_CHECK: &str = r#"
 impl Browser {
     /// Every site's hidden elements and own CSS, and the darkening sheet.
     pub(crate) fn apply_site_styles(&self) {
-        let content = &self.engine.content;
-        content.remove_all_style_sheets();
-        content.add_style_sheet(&UserStyleSheet::new(
-            DUSK_CSS,
-            UserContentInjectedFrames::TopFrame,
-            UserStyleLevel::User,
-            &[],
-            &[],
-        ));
+        let contents = self.engine.contents();
+        let dusk = UserStyleSheet::new(DUSK_CSS, UserContentInjectedFrames::TopFrame, UserStyleLevel::User, &[], &[]);
+        for content in contents {
+            content.remove_all_style_sheets();
+            content.add_style_sheet(&dusk);
+        }
         let mut by_host: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
         for (host, selectors) in self.places.hidden().unwrap_or_default() {
             // One rule per selector: an invalid one only loses itself.
@@ -85,7 +82,9 @@ impl Browser {
             let allow = [format!("*://{host}/*"), format!("*://*.{host}/*")];
             let allow: Vec<&str> = allow.iter().map(String::as_str).collect();
             let sheet = UserStyleSheet::new(&css, UserContentInjectedFrames::TopFrame, UserStyleLevel::User, &allow, &[]);
-            content.add_style_sheet(&sheet);
+            for content in contents {
+                content.add_style_sheet(&sheet);
+            }
         }
     }
 

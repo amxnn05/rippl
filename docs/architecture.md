@@ -51,6 +51,7 @@ crates/rippl-core/        no GTK, no WebKit: everything here runs under `cargo t
   src/ai.rs               the AI add-on's requests and answers (OpenAI-style), translations
   src/clean.rs            click IDs and campaign tags off addresses
   src/ytdlp.rs            video downloads: which text is a link, yt-dlp's arguments, its progress lines
+  src/cache.rs            the HTTP cache's cap: which sites to empty when it is over
   examples/shield_convert.rs   runs the converter on a list file, for inspection
 
 app/src/
@@ -73,6 +74,8 @@ app/src/
   keyring.rs              the Secret Service through libsecret (or memory, for tests)
   signin.rs               form watching, the save question, the account list, filling
   split.rs                split view, 2–4 pages: place/detach views, nested panes, pane focus
+  site_groups.rs          one site's tabs as one row of tiles (Ctrl+Alt+G)
+  cache.rs                keeps the HTTP cache under `cache`, biggest sites first
   look.rs                 the design: palette, column rows, letters, pins, CSS
   closed.rs               reopen closed tabs, copy clean address, paste and go
   sitecard.rs             site card, tab menu, duplicate, print, blocked pop-ups
@@ -149,6 +152,15 @@ a tab that wakes on the same site as an awake tab is made related to it too, sha
 (~160 MB saved per extra tab of a site). Each tab records its family, and a process is only ended
 when no awake tab of the family is left.
 
+## Two content managers
+
+Shield's filters live in a `UserContentManager` every view shares. Sites Shield is off for get views
+from a second one, `Engine::open_content`, with the same scripts and style sheets but no filters.
+Whatever rippl adds to pages goes into both (`Engine::contents`). A tab moves between them by
+getting a new view with its history (`Browser::rehome`). This happens when Shield is switched for
+its site, or when a page's response shows it is going into or out of such a site
+(`ResponsePolicyDecision::is_main_frame_main_resource`, before the page process gets any of it).
+
 ## Signal safety
 
 GTK and WebKit signals can fire while rippl is changing state; for example, closing a view fires
@@ -189,7 +201,7 @@ in pages. Details: [phases/phase-3-shield.md](phases/phase-3-shield.md).
 
 | Path | What |
 |---|---|
-| `~/.local/share/rippl/session` | open tabs (not private ones), spaces, groups: plain text, format 2 |
+| `~/.local/share/rippl/session` | open tabs (not private ones), spaces, groups (and site groups), splits: plain text, format 2 |
 | `~/.local/share/rippl/spaces/<id>/web/` | a space's own cookies and site data (space 0 uses `web/`) |
 | `~/.local/share/rippl/profiles/<name>/`, `~/.cache/rippl/profiles/<name>/` | a profile: all of the above, its own |
 | `~/.local/share/rippl/places.sqlite` | history, bookmarks, site permission answers, hidden elements |
@@ -199,7 +211,7 @@ in pages. Details: [phases/phase-3-shield.md](phases/phase-3-shield.md).
 | `~/.local/share/rippl/web/cookies.sqlite` | cookies (sign-ins) |
 | `~/Downloads` (XDG download dir) | downloaded files |
 | `~/.local/share/rippl/web/storage/`, `itp/` | site storage, WebKit's tracking-prevention data |
-| `~/.cache/rippl/web/` | HTTP cache |
+| `~/.cache/rippl/web/` | HTTP cache, kept under `cache` (512 MB by default) |
 | `~/.cache/rippl/shield/*.txt`, `*.stamp` | downloaded filter lists and when they were fetched |
 | `~/.cache/rippl/shield/compiled/` | WebKit's compiled filters |
 | `~/.config/rippl/config` | settings ([configuration.md](configuration.md)) |

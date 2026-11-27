@@ -269,19 +269,30 @@ impl Browser {
         line
     }
 
-    /// Shield off (or back on) for `host`, then reload the page.
+    /// Shield off (or back on) for `host`, at once: every awake tab of the
+    /// site, in every window, gets a view with the filters or without
+    /// (`rehome`), keeping its history. Sleeping tabs wake into the right one.
     pub(crate) fn toggle_shield_for(&self, host: &str) {
-        let weak = self.weak();
-        self.notice("Updating the blocker for this site…");
-        self.shield.toggle(host, move |_| {
-            if let Some(b) = weak.upgrade() {
-                b.show_front();
-                if let Some(v) = b.front_view() {
-                    v.reload();
-                }
-            }
-        });
+        let off = self.shield.toggle(host);
         self.install_page_scripts();
+        for b in crate::windows::all() {
+            // Every awake tab whose view now has the wrong filters: the
+            // site's, its subdomains'.
+            let ids: Vec<TabId> = {
+                let tabs = b.tabs.borrow();
+                let views = b.views.borrow();
+                tabs.list
+                    .iter()
+                    .filter(|t| views.get(&t.id).is_some_and(|v| b.engine.shielded(v) != b.shielded_for(&t.url)))
+                    .map(|t| t.id)
+                    .collect()
+            };
+            for id in ids {
+                b.rehome(id, None);
+            }
+            b.show_front();
+        }
+        self.notice(if off { "Shield is off for this site" } else { "Shield is on for this site" });
     }
 
     /// Every tab of a kept-awake site is marked so it never sleeps.
@@ -364,6 +375,12 @@ impl Browser {
             ("Put beside this tab".into(), std::rc::Rc::new(|b: &Browser, id| b.split_with(id))),
         ];
         items.extend(self.pin_folder_items(id));
+        let site = self.tabs.borrow().get(id).and_then(|t| rippl_core::tabs::site_of(&t.url));
+        if let Some(site) = site.filter(|_| !pinned) {
+            let grouped = group.is_some_and(|g| self.tabs.borrow().is_site_group(g));
+            let label = if grouped { format!("Ungroup {site}") } else { format!("Group tabs from {site}") };
+            items.push((label, std::rc::Rc::new(|b: &Browser, id| b.group_site_of(id))));
+        }
         if !pinned {
             items.push(("Add to a new group".into(), std::rc::Rc::new(|b: &Browser, id| {
                 b.tabs.borrow_mut().new_group(id, "");

@@ -87,10 +87,9 @@ The HTTP cache written was also about half as large with Shield on (22 vs 30 MB,
 
 ## Known limits
 
-- **Turning Shield off for a site takes about 6 s**, because both lists are recompiled. A faster way
-  would be a second content manager without filters for allowed sites, swapping the tab's view
-  (the same move as sleep/wake). Planned.
+- ~~Turning Shield off for a site takes about 6 s~~: instant since [phase 11](phase-11-polish.md),
+  with a second content manager without filters for those sites.
 - `^` at the very end of a URL can't be matched (WebKit's regex has no `|`), so a few rules match
   slightly less than written.
-- The HTTP cache folder is not yet capped.
+- ~~The HTTP cache folder is not yet capped~~: `cache` since [phase 11](phase-11-polish.md).
 - Compiling happens in the UI process. Its heap grows during the compile and is trimmed afterwards.

@@ -79,6 +79,10 @@ autoplay = muted
 # A click of the middle button on a page scrolls it towards the pointer (off, default)
 autoscroll = off
 
+# The web cache on disk is kept under this (512m, default; 128m, 256m, 1g, 2g).
+# Checked a minute after launch and every 6 hours; the biggest sites go first.
+cache = 512m
+
 # Tabs left unseen this long close themselves, into rippl://archive
 # (never, default; 12h, 1d, 7d, 30d)
 close_after = never
@@ -143,8 +147,8 @@ See [privacy.md](privacy.md) for how to choose a search engine.
 ## `~/.config/rippl/shield-allow`
 
 Sites Shield is turned off for, one host per line (subdomains included). `Ctrl+Shift+B` adds or
-removes the site in front, recompiles the filters (about 6 s) and reloads the page. While a site
-is on the list, the address field shows a warning icon.
+removes the site in front, at once: its open tabs get views without the filters (or with them
+again), keeping their history. While a site is on the list, the address field shows a warning icon.
 
 ## Glass and Hyprland
 
@@ -178,6 +182,7 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 |---|---|
 | `RIPPL_SLEEP_AFTER=<seconds>` | Overrides `sleep`, in seconds (for measuring) |
 | `RIPPL_CLOSE_AFTER=<seconds>` | Overrides `close_after`, in seconds (for measuring) |
+| `RIPPL_CACHE_CHECK=<seconds>` | When the first cache check runs (default 60), for testing `cache` |
 | `RIPPL_LEAN=1` | WebKit's smaller cache model: less RAM, slower Back |
 | `RIPPL_NO_SHARE=1` | Every tab in a page process of its own, even on the same site |
 | `RIPPL_NO_GPU=1` | Pages drawn without the GPU: 167 → 95 MB per light page, but about twice the CPU while scrolling ([performance.md](performance.md)) |
@@ -213,7 +218,8 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 | `F9`, `Ctrl+Alt+R` | Reading mode on/off |
 | `Ctrl+Shift+H` | Hide something on this site (click it; `Esc` cancels) |
 | `Ctrl+Shift+U` | Show everything hidden on this site again |
-| `Ctrl+Alt+S` | Split view: this tab beside the previous one, or take it out of its split |
+| `Ctrl+Alt+S` | Split view: this tab beside the previous one, or take it out of its split. Splits are kept in the session |
+| `Ctrl+Alt+G`, a tab's menu's *Group tabs from …* | This site's tabs as one row of tiles (click a tile: that tab); again on a grouped tab: loose again. `shortcut.group-site` moves it |
 | Alt-click a tab, its menu's *Put beside this tab* | Add it to the split in front (up to four: 3 across, 2×2) |
 | `Ctrl+Shift+T` | Reopen the last closed tab, with its history and scroll |
 | Click the tab you're on, `Ctrl+I` | Site card: connection, copy, print, zoom, ad blocking, keep awake, pop-ups, permissions |

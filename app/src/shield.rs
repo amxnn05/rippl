@@ -20,7 +20,10 @@
 //!   uBlock's own "Expires"), in the background, with the files it
 //!   `!#include`s; a bundle is recompiled when one of its sources changed.
 //! - Sites Shield is off for (Ctrl+Shift+B, the site card) are kept in
-//!   `~/.config/rippl/shield-allow` and compiled in as exceptions.
+//!   `~/.config/rippl/shield-allow`. They are not compiled in: their tabs
+//!   get views from a second content manager without the filters
+//!   (`Engine::open_content`), so turning Shield off or on for a site is
+//!   instant, where recompiling took about 6 s.
 //!
 //! Fetching lists is the only network request rippl makes on its own. It
 //! sends no cookies and a generic user agent.
@@ -208,7 +211,7 @@ impl Shield {
     }
 
     async fn add_seed(&self) {
-        let (json, _) = shield::convert(&[SEED], &self.allowed_list());
+        let (json, _) = shield::convert(&[SEED], &[]);
         match self.store.save_future(SEED_ID, &glib::Bytes::from_owned(json.into_bytes())).await {
             Ok(filter) => {
                 self.content.add_filter(&filter);
@@ -271,12 +274,12 @@ impl Shield {
         if texts.is_empty() {
             return;
         }
-        let allowed = self.allowed_list();
         let started = std::time::Instant::now();
-        // Converting is plain Rust: off the main thread.
+        // Converting is plain Rust: off the main thread. No exceptions for
+        // allowed sites: those pages use views without the filters.
         let Ok((json, stats)) = gio::spawn_blocking(move || {
             let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
-            shield::convert(&refs, &allowed)
+            shield::convert(&refs, &[])
         })
         .await
         else {
@@ -310,9 +313,26 @@ impl Shield {
         self.allowed.borrow().contains(host)
     }
 
-    /// Turns Shield off for `host` (or back on), recompiles every bundle
-    /// with the new exceptions, then calls `done`.
-    pub fn toggle(self: &Rc<Self>, host: &str, done: impl FnOnce(bool) + 'static) {
+    /// Whether Shield is off for pages on `host`: it or a domain above it
+    /// is on the list (`example.com` covers `news.example.com`).
+    pub fn is_off_for(&self, host: &str) -> bool {
+        let allowed = self.allowed.borrow();
+        let mut rest = host;
+        loop {
+            if allowed.contains(rest) {
+                return true;
+            }
+            match rest.split_once('.') {
+                Some((_, up)) if up.contains('.') => rest = up,
+                _ => return false,
+            }
+        }
+    }
+
+    /// Turns Shield off for `host` (or back on) and keeps the list; returns
+    /// whether it is now off. The filters don't change: the site's tabs
+    /// need new views (`Browser::toggle_shield_for`).
+    pub fn toggle(&self, host: &str) -> bool {
         let now_allowed = {
             let mut allowed = self.allowed.borrow_mut();
             if !allowed.remove(host) {
@@ -325,18 +345,7 @@ impl Shield {
             let _ = std::fs::create_dir_all(parent);
         }
         let _ = std::fs::write(allow_path(), format!("# Sites rippl's Shield is off for, one per line.\n{text}"));
-        let this = self.clone();
-        glib::MainContext::default().spawn_local(async move {
-            let ids: Vec<&'static str> = this.loaded.borrow().iter().copied().collect();
-            for id in ids {
-                this.compile(id).await;
-            }
-            if this.loaded.borrow().len() < BUNDLES.len() {
-                this.content.remove_filter_by_id(SEED_ID);
-                this.add_seed().await;
-            }
-            done(now_allowed);
-        });
+        now_allowed
     }
 
     /// One line for the control socket.

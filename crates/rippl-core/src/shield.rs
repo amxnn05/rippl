@@ -28,7 +28,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Bump when the conversion changes, so compiled filters are rebuilt.
-pub const CONVERTER_VERSION: u32 = 3;
+pub const CONVERTER_VERSION: u32 = 4;
 
 /// Generic hiding selectors per rule. One rule per selector would multiply
 /// the rule count; one huge rule makes one bad selector hide nothing.

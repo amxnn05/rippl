@@ -263,8 +263,7 @@ impl Browser {
             }
             ("settings", "shield-on") => {
                 if self.shield.is_allowed(arg) {
-                    self.shield.toggle(arg, |_| {});
-                    self.install_page_scripts();
+                    self.toggle_shield_for(arg);
                 }
                 Ok(String::new())
             }

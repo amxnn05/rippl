@@ -193,13 +193,38 @@ pub fn colour_ok(c: &str) -> bool {
     c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|x| x.is_ascii_hexdigit())
 }
 
-/// A named, foldable section of ordinary tabs in one space.
+/// A named, foldable section of ordinary tabs in one space; or, with
+/// `site`, one site's tabs gathered into a single row of tiles.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Group {
     pub id: GroupId,
     pub space: SpaceId,
     pub name: String,
     pub collapsed: bool,
+    /// Made by "Group this site's tabs": the site (host, `www.` aside).
+    /// Such a group shows as one row and ends when one tab is left.
+    pub site: Option<String>,
+}
+
+/// The site a tab belongs to, for grouping by site: its host, without
+/// `www.` or a port. None for a blank tab.
+pub fn site_of(url: &str) -> Option<String> {
+    let rest = url.split_once("://")?.1;
+    let host = rest.split(['/', '?', '#']).next()?.rsplit('@').next()?;
+    let host = host.split(':').next()?.to_ascii_lowercase();
+    let host = host.strip_prefix("www.").unwrap_or(&host).to_string();
+    (!host.is_empty()).then_some(host)
+}
+
+/// What grouping a site's tabs did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SiteGrouping {
+    /// Its tabs are now one group.
+    Grouped(GroupId, usize),
+    /// It was a site group: its tabs are loose again.
+    Ungrouped(usize),
+    /// Fewer than two tabs of that site (or a pinned or blank tab).
+    Alone,
 }
 
 /// The tabs of a window, in every space, and which one is in front.
@@ -521,7 +546,7 @@ impl Tabs {
         let g = self.next_group;
         self.next_group += 1;
         let name = if name.trim().is_empty() { "Group".to_string() } else { name.trim().to_string() };
-        self.groups.push(Group { id: g, space, name, collapsed: false });
+        self.groups.push(Group { id: g, space, name, collapsed: false, site: None });
         let old = self.get(id)?.group;
         self.get_mut(id)?.group = Some(g);
         if let Some(o) = old {
@@ -566,15 +591,81 @@ impl Tabs {
         }
     }
 
+    /// Whether `group` was made from a site's tabs.
+    pub fn is_site_group(&self, group: GroupId) -> bool {
+        self.groups.iter().any(|g| g.id == group && g.site.is_some())
+    }
+
+    /// Gathers the unpinned tabs of `id`'s site, in its space, into one
+    /// site group, beside the first of them, in their order; tabs taken
+    /// from other groups leave those. If `id` is in a site group already,
+    /// its tabs go loose instead, where they are.
+    pub fn group_site(&mut self, id: TabId) -> SiteGrouping {
+        let Some(tab) = self.get(id) else { return SiteGrouping::Alone };
+        if let Some(g) = tab.group.filter(|g| self.is_site_group(*g)) {
+            let n = self.ungroup(g);
+            return SiteGrouping::Ungrouped(n);
+        }
+        let Some(site) = site_of(&tab.url).filter(|_| !tab.pinned) else { return SiteGrouping::Alone };
+        let space = tab.space;
+        let of_site = |t: &Tab| t.space == space && !t.pinned && site_of(&t.url).as_deref() == Some(site.as_str());
+        let n = self.list.iter().filter(|t| of_site(t)).count();
+        if n < 2 {
+            return SiteGrouping::Alone;
+        }
+        let g = self.next_group;
+        self.next_group += 1;
+        self.groups.push(Group { id: g, space, name: site.clone(), collapsed: false, site: Some(site.clone()) });
+        // Nothing before the first of them moves, so they go back in where
+        // it was.
+        let first = self.list.iter().position(&of_site).unwrap_or(0);
+        let mut members = Vec::new();
+        let mut i = first;
+        while i < self.list.len() {
+            if of_site(&self.list[i]) {
+                members.push(self.list.remove(i));
+            } else {
+                i += 1;
+            }
+        }
+        let old: Vec<GroupId> = members.iter().filter_map(|t| t.group).collect();
+        for (k, mut t) in members.into_iter().enumerate() {
+            t.group = Some(g);
+            self.list.insert(first + k, t);
+        }
+        for o in old {
+            self.drop_empty_group(o);
+        }
+        SiteGrouping::Grouped(g, n)
+    }
+
+    /// Takes every tab out of `group`, leaving them where they are; returns
+    /// how many there were.
+    pub fn ungroup(&mut self, group: GroupId) -> usize {
+        let mut n = 0;
+        for t in self.list.iter_mut().filter(|t| t.group == Some(group)) {
+            t.group = None;
+            n += 1;
+        }
+        self.groups.retain(|g| g.id != group);
+        n
+    }
+
+    /// A group with no tabs goes; a site group goes with one tab left.
     fn drop_empty_group(&mut self, group: GroupId) {
-        if !self.list.iter().any(|t| t.group == Some(group)) {
-            self.groups.retain(|g| g.id != group);
+        let n = self.list.iter().filter(|t| t.group == Some(group)).count();
+        if n == 0 || (n == 1 && self.is_site_group(group)) {
+            self.ungroup(group);
         }
     }
 
     fn tidy_groups(&mut self) {
         let used: Vec<GroupId> = self.list.iter().filter_map(|t| t.group).collect();
         self.groups.retain(|g| used.contains(&g.id));
+        let sites: Vec<GroupId> = self.groups.iter().filter(|g| g.site.is_some()).map(|g| g.id).collect();
+        for g in sites {
+            self.drop_empty_group(g);
+        }
     }
 
     // ---- restoring -------------------------------------------------------
@@ -658,6 +749,55 @@ mod tests {
         // Half of a pair still wanted: both stay.
         assert_eq!(due_for_closing(&list, &[], &[vec![6, 7]], 5000, after), vec![1]);
         assert!(due_for_closing(&list, &[], &[], 2000, after).is_empty());
+    }
+
+    #[test]
+    fn a_sites_tabs_group_and_ungroup() {
+        let mut tabs = Tabs::default();
+        let a = tabs.open("https://www.youtube.com/watch?v=1");
+        let b = tabs.open("https://docs.rs/");
+        let c = tabs.open("https://youtube.com/feed");
+        let d = tabs.open("https://example.com/");
+        let e = tabs.open("https://m.youtube.com/x"); // another host: not the same site
+        let f = tabs.open("https://youtube.com:443/shorts");
+        let pin = tabs.open("https://youtube.com/pinned");
+        tabs.set_pinned(pin, true);
+        tabs.new_group(d, "Mine");
+        let mine = tabs.get(d).unwrap().group;
+        tabs.set_group(f, mine);
+        let g = match tabs.group_site(c) {
+            SiteGrouping::Grouped(g, 3) => g,
+            other => panic!("{other:?}"),
+        };
+        // Together where the first was, in their order; the pin stays out.
+        let order: Vec<TabId> = tabs.here().filter(|t| !t.pinned).map(|t| t.id).collect();
+        assert_eq!(order, vec![a, c, f, b, d, e]);
+        assert!([a, c, f].iter().all(|t| tabs.get(*t).unwrap().group == Some(g)));
+        assert_eq!(tabs.get(pin).unwrap().group, None);
+        assert!(tabs.is_site_group(g));
+        assert_eq!(tabs.groups.iter().find(|x| x.id == g).unwrap().name, "youtube.com");
+        // "Mine" kept d when f left it.
+        assert!(tabs.get(d).unwrap().group.is_some());
+        // Again on a member: loose again, where they are.
+        assert_eq!(tabs.group_site(a), SiteGrouping::Ungrouped(3));
+        assert!(!tabs.is_site_group(g) && tabs.get(a).unwrap().group.is_none());
+        // One tab of a site, a blank tab: nothing to group.
+        assert_eq!(tabs.group_site(b), SiteGrouping::Alone);
+        let blank = tabs.open("");
+        assert_eq!(tabs.group_site(blank), SiteGrouping::Alone);
+    }
+
+    #[test]
+    fn a_site_group_ends_with_one_tab_left() {
+        let mut tabs = Tabs::default();
+        let a = tabs.open("https://a.com/1");
+        let b = tabs.open("https://a.com/2");
+        let c = tabs.open("https://a.com/3");
+        let SiteGrouping::Grouped(g, 3) = tabs.group_site(a) else { panic!() };
+        tabs.close(b);
+        assert!(tabs.is_site_group(g));
+        tabs.close(c);
+        assert!(tabs.groups.is_empty() && tabs.get(a).unwrap().group.is_none());
     }
 
     #[test]

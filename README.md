@@ -14,6 +14,18 @@ inside WebKit before they load, and tabs you aren't using give their memory back
 </picture>
 <p align="center"><sub>The window as drawn on <a href="https://ripplbrowser.web.app">ripplbrowser.web.app</a>.</sub></p>
 
+## New
+
+> **Videos at their best, in one keystroke.** `Ctrl+Shift+Y`, paste a link from YouTube, Vimeo or
+> any of the thousand sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) knows, and Return. You get the
+> highest resolution at the highest frame rate (4K60 if it's there), with the best sound, as one
+> `.mp4`. `Shift+Return` gives only the sound, as `.mp3`. It's listed with your downloads, with
+> pause, resume and cancel.
+>
+> **One site, one row.** `Ctrl+Alt+G`, or *Group tabs from …* in a tab's menu: every tab of that
+> site folds into a single row as tall as a tab, with a small tile for each page. Click a tile to go
+> to its page. Press it again to spread them out.
+
 ## Size and speed
 
 A 1.2 MB binary on the system's WebKitGTK (about 195 MB with WebKitGTK and GTK, against 430–480 MB
@@ -46,9 +58,10 @@ remember your answer per site, and light/dark mode. Pinned tabs, a reading mode 
 anything on a page hidden for good with one click, and history, bookmarks and settings as pages of
 their own. Bookmarks come over from Chrome, Brave, Edge, Vivaldi, Firefox, LibreWolf or Zen.
 
-Videos: `Ctrl+Shift+Y`, paste a link from YouTube, Vimeo or any site yt-dlp knows, and Return. It
-comes down through [yt-dlp](https://github.com/yt-dlp/yt-dlp) (installed separately) as `.mp4`, or
-as `.mp3` with `Shift+Return`, into the downloads list with pause, resume and cancel.
+Videos: `Ctrl+Shift+Y`, paste a link and Return: the best resolution and frame rate, as `.mp4`
+(or `.mp3` with `Shift+Return`), through [yt-dlp](https://github.com/yt-dlp/yt-dlp) (installed
+separately). Turning Shield off for a site that breaks (`Ctrl+Shift+B`) is instant, split views
+come back after a restart, and the web cache stays under 512 MB (`cache` in the config).
 
 Passwords live in your system keyring (GNOME Keyring), never in rippl's files. rippl offers to save
 a sign-in only once it has worked, offers saved accounts under the box when you click it (on that
@@ -79,7 +92,7 @@ To run it from the source folder without installing: `cargo build --release && .
 
 `Ctrl+L` address · `Ctrl+T` new tab · `Ctrl+W` close · `Ctrl+Shift+N` private tab · `Ctrl+Tab` tab switcher ·
 `Ctrl+1`–`9` jump · `Alt+←/→` back/forward · `Ctrl+F` find · `Ctrl+D` bookmark · `Ctrl+H` history ·
-`Ctrl+Shift+P` pin · `Ctrl+Alt+S` split view · `Ctrl+Alt+P` passwords · `F9` reading mode · `Ctrl+Shift+H` hide something · `Ctrl+,` settings ·
+`Ctrl+Shift+P` pin · `Ctrl+Alt+S` split view · `Ctrl+Alt+G` group this site · `Ctrl+Shift+Y` download a video · `Ctrl+Alt+P` passwords · `F9` reading mode · `Ctrl+Shift+H` hide something · `Ctrl+,` settings ·
 `Ctrl+Shift+B` Shield off for this site · `Ctrl+S` hide tabs.
 All keys and settings: [docs/configuration.md](docs/configuration.md).
 

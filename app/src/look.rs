@@ -86,6 +86,23 @@ window.rippl .tabs row.in-group { margin-left: 12px; }
 window.rippl .tabs row.group-head { min-height: 24px; color: var(--muted); font-size: 11.5px; font-weight: 600;
   padding: 6px 6px 0 8px; }
 window.rippl .tabs row.group-head:hover { background: transparent; color: var(--ink); }
+/* A site group (site_groups.rs): one row, as tall as a tab, a hairline
+   box of small tiles. */
+window.rippl .tabs row.stack { min-height: 28px; padding: 3px 4px; margin: 1px 0; border-radius: 9px;
+  background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); }
+window.rippl .tabs row.stack:hover { background: transparent; box-shadow: inset 0 0 0 1px var(--faint); }
+window.rippl .tabs row.stack.front { background: var(--tile); }
+window.rippl .tabs row.stack flowboxchild { padding: 0; min-width: 0; min-height: 0; background: transparent; }
+window.rippl .stack-tile { min-width: 26px; min-height: 20px; padding: 0; border-radius: 6px; border: none;
+  background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); color: var(--muted);
+  transition: background 140ms ease-out, box-shadow 140ms ease-out, opacity 140ms ease-out; }
+window.rippl .stack-tile:hover { background: var(--hover); box-shadow: inset 0 0 0 1px var(--faint); }
+window.rippl .stack-tile.front { min-width: 32px; background: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--faint), 0 1px 2px rgba(0,0,0,0.06); color: var(--ink); }
+window.rippl .stack-tile.asleep { opacity: 0.55; }
+window.rippl .stack-tile.asleep:hover { opacity: 1; }
+window.rippl .stack-tile.split { box-shadow: inset 0 -2px 0 var(--accent), inset 0 0 0 1px var(--hairline); }
+window.rippl .stack-tile .mark { min-width: 13px; min-height: 13px; font-size: 9px; }
 window.rippl .foot .space { min-width: 22px; min-height: 22px; padding: 0; border-radius: 6px; border: none;
   box-shadow: none; background: transparent; color: var(--faint); font-size: 11px; font-weight: 600; }
 window.rippl .foot .space:hover { color: var(--ink); background: var(--hover); }
@@ -433,9 +450,22 @@ impl Browser {
         let mut pin_at = 0;
         let mut in_group: Option<rippl_core::tabs::GroupId> = None;
         let mut folders_drawn: Vec<String> = Vec::new();
-        // Only the space on screen; a group's tabs under its heading.
+        let mut stacks_drawn: Vec<rippl_core::tabs::GroupId> = Vec::new();
+        // Only the space on screen; a group's tabs under its heading, a
+        // site group's as one row of tiles (site_groups.rs).
         for tab in tabs.here() {
             let id = tab.id;
+            if !tab.pinned
+                && let Some(group) = tab.group.and_then(|g| tabs.groups.iter().find(|x| x.id == g && x.site.is_some()))
+            {
+                in_group = tab.group;
+                if !stacks_drawn.contains(&group.id) {
+                    stacks_drawn.push(group.id);
+                    let members: Vec<&rippl_core::tabs::Tab> = tabs.here().filter(|t| t.group == Some(group.id)).collect();
+                    self.list.append(&self.site_stack(group, &members, tabs.front));
+                }
+                continue;
+            }
             if !tab.pinned && tab.group != in_group {
                 in_group = tab.group;
                 if let Some(group) = tab.group.and_then(|g| tabs.groups.iter().find(|x| x.id == g)) {
@@ -651,8 +681,16 @@ impl Browser {
     }
 
     /// Right-click on a group's heading: rename it, or ungroup its tabs.
-    fn group_menu(&self, group: rippl_core::tabs::GroupId, anchor: &gtk::Widget) {
-        let name = self.tabs.borrow().groups.iter().find(|g| g.id == group).map(|g| g.name.clone()).unwrap_or_default();
+    /// A site group is named by its site: no name to change.
+    pub(crate) fn group_menu(&self, group: rippl_core::tabs::GroupId, anchor: &gtk::Widget) {
+        let (name, site) = self
+            .tabs
+            .borrow()
+            .groups
+            .iter()
+            .find(|g| g.id == group)
+            .map(|g| (g.name.clone(), g.site.is_some()))
+            .unwrap_or_default();
         let menu = gtk::Box::new(gtk::Orientation::Vertical, 6);
         menu.set_margin_top(8);
         menu.set_margin_bottom(8);
@@ -662,7 +700,9 @@ impl Browser {
         let ungroup = gtk::Button::with_label("Ungroup tabs");
         ungroup.add_css_class("flat");
         ungroup.add_css_class("menu-item");
-        menu.append(&entry);
+        if !site {
+            menu.append(&entry);
+        }
         menu.append(&ungroup);
         let popover = gtk::Popover::builder().child(&menu).has_arrow(false).build();
         popover.add_css_class("tab-menu");
@@ -694,7 +734,9 @@ impl Browser {
             glib::idle_add_local_once(move || b.render());
         });
         popover.popup();
-        entry.grab_focus();
+        if !site {
+            entry.grab_focus();
+        }
     }
 
     /// Click: select. Middle-click: close. Alt-click: beside the front tab.

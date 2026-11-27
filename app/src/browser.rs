@@ -646,6 +646,36 @@ impl Browser {
     /// Gives `id` a view and its page back: from what it kept when it fell
     /// asleep (history and scroll), or from its address if it never had one.
     fn wake(&self, id: TabId) {
+        self.wake_to(id, None);
+    }
+
+    /// Whether a page at `url` gets Shield's filters: yes, unless Shield is
+    /// off for its site.
+    pub(crate) fn shielded_for(&self, url: &str) -> bool {
+        !shield::host_of(url).is_some_and(|h| self.shield.is_off_for(&h))
+    }
+
+    /// A new view for `id`, with Shield's filters or without as its site
+    /// now needs: the same history, then `to` (or the page it was on).
+    /// What turning Shield off for a site does to that site's tabs.
+    pub(crate) fn rehome(&self, id: TabId, to: Option<String>) {
+        if !self.views.borrow().contains_key(&id) {
+            return;
+        }
+        debug!("rehome {id} -> {to:?}");
+        self.sleep(id);
+        self.wake_to(id, to);
+        let front = self.front();
+        let shown = front == Some(id) || self.split_of(id).is_some_and(|s| front.is_some_and(|f| s.contains(&f)));
+        if let Some(f) = front.filter(|_| shown) {
+            self.place(f);
+        }
+        self.render();
+    }
+
+    /// `wake`, going to `to` after the kept history instead of back to the
+    /// page it was on.
+    fn wake_to(&self, id: TabId, to: Option<String>) {
         debug!("wake {id}");
         let (url, private, memory, space) = {
             let mut tabs = self.tabs.borrow_mut();
@@ -656,7 +686,10 @@ impl Browser {
         // Another awake tab of the same site: share its page process (each
         // process costs ~160 MB before any page content). Same site only,
         // same kind of session: a private tab never shares with a kept one.
-        let sibling = self.sibling_of(id, &url, private);
+        let target = to.clone().unwrap_or_else(|| url.clone());
+        let sibling = self
+            .sibling_of(id, &target, private)
+            .filter(|(_, v)| self.engine.shielded(v) == self.shielded_for(&target));
         let view = match &sibling {
             Some((other, opener)) => {
                 let family = self.family.borrow().get(other).copied().unwrap_or(*other);
@@ -664,13 +697,17 @@ impl Browser {
                 debug!("wake {id}: sharing tab {other}'s page process");
                 self.engine.related_view(opener)
             }
-            None => self.engine.view(private, space),
+            None => self.engine.view(private, space, self.shielded_for(to.as_deref().unwrap_or(&url))),
         };
         self.adopt(id, &view);
         debug!("wake {id}: kept state = {:?} bytes", memory.as_ref().map(Vec::len));
         let restored = memory.is_some_and(|bytes| {
             let state = webkit6::WebViewSessionState::new(&glib::Bytes::from_owned(bytes));
             view.restore_session_state(&state);
+            if let Some(to) = &to {
+                view.load_uri(to);
+                return true;
+            }
             // Restoring brings back the history, not the page: go to it.
             match view.back_forward_list().and_then(|l| l.current_item()) {
                 Some(item) => {
@@ -680,7 +717,9 @@ impl Browser {
                 None => false,
             }
         });
-        if !restored && !url.is_empty() {
+        if let Some(to) = to.filter(|_| !restored) {
+            view.load_uri(&to);
+        } else if !restored && !url.is_empty() {
             view.load_uri(&url);
         }
     }
@@ -1002,6 +1041,23 @@ impl Browser {
                 glib::idle_add_local_once(move || b.peek(&url, id));
                 return true;
             }
+            // A page going into or out of a site Shield is off for, in a
+            // view with the wrong filters: its response is turned away
+            // before the page process gets any of it, and the page loads
+            // again in a view with the right ones (the redirects before it
+            // were only addresses). The navigation's own decision can't
+            // tell the main frame from a subframe; this one can.
+            if kind == webkit6::PolicyDecisionType::Response
+                && let Some(r) = decision.downcast_ref::<webkit6::ResponsePolicyDecision>()
+                && r.is_main_frame_main_resource()
+                && let Some(uri) = r.request().and_then(|q| q.uri()).map(|u| u.to_string()).filter(|u| u.starts_with("http"))
+                && b.engine.shielded(v) != b.shielded_for(&uri)
+            {
+                debug!("{id}: {uri} needs {} filters", if b.shielded_for(&uri) { "Shield's" } else { "no" });
+                decision.ignore();
+                glib::idle_add_local_once(move || b.rehome(id, Some(uri)));
+                return true;
+            }
             if kind != webkit6::PolicyDecisionType::NavigationAction {
                 return false;
             }
@@ -1271,9 +1327,8 @@ impl Browser {
                     "ok: fetching".into()
                 }
                 ("toggle", host) if !host.is_empty() => {
-                    self.shield.toggle(host.trim(), |_| {});
-                    self.install_page_scripts();
-                    "ok: recompiling".into()
+                    self.toggle_shield_for(host.trim());
+                    format!("ok: {}", if self.shield.is_allowed(host.trim()) { "off" } else { "on" })
                 }
                 _ => "error: shield [update | toggle <host>]".into(),
             },
@@ -1493,6 +1548,16 @@ impl Browser {
                     None => "error: no such tab".into(),
                 }
             }
+            // group-site <tab index>: Ctrl+Alt+G on that tab.
+            "group-site" => match at(rest.trim()) {
+                Some(id) => {
+                    let done = self.tabs.borrow_mut().group_site(id);
+                    self.dirty.set(true);
+                    self.render();
+                    format!("ok {done:?}")
+                }
+                None => "error: no such tab".into(),
+            },
             "join" => {
                 let (n, g) = rest.split_once(' ').unwrap_or((rest, ""));
                 if let (Some(id), Ok(g)) = (at(n), g.trim().parse()) {
@@ -1511,7 +1576,11 @@ impl Browser {
             }
             "groups" => {
                 let tabs = self.tabs.borrow();
-                tabs.groups.iter().map(|g| format!("{}\t{}\t{}\tcollapsed={}", g.id, g.space, g.name, g.collapsed)).collect::<Vec<_>>().join("\n")
+                tabs.groups
+                    .iter()
+                    .map(|g| format!("{}\t{}\t{}\tcollapsed={}\tsite={}", g.id, g.space, g.name, g.collapsed, g.site.as_deref().unwrap_or("-")))
+                    .collect::<Vec<_>>()
+                    .join("\n")
             }
             "rows" => {
                 // What the column shows, as text.
@@ -1989,6 +2058,12 @@ impl Browser {
                 v.reload_bypass_cache();
             }
         });
+        // The front tab's site: its tabs as one row, or loose again.
+        self.action(app, "group-site", &["<Ctrl><Alt>g"], |b| {
+            if let Some(f) = b.front() {
+                b.group_site_of(f);
+            }
+        });
         // Shield off (or back on) for the site in front, then reload it.
         self.action(app, "shield-toggle", &["<Ctrl><Shift>b"], |b| {
             let url = b.front().and_then(|f| b.tabs.borrow().get(f).map(|t| t.url.clone()));
@@ -2226,7 +2301,7 @@ impl Browser {
     }
 
     pub(crate) fn save(&self) {
-        let text = Session::of(&self.tabs.borrow()).write();
+        let text = Session::of_with_splits(&self.tabs.borrow(), &self.splits.borrow()).write();
         let path = self.session_path();
         let tmp = path.with_extension("tmp");
         let result = std::fs::create_dir_all(engine::data_dir())
@@ -2241,7 +2316,9 @@ impl Browser {
     /// view. A URL given on the command line opens after them.
     fn restore(&self) {
         let session = std::fs::read_to_string(self.session_path()).map(|t| Session::read(&t)).unwrap_or_default();
-        let front = session.restore_into(&mut self.tabs.borrow_mut());
+        let (front, splits) = session.restore_all(&mut self.tabs.borrow_mut());
+        // Side by side again: shown when one of them comes to front.
+        *self.splits.borrow_mut() = splits;
         // URLs from the command line (not `--profile` and its name).
         let mut args = std::env::args().skip(if self.primary { 1 } else { usize::MAX });
         let mut asked = Vec::new();
@@ -2277,6 +2354,7 @@ impl Browser {
         self.close_left_alone();
         self.render();
         self.start_sync();
+        self.watch_cache();
     }
 
 }

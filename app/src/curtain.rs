@@ -90,15 +90,16 @@ impl Browser {
         if !self.primary {
             return;
         }
-        let content = &self.engine.content;
-        content.register_script_message_handler(HANDLER, Some("rippl"));
-        content.connect_script_message_received(Some(HANDLER), move |_, value| {
-            let Some(b) = crate::windows::all().into_iter().next() else { return };
-            let Ok(report) = serde_json::from_str::<serde_json::Value>(&value.to_str()) else { return };
-            let host = report.get("host").and_then(|h| h.as_str()).unwrap_or("");
-            let selector = report.get("selector").and_then(|s| s.as_str()).unwrap_or("");
-            b.keep_hidden(host, selector);
-        });
+        for content in self.engine.contents() {
+            content.register_script_message_handler(HANDLER, Some("rippl"));
+            content.connect_script_message_received(Some(HANDLER), move |_, value| {
+                let Some(b) = crate::windows::all().into_iter().next() else { return };
+                let Ok(report) = serde_json::from_str::<serde_json::Value>(&value.to_str()) else { return };
+                let host = report.get("host").and_then(|h| h.as_str()).unwrap_or("");
+                let selector = report.get("selector").and_then(|s| s.as_str()).unwrap_or("");
+                b.keep_hidden(host, selector);
+            });
+        }
         self.apply_hidden();
     }
 

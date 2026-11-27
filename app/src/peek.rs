@@ -157,7 +157,7 @@ impl Browser {
             Some(t) => (t.private, t.space),
             None => return,
         };
-        let view = self.engine.view(private, space);
+        let view = self.engine.view(private, space, self.shielded_for(url));
         view.set_hexpand(true);
         view.set_vexpand(true);
         view.load_uri(url);

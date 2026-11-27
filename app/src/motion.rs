@@ -76,6 +76,8 @@ window.rippl .home-grid { animation: rippl-fade 300ms ease-out; }
 window.rippl .tabs row.fresh, window.rippl .top-tab.fresh { animation: rippl-in-left 300ms cubic-bezier(0.25, 1.2, 0.4, 1); }
 window.rippl .tabs row.leaving, window.rippl .top-tab.leaving { animation: rippl-out-left 170ms ease-in forwards; }
 window.rippl .pin.fresh { animation: rippl-pop 280ms cubic-bezier(0.2, 1.3, 0.4, 1); }
+window.rippl .stack-tile.fresh { animation: rippl-pop 280ms cubic-bezier(0.2, 1.3, 0.4, 1); }
+window.rippl .stack-tile.leaving { animation: rippl-sink 170ms ease-in forwards; }
 
 /* Hover and choice: colours ease; pressing gives. */
 window.rippl .tabs row, window.rippl .pin, window.rippl .new-tab, window.rippl .top-tab, window.rippl .rail-row,

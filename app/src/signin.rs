@@ -156,22 +156,24 @@ impl Browser {
         // Once, by the first window, for all: each window then looks for
         // the page among its own tabs.
         if self.primary {
-            let content = &self.engine.content;
-            content.add_script(&UserScript::for_world(
+            let forms = UserScript::for_world(
                 FORMS,
                 UserContentInjectedFrames::TopFrame,
                 UserScriptInjectionTime::End,
                 "rippl",
                 &[],
                 &[],
-            ));
-            content.register_script_message_handler(HANDLER, Some("rippl"));
-            content.connect_script_message_received(Some(HANDLER), move |_, value| {
-                let text = value.to_str();
-                for b in crate::windows::all() {
-                    b.signin_message(&text);
-                }
-            });
+            );
+            for content in self.engine.contents() {
+                content.add_script(&forms);
+                content.register_script_message_handler(HANDLER, Some("rippl"));
+                content.connect_script_message_received(Some(HANDLER), move |_, value| {
+                    let text = value.to_str();
+                    for b in crate::windows::all() {
+                        b.signin_message(&text);
+                    }
+                });
+            }
         }
 
         let weak = self.weak();

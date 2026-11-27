@@ -4,6 +4,7 @@
 
 pub mod address;
 pub mod ai;
+pub mod cache;
 pub mod clean;
 pub mod downloads;
 pub mod import;

@@ -19,6 +19,10 @@ pub struct Engine {
     pub settings: Settings,
     /// Shared by every view: Shield's filters live here (see shield.rs).
     pub content: UserContentManager,
+    /// The same scripts and style sheets without Shield's filters: views of
+    /// sites Shield is off for. Switching a site is then instant (its tabs
+    /// get a new view), where recompiling the filters took seconds.
+    pub open_content: UserContentManager,
     /// Told of every download, from the kept session and from each private
     /// tab's own (see downloads.rs).
     pub on_download: std::cell::RefCell<Option<DownloadHook>>,
@@ -217,14 +221,17 @@ impl Engine {
                 false
             }
         };
+        let open_content = UserContentManager::new();
         if gpc {
-            content.add_script(&webkit6::UserScript::new(
+            let script = webkit6::UserScript::new(
                 GPC_SCRIPT,
                 webkit6::UserContentInjectedFrames::AllFrames,
                 webkit6::UserScriptInjectionTime::Start,
                 &[],
                 &[],
-            ));
+            );
+            content.add_script(&script);
+            open_content.add_script(&script);
         }
 
         // The network process gets the same limits. WebKit reads them only
@@ -271,6 +278,7 @@ impl Engine {
             session,
             settings,
             content,
+            open_content,
             on_download: Default::default(),
             extension,
             start: std::cell::RefCell::new((gpc, https_only, Vec::new())),
@@ -392,9 +400,30 @@ impl Engine {
         }
     }
 
+    /// The network sessions that keep things on disk: the first space's and
+    /// every other space's opened so far (not private tabs').
+    pub fn kept_sessions(&self) -> Vec<NetworkSession> {
+        let mut all = vec![self.session.clone()];
+        all.extend(self.spaces.borrow().values().cloned());
+        all
+    }
+
+    /// Both content managers: whatever a page gets, it gets in both.
+    pub fn contents(&self) -> [&UserContentManager; 2] {
+        [&self.content, &self.open_content]
+    }
+
+    /// Whether `view` has Shield's filters.
+    pub fn shielded(&self, view: &WebView) -> bool {
+        view.user_content_manager().as_ref() != Some(&self.open_content)
+    }
+
     /// A new page view in `space`. `private`: its own throwaway network
     /// session, so its cookies and sign-ins exist only while it does.
-    pub fn view(&self, private: bool, space: u32) -> WebView {
+    ///
+    /// `shielded`: with Shield's filters, or (a site Shield is off for)
+    /// without.
+    pub fn view(&self, private: bool, space: u32, shielded: bool) -> WebView {
         let session = if private {
             let own = NetworkSession::new_ephemeral();
             harden(&own);
@@ -409,7 +438,7 @@ impl Engine {
             .web_context(&self.context)
             .network_session(&session)
             .settings(&self.settings)
-            .user_content_manager(&self.content)
+            .user_content_manager(if shielded { &self.content } else { &self.open_content })
             .hexpand(true)
             .vexpand(true)
             .build()
@@ -417,12 +446,14 @@ impl Engine {
 
     /// A view for a page that asked for a new window (`window.open`, a
     /// link with target=_blank). WebKit requires it be related to the
-    /// view that asked: same session, same process rules.
+    /// view that asked: same session, same process rules, and the same
+    /// filters (or none).
     pub fn related_view(&self, opener: &WebView) -> WebView {
+        let content = opener.user_content_manager().unwrap_or_else(|| self.content.clone());
         WebView::builder()
             .related_view(opener)
             .settings(&self.settings)
-            .user_content_manager(&self.content)
+            .user_content_manager(&content)
             .hexpand(true)
             .vexpand(true)
             .build()

@@ -72,6 +72,9 @@ pub fn link(text: &str) -> Option<String> {
     ok_host.then_some(full)
 }
 
+/// How video formats are ranked: resolution, then frame rate, then HDR.
+pub const BEST: &str = "res,fps,hdr:12";
+
 /// How rippl names the file: the title (cut to 150 bytes) and the video's
 /// id, so two videos with one title don't land on the same name.
 pub const NAME: &str = "%(title).150B [%(id)s].%(ext)s";
@@ -107,9 +110,13 @@ pub fn args(url: &str, format: Format, dir: &Path, proxy: &Proxy, ffmpeg: bool) 
     a.push(dir.to_string_lossy().into_owned());
     a.push("--output".into());
     a.push(NAME.into());
+    // The highest resolution first, then the highest frame rate, then HDR;
+    // the rest is yt-dlp's own order (the better codec, then bitrate). The
+    // container never decides: a 1080p60 VP9 or AV1 stream beats a 1080p30
+    // H.264 one, and ffmpeg puts any of them in the .mp4.
     let fmt: &[&str] = match (format, ffmpeg) {
-        (Format::Video, true) => &["--format", "bv*+ba/b", "--format-sort", "res,ext:mp4:m4a", "--merge-output-format", "mp4"],
-        (Format::Video, false) => &["--format", "b"],
+        (Format::Video, true) => &["--format", "bv*+ba/b", "--format-sort", BEST, "--merge-output-format", "mp4"],
+        (Format::Video, false) => &["--format", "b", "--format-sort", BEST],
         (Format::Audio, true) => &["--format", "ba/b", "--extract-audio", "--audio-format", "mp3", "--audio-quality", "0"],
         (Format::Audio, false) => &["--format", "ba[ext=m4a]/ba/b"],
     };
@@ -264,6 +271,9 @@ mod tests {
         let has = |a: &[String], s: &str| a.iter().any(|x| x == s);
         let v = args("https://a.com", Format::Video, dir, &Proxy::System, true);
         assert!(has(&v, "--merge-output-format") && has(&v, "mp4") && has(&v, "bv*+ba/b"));
+        // Frame rate right after resolution; the container never ranks.
+        let sort = &v[v.iter().position(|x| x == "--format-sort").unwrap() + 1];
+        assert!(sort.starts_with("res,fps") && !sort.contains("ext"));
         let v = args("https://a.com", Format::Video, dir, &Proxy::System, false);
         assert!(!has(&v, "--merge-output-format") && has(&v, "b"));
         let a = args("https://a.com", Format::Audio, dir, &Proxy::System, true);

@@ -36,7 +36,7 @@ scripts/ctl.sh close 2
 scripts/ctl.sh sleep                # sleep every tab that may sleep, now
 scripts/ctl.sh shield               # list status, fetch age, allowed sites
 scripts/ctl.sh shield update        # fetch the lists again now
-scripts/ctl.sh shield toggle <host> # as Ctrl+Shift+B
+scripts/ctl.sh shield toggle <host> # as Ctrl+Shift+B: at once, says off/on
 scripts/ctl.sh type <text>          # as typed in the field: prints the field and its offers
 scripts/ctl.sh enter                # Return in the field
 scripts/ctl.sh history [n]          # recent history: visits, url, title
@@ -80,7 +80,8 @@ scripts/ctl.sh spaces               # id, name, tab count, * for the one on scre
 scripts/ctl.sh space new <name> | space <id> | space delete <id>
 scripts/ctl.sh move-to-space <tab index> <space id>
 scripts/ctl.sh group <tab index> <name>   # a new group; join <tab index> <group id>; fold <group id>
-scripts/ctl.sh groups
+scripts/ctl.sh groups                       # with site=<host> for a site group
+scripts/ctl.sh group-site <tab index>       # as Ctrl+Alt+G on that tab: Grouped / Ungrouped / Alone
 scripts/ctl.sh rows                 # what the column shows, as text
 ```
 

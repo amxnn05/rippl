@@ -37,6 +37,7 @@ development phase did.
 | Motion: springs, fades, slides, elastic page edges, reduced motion | done | [motion.md](phases/motion.md) |
 | Phase 9: shipping — logo, desktop entry, default browser, install script, packages, welcome | done | [phase-9-ship.md](phases/phase-9-ship.md) |
 | Phase 10: downloading videos with yt-dlp (Ctrl+Shift+Y) | done | [phase-10-grab.md](phases/phase-10-grab.md) |
+| Phase 11: polish — site groups (Ctrl+Alt+G), the best video, instant Shield per site, splits kept, a capped cache | done | [phase-11-polish.md](phases/phase-11-polish.md) |
 
 ## Keeping these docs current
 

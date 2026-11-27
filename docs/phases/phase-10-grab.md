@@ -16,7 +16,8 @@ opening a terminal: a shortcut, paste the link, Return.
   It opens holding the link on the clipboard if there is one, else the front page's address,
   selected, so on a video page it is `Ctrl+Shift+Y`, Return. `Esc`, a click on the dim, or the
   shortcut again closes it.
-- **Return** downloads `grab_format` (default: the best video with its sound, as `.mp4`);
+- **Return** downloads `grab_format` (default: the best video with its sound, as `.mp4`: the
+  highest resolution, then the highest frame rate, since [phase 11](phase-11-polish.md));
   **Shift+Return** the other (only the sound, as `.mp3`).
 - **The download** is listed at the foot of the column with the others (`app/src/downloads.rs`):
   the video's title once yt-dlp knows it, a progress bar, "12.0 MB of 40.0 MB · 1.5 MB/s · 20 s

@@ -68,9 +68,11 @@ impl Browser {
     /// Puts in the scripts the settings ask for, taking out the old ones.
     /// For pages loaded from now on.
     pub(crate) fn install_page_scripts(&self) {
-        let content = &self.engine.content;
+        let contents = self.engine.contents();
         for script in self.page_scripts.borrow_mut().drain(..) {
-            content.remove_script(&script);
+            for content in contents {
+                content.remove_script(&script);
+            }
         }
         let mut scripts = Vec::new();
         let config = self.config.borrow();
@@ -135,7 +137,9 @@ impl Browser {
             ));
         }
         for script in &scripts {
-            content.add_script(script);
+            for content in contents {
+                content.add_script(script);
+            }
         }
         *self.page_scripts.borrow_mut() = scripts;
     }
