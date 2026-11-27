@@ -86,23 +86,30 @@ window.rippl .tabs row.in-group { margin-left: 12px; }
 window.rippl .tabs row.group-head { min-height: 24px; color: var(--muted); font-size: 11.5px; font-weight: 600;
   padding: 6px 6px 0 8px; }
 window.rippl .tabs row.group-head:hover { background: transparent; color: var(--ink); }
-/* A site group (site_groups.rs): one row, as tall as a tab, a hairline
-   box of small tiles. */
-window.rippl .tabs row.stack { min-height: 28px; padding: 3px 4px; margin: 1px 0; border-radius: 9px;
+/* The field's loading line: a soft blue glow that fades out at both
+   ends, not a hard bar. */
+window.rippl entry.field > progress { margin: 0 12px; border: none; background: none; box-shadow: none; }
+window.rippl entry.field > progress > trough { min-height: 2px; border: none; background: none; box-shadow: none; }
+window.rippl entry.field > progress > trough > progress { min-height: 2px; border: none; border-radius: 2px;
+  background-color: transparent;
+  background-image: linear-gradient(to right, alpha(#4285f5, 0), alpha(#4285f5, 0.85) 35%, #8ab4ff 80%, alpha(#8ab4ff, 0));
+  box-shadow: 0 0 6px 1px alpha(#4285f5, 0.45), 0 0 14px 2px alpha(#4285f5, 0.18); }
+/* A site group (site_groups.rs): one row, as tall as a tab, with soft
+   tiles inside a hairline; the front tab's tile a shade stronger. */
+window.rippl .tabs row.stack { min-height: 30px; padding: 4px; margin: 2px 0; border-radius: 10px;
   background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); }
 window.rippl .tabs row.stack:hover { background: transparent; box-shadow: inset 0 0 0 1px var(--faint); }
-window.rippl .tabs row.stack.front { background: var(--tile); }
-window.rippl .tabs row.stack flowboxchild { padding: 0; min-width: 0; min-height: 0; background: transparent; }
-window.rippl .stack-tile { min-width: 26px; min-height: 20px; padding: 0; border-radius: 6px; border: none;
-  background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); color: var(--muted);
-  transition: background 140ms ease-out, box-shadow 140ms ease-out, opacity 140ms ease-out; }
-window.rippl .stack-tile:hover { background: var(--hover); box-shadow: inset 0 0 0 1px var(--faint); }
-window.rippl .stack-tile.front { min-width: 32px; background: var(--ground);
-  box-shadow: inset 0 0 0 1px var(--faint), 0 1px 2px rgba(0,0,0,0.06); color: var(--ink); }
-window.rippl .stack-tile.asleep { opacity: 0.55; }
+window.rippl .tabs row.stack.front { background: var(--hover); }
+window.rippl .stack-tile { border-radius: 7px; background: var(--tile); color: var(--muted);
+  transition: background 160ms ease-out, box-shadow 160ms ease-out, opacity 160ms ease-out; }
+window.rippl .stack-tile:hover { background: var(--wash); }
+window.rippl .stack-tile.front { background: var(--pin-live); color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--faint); }
+window.rippl .stack-tile.asleep { opacity: 0.6; }
 window.rippl .stack-tile.asleep:hover { opacity: 1; }
-window.rippl .stack-tile.split { box-shadow: inset 0 -2px 0 var(--accent), inset 0 0 0 1px var(--hairline); }
-window.rippl .stack-tile .mark { min-width: 13px; min-height: 13px; font-size: 9px; }
+window.rippl .stack-tile.split { box-shadow: inset 0 -2px 0 var(--accent); }
+window.rippl .stack-tile.front.split { box-shadow: inset 0 -2px 0 var(--accent), inset 0 0 0 1px var(--faint); }
+window.rippl .stack-tile .mark { min-width: 14px; min-height: 14px; font-size: 10px; font-weight: 600; background: transparent; }
 window.rippl .foot .space { min-width: 22px; min-height: 22px; padding: 0; border-radius: 6px; border: none;
   box-shadow: none; background: transparent; color: var(--faint); font-size: 11px; font-weight: 600; }
 window.rippl .foot .space:hover { color: var(--ink); background: var(--hover); }

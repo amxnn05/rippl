@@ -67,6 +67,24 @@ one row, and videos at their best quality and frame rate.
   end-to-end test (navigate a filtered tab into a site Shield is off for, check that
   `window.ga` loaded) caught it, and the check moved to the response decision.
 
+- **A click on a tile didn't switch tabs** (reported after the first push). The tiles were
+  `GtkButton`s in a `GtkFlowBox`, and both handle a click themselves, most likely before rippl's
+  own click handler (the one every tab row uses) could bring the tab to front. They are now plain boxes in plain
+  rows, with the same handler as a tab row. The control socket's `select` goes around the
+  pointer, which is why the tests passed.
+
+- **A new tab left the column without its field.** The field moves into the middle of a new tab
+ , and the column's top stood empty. A stand-in of the same look now holds
+  its place there while the field is away; a click or a key in it goes to the field.
+
+- **A page loading in another tab drew its loading line on a new tab's field.** The line was only
+  ever set by the front tab's page, never cleared when another tab came to front.
+  `Browser::show_progress` now sets it from the front tab whenever the front changes, and never on
+  a new tab. The line itself is now a soft blue glow that fades out at both ends, and it glides:
+  `ease_progress` moves it toward WebKit's latest value on the frame clock (the screen's rate),
+  frame-time based, so it doesn't jump in WebKit's few steps; a finished load sweeps to the end
+  before the line goes. `motion = reduced` sets it directly.
+
 ## Measurements
 
 This machine, debug build, local test server, scratch profile:

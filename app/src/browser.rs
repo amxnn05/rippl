@@ -60,6 +60,9 @@ pub struct Browser {
     pub(crate) window: gtk::ApplicationWindow,
     pub(crate) column: gtk::Box,
     pub(crate) field: gtk::Entry,
+    /// In the column's top while the field stands on a new tab (home.rs),
+    /// so the column never loses its field: a click or a key goes to it.
+    pub(crate) field_standin: gtk::Entry,
     pub(crate) list: gtk::ListBox,
     /// Pinned tabs, as letter squares above the list.
     pub(crate) pins: gtk::Grid,
@@ -122,6 +125,13 @@ pub struct Browser {
     /// "‹ Tabs" put them away for now.
     pub(crate) rail: crate::settings_rail::Rail,
     pub(crate) rail_away: Cell<bool>,
+    /// The field's loading line, eased frame by frame (`ease_progress`):
+    /// where it is drawn, where it is going, whether it is sweeping to
+    /// the end of a finished load, and the last frame's time.
+    progress_shown: Cell<f64>,
+    progress_target: Cell<f64>,
+    progress_finish: Cell<bool>,
+    progress_tick: Cell<Option<i64>>,
     /// Motion (motion.rs): the column's slide, tabs folding away as they
     /// close, each tab's row (for that), and the tabs already shown once.
     pub(crate) column_slide: gtk::Revealer,
@@ -253,6 +263,9 @@ impl Browser {
         column.set_size_request(232, -1);
         column.set_hexpand(false);
         column.append(&field);
+        let field_standin = gtk::Entry::builder().placeholder_text("Search or enter address").visible(false).build();
+        field_standin.add_css_class("field");
+        column.append(&field_standin);
         column.append(&suggest_area);
         column.append(&tabs_area);
         column.append(&downloads.area);
@@ -405,6 +418,7 @@ impl Browser {
             window,
             column,
             field,
+            field_standin,
             list,
             pins,
             new_tab,
@@ -437,6 +451,10 @@ impl Browser {
             switcher,
             rail,
             rail_away: Cell::new(false),
+            progress_shown: Cell::new(0.0),
+            progress_target: Cell::new(0.0),
+            progress_finish: Cell::new(false),
+            progress_tick: Cell::new(None),
             column_slide,
             closing: RefCell::new(HashSet::new()),
             row_of: RefCell::new(HashMap::new()),
@@ -943,8 +961,7 @@ impl Browser {
         view.connect_estimated_load_progress_notify(move |v| {
             let Some(b) = weak.upgrade().filter(|b| b.ours(id, v)) else { return };
             if b.front() == Some(id) {
-                let p = v.estimated_load_progress();
-                b.field.set_progress_fraction(if p >= 1.0 || !v.is_loading() { 0.0 } else { p });
+                b.ease_progress();
             }
         });
 
@@ -969,7 +986,7 @@ impl Browser {
                 _ => return,
             }
             if b.front() == Some(id) {
-                b.field.set_progress_fraction(0.0);
+                b.ease_progress();
             }
             b.signin_page_loaded(id, v);
             b.dusk(id, v);
@@ -1225,7 +1242,75 @@ impl Browser {
     // ---- the column ---------------------------------------------------
 
     /// The field and the window title follow the tab in front.
+    /// The field's loading line: the front tab's page, while it loads.
+    /// Never on a new tab's field, nor left over from another tab. Another
+    /// tab came to front: the line is put where that page is, at once.
+    pub(crate) fn show_progress(&self) {
+        let p = self.front_progress();
+        self.progress_finish.set(false);
+        self.progress_target.set(p);
+        self.progress_shown.set(p);
+        self.field.set_progress_fraction(p);
+    }
+
+    fn front_progress(&self) -> f64 {
+        match self.front_view() {
+            Some(v) if v.is_loading() && !self.field_at_home() => v.estimated_load_progress().min(0.999),
+            _ => 0.0,
+        }
+    }
+
+    /// The front page's load moved on: the line glides there on the frame
+    /// clock (the screen's rate), rather than jumping in WebKit's few
+    /// steps. A finished load sweeps to the end, then the line goes.
+    pub(crate) fn ease_progress(&self) {
+        let p = self.front_progress();
+        let finishing = p == 0.0 && self.progress_shown.get() > 0.0 && !self.field_at_home();
+        self.progress_finish.set(finishing);
+        self.progress_target.set(if finishing { 1.0 } else { p });
+        // A new load starts from the left at once.
+        if p > 0.0 && p < self.progress_shown.get() {
+            self.progress_shown.set(p * 0.5);
+        }
+        if self.progress_tick.get().is_some() || !self.config.borrow().motion_full {
+            if !self.config.borrow().motion_full {
+                self.show_progress();
+            }
+            return;
+        }
+        self.progress_tick.set(Some(0));
+        let weak = self.weak();
+        self.field.add_tick_callback(move |field, clock| {
+            let Some(b) = weak.upgrade() else { return glib::ControlFlow::Break };
+            let now = clock.frame_time();
+            let last = b.progress_tick.get().filter(|t| *t > 0).unwrap_or(now - 16_667);
+            b.progress_tick.set(Some(now));
+            let dt = ((now - last) as f64 / 1e6).clamp(0.0, 0.1);
+            let (shown, target) = (b.progress_shown.get(), b.progress_target.get());
+            // Quick to follow, softer at the end of a sweep.
+            let rate = if b.progress_finish.get() { 9.0 } else { 6.0 };
+            let mut next = shown + (target - shown) * (1.0 - (-rate * dt).exp());
+            let settled = (target - next).abs() < 0.003;
+            if settled {
+                next = target;
+            }
+            if settled && b.progress_finish.get() {
+                next = 0.0;
+                b.progress_finish.set(false);
+                b.progress_target.set(0.0);
+            }
+            b.progress_shown.set(next);
+            field.set_progress_fraction(next);
+            if settled {
+                b.progress_tick.set(None);
+                return glib::ControlFlow::Break;
+            }
+            glib::ControlFlow::Continue
+        });
+    }
+
     pub(crate) fn show_front(&self) {
+        self.show_progress();
         let (url, title) = {
             let tabs = self.tabs.borrow();
             match tabs.front.and_then(|f| tabs.get(f)) {

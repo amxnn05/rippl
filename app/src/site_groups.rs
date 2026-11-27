@@ -37,22 +37,18 @@ impl Browser {
         if holds_front {
             row.add_css_class("front");
         }
-        let tiles = gtk::FlowBox::builder()
-            .selection_mode(gtk::SelectionMode::None)
-            .homogeneous(false)
-            .column_spacing(4)
-            .row_spacing(4)
-            .min_children_per_line(1)
-            .max_children_per_line(12)
-            .activate_on_single_click(false)
-            .build();
-        tiles.set_focusable(false);
-        for tab in members {
-            let tile = self.stack_tile(tab, Some(tab.id) == front);
-            tiles.append(&tile);
-            if let Some(child) = tile.parent() {
-                child.set_focusable(false);
+        // Plain boxes, a line of tiles at a time: a FlowBox or a Button
+        // handles the click itself, and the tab never came to front.
+        let across = if self.config.borrow().icon_column { 1 } else { 6 };
+        let tiles = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        tiles.set_valign(gtk::Align::Center);
+        for line in members.chunks(across) {
+            let strip = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+            strip.set_valign(gtk::Align::Center);
+            for tab in line {
+                strip.append(&self.stack_tile(tab, Some(tab.id) == front));
             }
+            tiles.append(&strip);
         }
         row.set_child(Some(&tiles));
         let site = group.site.clone().unwrap_or_default();
@@ -66,7 +62,14 @@ impl Browser {
             let Some(b) = weak.upgrade() else { return };
             let Some(w) = gesture.widget() else { return };
             let on_tile = w.pick(x, y, gtk::PickFlags::DEFAULT).is_some_and(|p| {
-                p.has_css_class("stack-tile") || p.ancestor(gtk::Button::static_type()).is_some_and(|a| a.has_css_class("stack-tile"))
+                let mut at = Some(p);
+                while let Some(x) = at {
+                    if x.has_css_class("stack-tile") {
+                        return true;
+                    }
+                    at = x.parent();
+                }
+                false
             });
             if !on_tile {
                 glib::idle_add_local_once(move || b.group_menu(gid, &w));
@@ -78,17 +81,20 @@ impl Browser {
 
     /// One tab in a site group: its icon (or letter), the loading ring
     /// while it loads, its title as a tooltip.
-    fn stack_tile(&self, tab: &Tab, live: bool) -> gtk::Button {
-        let tile = gtk::Button::new();
+    fn stack_tile(&self, tab: &Tab, live: bool) -> gtk::CenterBox {
+        let tile = gtk::CenterBox::new();
         tile.add_css_class("stack-tile");
-        tile.set_focusable(false);
+        tile.set_cursor_from_name(Some("pointer"));
+        // Sized here, not in CSS: every tile the same, the front one wider.
+        tile.set_size_request(if live { 38 } else { 30 }, 22);
+        tile.set_valign(gtk::Align::Center);
         let face: gtk::Widget = if tab.loading && tab.life == Life::Awake {
             crate::loader::ring(12).upcast()
         } else {
             match self.icon_for(tab.id, &tab.url).filter(|_| !tab.private) {
                 Some(icon) => {
                     let image = gtk::Image::from_paintable(Some(&icon));
-                    image.set_pixel_size(14);
+                    image.set_pixel_size(13);
                     image.upcast()
                 }
                 None => {
@@ -98,7 +104,10 @@ impl Browser {
                 }
             }
         };
-        tile.set_child(Some(&face));
+        face.set_hexpand(false);
+        face.set_halign(gtk::Align::Center);
+        face.set_valign(gtk::Align::Center);
+        tile.set_center_widget(Some(&face));
         tile.set_tooltip_text(Some(&format!("{}\n{}", tab.title, tab.url)));
         if live {
             tile.add_css_class("front");

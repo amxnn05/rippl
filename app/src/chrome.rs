@@ -104,7 +104,7 @@ impl Browser {
     }
 
     /// Whether the field lives in the strip above the page.
-    fn field_on_top(&self) -> bool {
+    pub(crate) fn field_on_top(&self) -> bool {
         let c = self.config.borrow();
         c.top_tabs || c.icon_column
     }

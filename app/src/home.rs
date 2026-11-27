@@ -11,7 +11,9 @@
 //!
 //! It is the same field as the column's, moved: whatever it does there
 //! (offers, keywords, Tab to search a site) it does here. With a page in
-//! front it goes back to the top of the column.
+//! front it goes back to the top of the column. Meanwhile a stand-in of
+//! the same look holds its place there, so the column never loses its
+//! field; clicking it is clicking the field.
 //!
 //! it breathes a faint glow under the field; rippl doesn't, as an
 //! animation that never stops costs a frame clock on an idle window.
@@ -103,6 +105,18 @@ impl Browser {
             b.at_home(home);
         });
         self.at_home(self.stage.visible_child().is_some_and(|c| c == *self.blank.upcast_ref::<gtk::Widget>()));
+
+        // The column's stand-in hands the keyboard to the field at once,
+        // so typing there types in it.
+        let focus = gtk::EventControllerFocus::new();
+        let weak = self.weak();
+        focus.connect_enter(move |_| {
+            let Some(b) = weak.upgrade() else { return };
+            glib::idle_add_local_once(move || {
+                b.field.grab_focus();
+            });
+        });
+        self.field_standin.add_controller(focus);
     }
 
     /// Puts the field (and its offers) in the middle of the blank page, or
@@ -115,6 +129,9 @@ impl Browser {
             return;
         }
         self.home_mode.set(home);
+        self.show_progress();
+        // The column keeps a field at its top either way.
+        self.field_standin.set_visible(home && !self.field_on_top());
         let focused = self.field.has_focus();
         self.field.unparent();
         self.suggest_area.unparent();
