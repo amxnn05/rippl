@@ -33,6 +33,12 @@ pub(crate) fn parse(value: &str) -> Result<Vec<String>, String> {
 
 /// "zoom-in" → "Zoom in".
 fn label(name: &str) -> String {
+    // Commands whose own names say too little.
+    match name {
+        "grab" => return "Download a video (paste its link, Return)".into(),
+        "group-site" => return "Group this site's tabs into one row".into(),
+        _ => {}
+    }
     let words = name.replace('-', " ");
     let mut c = words.chars();
     c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
@@ -90,7 +96,7 @@ impl Browser {
     pub(crate) fn shortcut_rows(&self) -> Vec<Setting> {
         let app = self.window.application();
         let mut known = self.known_actions.borrow().clone();
-        known.sort();
+        known.sort_by_key(|(n, _)| label(n));
         known
             .into_iter()
             .map(|(name, own)| {
