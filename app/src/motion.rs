@@ -59,6 +59,8 @@ window.rippl .status.enter { animation: rippl-fade 140ms ease-out; }
 
 /* Peek and the switcher: the dim fades, the panel glides up. */
 window.rippl .peek-dim.enter, window.rippl .switcher-dim.enter { animation: rippl-fade 200ms ease-out; }
+window.rippl .grab-dim.enter { animation: rippl-fade 160ms ease-out; }
+window.rippl .grab-dim.enter .grab-box { animation: rippl-pop 260ms cubic-bezier(0.2, 1.25, 0.4, 1); }
 window.rippl .peek-dim.enter .peek-panel { animation: rippl-pop 340ms cubic-bezier(0.2, 1.25, 0.4, 1); }
 window.rippl .switcher-dim.enter .switcher { animation: rippl-pop 280ms cubic-bezier(0.2, 1.3, 0.4, 1); }
 window.rippl .switch-card { transition: background-color 140ms ease-out, transform 200ms cubic-bezier(0.2, 1.3, 0.4, 1); }
@@ -103,6 +105,7 @@ impl Browser {
         enters(&self.peek_dim);
         enters(&self.switcher.layer);
         enters(&self.find_bar);
+        enters(&self.grab_bar);
         enters(&self.ask_bar);
         enters(&self.save_bar);
         enters(&self.popup_bar);

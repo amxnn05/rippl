@@ -36,7 +36,7 @@ development phase did.
 | Feature batch 6: Settings, the AI add-on, Translate page, agents over MCP | done | [batch-6.md](phases/batch-6.md) |
 | Motion: springs, fades, slides, elastic page edges, reduced motion | done | [motion.md](phases/motion.md) |
 | Phase 9: shipping — logo, desktop entry, default browser, install script, packages, welcome | done | [phase-9-ship.md](phases/phase-9-ship.md) |
-| 9. Ship: desktop entry, default browser, packages | planned | [roadmap.md](roadmap.md) |
+| Phase 10: downloading videos with yt-dlp (Ctrl+Shift+Y) | done | [phase-10-grab.md](phases/phase-10-grab.md) |
 
 ## Keeping these docs current
 

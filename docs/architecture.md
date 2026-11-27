@@ -50,6 +50,7 @@ crates/rippl-core/        no GTK, no WebKit: everything here runs under `cargo t
   src/sync.rs             folder sync: items, stamps, tombstones, the merge
   src/ai.rs               the AI add-on's requests and answers (OpenAI-style), translations
   src/clean.rs            click IDs and campaign tags off addresses
+  src/ytdlp.rs            video downloads: which text is a link, yt-dlp's arguments, its progress lines
   examples/shield_convert.rs   runs the converter on a list file, for inspection
 
 app/src/
@@ -63,7 +64,9 @@ app/src/
   omnibox.rs              the field while typing: offers, completion, ↑↓
   find.rs                 find-in-page bar (Ctrl+F)
   permissions.rs          the permission question bar and its rules
-  downloads.rs            the downloads list at the foot of the column; pause, resume (Range)
+  downloads.rs            the downloads list at the foot of the column; pause, resume (Range);
+                          yt-dlp's video downloads, run as a child process that ends with rippl
+  grab.rs                 Ctrl+Shift+Y: the new tab's field over the page, for a video link
   reader.rs               reading mode: extractor (isolated world) + reader page
   curtain.rs              hide elements: picker, per-site user style sheets
   internal_pages.rs       serves rippl://history|bookmarks|passwords|settings, token-checked buttons

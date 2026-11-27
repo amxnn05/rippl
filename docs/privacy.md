@@ -12,6 +12,7 @@ you is collected, because there is nowhere for it to go.
 | Files you download | When you download them | Saved in your Downloads folder; the request goes to the site |
 | Filter-list downloads | First launch, then when older than 4 days (checked every 6 hours) | `easylist.to` (EasyList, EasyPrivacy) and `ublockorigin.github.io` (uBlock Origin's lists, with the files they include): plain GETs with user agent `rippl`, no cookies. `ublock = off` drops the second |
 | Site icons | When a page names its icon | The site itself, as part of loading it |
+| A video you download with Ctrl+Shift+Y | Only when you press Return in that bar (`grab = off` turns the bar off) | The video's site and the servers it streams from, asked by **yt-dlp** (run by rippl, with yt-dlp's own user agent). It gets the link and nothing of rippl's: no cookies, no history; its config files are ignored, it doesn't update itself, and the `proxy` setting applies to it |
 | YouTube's ad reports | Never | Answered in the page with an empty 200 before they leave: blocked, and not seen as failing |
 | Anything else | Never | — |
 

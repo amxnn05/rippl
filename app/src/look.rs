@@ -127,6 +127,11 @@ window.rippl .home-offers { background: var(--ground); border-radius: 14px; padd
   box-shadow: 0 0 0 1px var(--hairline), 0 6px 20px rgba(0,0,0,0.07); }
 window.rippl .home-offers row { padding: 9px 12px; font-size: 13px; }
 window.rippl .home-grid { margin-top: 2px; }
+/* Ctrl+Shift+Y (grab.rs): the new tab's field over a light dim, a card under it. */
+window.rippl .grab-dim { background: rgba(0,0,0,0.12); }
+window.rippl .grab-note { padding: 10px 14px; }
+window.rippl .grab-note label { color: var(--muted); font-size: 12.5px; }
+window.rippl .grab-note label.grab-error { color: #b45309; }
 window.rippl .home-grid > flowboxchild { padding: 0; }
 window.rippl .home-tile { min-height: 50px; padding: 0 10px; border-radius: 14px; background: transparent;
   box-shadow: inset 0 0 0 1px var(--hairline); border: none; color: var(--muted); font-size: 12px; }

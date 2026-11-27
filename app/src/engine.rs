@@ -87,6 +87,11 @@ fn apply_proxy(session: &NetworkSession) {
     });
 }
 
+/// The proxy setting itself, for programs rippl runs (yt-dlp, grab.rs).
+pub fn proxy_setting() -> rippl_core::address::Proxy {
+    PROXY.with(|p| p.borrow().clone())
+}
+
 /// The proxy for rippl's own requests (filter lists, suggestions): the
 /// same as the pages', or a page's sites could be read through them.
 pub fn proxy_resolver() -> Option<webkit6::gio::ProxyResolver> {

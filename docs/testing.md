@@ -47,6 +47,12 @@ scripts/ctl.sh permissions          # saved answers and questions waiting
 scripts/ctl.sh permissions answer allow|deny
 scripts/ctl.sh permissions forget [host]
 scripts/ctl.sh download <url>       # `downloads` lists them
+scripts/ctl.sh grab <url> [video|audio]  # a video through yt-dlp, as Return in Ctrl+Shift+Y's bar
+scripts/ctl.sh grab-bar             # open that bar; again: what it holds, and its note
+scripts/ctl.sh download-pause <n>   # the nth download's pause / resume (as `downloads` lists them)
+scripts/ctl.sh download-remove <n>  # the nth yt-dlp download's ×: cancel and clean up, or take off the list
+scripts/ctl.sh window-shot <file.png>  # the whole window as drawn now: check UI without touching the desktop
+scripts/ctl.sh quit                 # end rippl, as closing its last window would
 scripts/ctl.sh pin                  # pin/unpin the front tab
 scripts/ctl.sh reader               # reading mode on/off
 scripts/ctl.sh pick                 # start the hide picker
@@ -102,6 +108,15 @@ scratch folder that contains fake profiles (`.config/google-chrome/Default/Bookm
 
 To keep downloads out of your real `~/Downloads`, put
 `XDG_DOWNLOAD_DIR="/some/scratch/dir"` in `$XDG_CONFIG_HOME/user-dirs.dirs` of the scratch profile.
+
+To test video downloads without the internet, make a clip with ffmpeg
+(`ffmpeg -f lavfi -i testsrc=size=320x240:rate=25 -f lavfi -i sine -t 6 -c:v libx264 -pix_fmt yuv420p
+-c:a aac -shortest clip.mp4`), put it in a page as `<video src="clip.mp4">`, serve the folder with
+`python3 -m http.server`, and `grab` the page's or the clip's address: yt-dlp's generic extractor
+takes both. To see pause and resume, serve a bigger file through a server that sends slowly and
+answers `Range` (phase 10's notes describe the one used). Test with a profile of its own
+(`--profile grabtest`, `RIPPL_PROFILE=grabtest scripts/ctl.sh …`) so a rippl you have open is
+never touched, and end it with `quit`.
 
 To test permission prompts, serve a page from `python3 -m http.server` that calls
 `navigator.geolocation.getCurrentPosition(...)` and writes the result into `document.title`. Then

@@ -144,6 +144,10 @@ pub struct Browser {
     pub(crate) find_bar: gtk::Box,
     pub(crate) find_entry: gtk::Entry,
     pub(crate) find_count: gtk::Label,
+    // Downloading a video with yt-dlp (grab.rs).
+    pub(crate) grab_bar: gtk::Box,
+    pub(crate) grab_entry: gtk::Entry,
+    pub(crate) grab_note: gtk::Label,
     /// Where the link under the pointer goes, at the foot of the page.
     pub(crate) status: gtk::Label,
     pub(crate) found: Cell<u32>,
@@ -284,9 +288,11 @@ impl Browser {
 
         // The find bar and the permission question float over the page.
         let (find_bar, find_entry, find_count) = Browser::find_bar();
+        let (grab_bar, grab_entry, grab_note) = Browser::grab_bar();
         let (ask_bar, ask_label, ask_deny, ask_allow) = Browser::permission_bar();
         let overlay = gtk::Overlay::builder().child(&stage).hexpand(true).vexpand(true).build();
         overlay.add_overlay(&find_bar);
+        overlay.add_overlay(&grab_bar);
         overlay.add_overlay(&ask_bar);
         let (save_bar, save_label, save_never, save_later, save_yes) = Browser::save_bar();
         overlay.add_overlay(&save_bar);
@@ -454,6 +460,9 @@ impl Browser {
             find_bar,
             find_entry,
             find_count,
+            grab_bar,
+            grab_entry,
+            grab_note,
             status,
             found: Cell::new(0),
             ask_bar,
@@ -500,6 +509,7 @@ impl Browser {
         browser.wire_look();
         browser.wire_omnibox();
         browser.wire_find();
+        browser.wire_grab();
         browser.wire_permission_bar();
         browser.wire_internal_pages();
         browser.wire_curtain();
@@ -1328,6 +1338,54 @@ impl Browser {
                 _ => "error: permissions [forget [host] | answer allow|deny]".into(),
             },
             "downloads" => self.downloads.status(),
+            // grab <url> [video|audio]: download a video with yt-dlp, as Return in Ctrl+Shift+Y's bar.
+            "grab" => {
+                let (url, kind) = rest.trim().rsplit_once(' ').filter(|(_, k)| matches!(*k, "video" | "audio")).unwrap_or((rest.trim(), ""));
+                let format = rippl_core::ytdlp::Format::from_key(kind).unwrap_or(self.config.borrow().grab_format);
+                match self.grab_link(url, format) {
+                    Ok(url) => format!("ok {url}"),
+                    Err(e) => format!("error: {e}"),
+                }
+            }
+            // quit: end rippl as closing its last window would (for tests: nothing kills it).
+            "quit" => {
+                if let Some(app) = self.window.application() {
+                    glib::idle_add_local_once(move || app.quit());
+                }
+                "ok".into()
+            }
+            // window-shot <file.png>: the whole window as it is drawn now, for checking UI.
+            "window-shot" => {
+                use gtk::graphene;
+                let path = rest.trim();
+                let (w, h) = (self.window.width() as f32, self.window.height() as f32);
+                let paintable = gtk::WidgetPaintable::new(Some(&self.window));
+                let snap = gtk::Snapshot::new();
+                paintable.snapshot(&snap, w as f64, h as f64);
+                let bounds = graphene::Rect::new(0.0, 0.0, w, h);
+                let texture = snap.to_node().zip(self.window.native().and_then(|n| n.renderer())).map(|(node, r)| {
+                    r.render_texture(node, Some(&bounds))
+                });
+                match texture.map(|t| t.save_to_png(path)) {
+                    Some(Ok(())) => format!("ok {w}x{h}"),
+                    Some(Err(e)) => format!("error: {e}"),
+                    None => "error: nothing drawn yet".into(),
+                }
+            }
+            // grab-bar: open Ctrl+Shift+Y's bar; then "grab-bar" again says what it holds.
+            "grab-bar" => {
+                if self.grab_bar.is_visible() {
+                    format!("{}\t{}", self.grab_entry.text(), self.grab_note.text())
+                } else {
+                    self.open_grab();
+                    "ok".into()
+                }
+            }
+            // download-remove <n>: the nth download's ×.
+            "download-remove" => {
+                self.downloads.press_close(rest.trim().parse::<usize>().unwrap_or(1).saturating_sub(1));
+                "ok".into()
+            }
             // download-pause <n>: the nth download's pause / resume button.
             "download-pause" => {
                 self.downloads.press_pause(rest.trim().parse::<usize>().unwrap_or(1).saturating_sub(1));
@@ -1979,6 +2037,14 @@ impl Browser {
         self.action(app, "save-archive", &["<Ctrl><Alt>a"], |b| b.save_archive());
         self.action(app, "copy-address", &["<Ctrl><Shift>c"], |b| b.copy_address());
         self.action(app, "paste-go", &["<Ctrl><Shift>v"], |b| b.paste_and_go());
+        // A video to Downloads through yt-dlp (grab.rs).
+        self.action(app, "grab", &["<Ctrl><Shift>y"], |b| {
+            if b.grab_bar.is_visible() {
+                b.close_grab();
+            } else {
+                b.open_grab();
+            }
+        });
         // Ctrl+K: the field, where typing finds open tabs.
         self.action(app, "switch-tab", &["<Ctrl>k"], |b| {
             b.field.grab_focus();

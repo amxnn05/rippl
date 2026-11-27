@@ -45,6 +45,14 @@ player = off
 # Space and arrow keys on a video with the browser's own controls (off, default)
 video_keys = off
 
+# Ctrl+Shift+Y: paste a video link, Return downloads it with yt-dlp (on, default).
+# yt-dlp must be installed (pacman -S yt-dlp); ffmpeg too, to merge video and sound or make .mp3.
+grab = on
+
+# What Return downloads there: video (the best, as .mp4; default) or audio (as .mp3).
+# Shift+Return downloads the other one.
+grab_format = video
+
 # Darken pages that have no dark look of their own, in the dark theme (off, default)
 dusk = off
 
@@ -194,6 +202,7 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 | `Alt+←` / `Alt+→` | Back / forward |
 | `Ctrl+R`, `F5` / `Ctrl+Shift+R` | Reload / reload without the cache |
 | `Ctrl+Shift+B` | Shield off (or on) for this site |
+| `Ctrl+Shift+Y` | Download a video: paste its link (the clipboard's, or the page's, is already there), `Return` for video, `Shift+Return` for audio only, `Esc` to close. `shortcut.grab` moves it |
 | `Ctrl+D`, click the ☆ in the field | Bookmark the page, or remove the bookmark |
 | Focus the field with nothing typed | Bookmarks, then recent pages |
 | `Ctrl+H` | `rippl://history`: search, forget, clear |

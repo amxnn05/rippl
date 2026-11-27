@@ -13,6 +13,7 @@
 | 8 | Same-site tabs share a page process, the look (`look.rs`), reopen closed tab, clean copy, paste and go, click IDs stripped, keywords, link status line, the features map | ✅ done, [notes](phases/phase-8-look.md) |
 | Feature batches | Batches 1–6 in [features.md](features.md): every features that can exist on Linux | batches 1–3 ✅ ([1](phases/batch-1.md), [2](phases/batch-2.md), [3](phases/batch-3.md)); batch 4 ✅ ([notes](phases/batch-4.md)), 5 ✅ ([notes](phases/batch-5.md)), 6 ✅ ([notes](phases/batch-6.md)); Phase 9 ✅ |
 | 9 | **Ship**: logo, `.desktop` file, AppStream, default browser, links from other apps, install script, Arch `PKGBUILD`, Flatpak, welcome | ✅ done, [notes](phases/phase-9-ship.md) |
+| 10 | **Videos**: Ctrl+Shift+Y, paste a link, Return: yt-dlp downloads it (video or audio) into the downloads list, with pause, resume and cancel | ✅ done, [notes](phases/phase-10-grab.md) |
 | Polish | instant per-site Shield toggle, split pairs in the session, capped HTTP cache | planned |
 
 ## Ideas to measure later

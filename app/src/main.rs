@@ -15,6 +15,7 @@ mod desktop;
 mod downloads;
 mod engine;
 mod find;
+mod grab;
 mod internal_pages;
 mod keyring;
 mod mcp;

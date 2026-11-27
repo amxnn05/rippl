@@ -23,6 +23,7 @@ use crate::browser::Browser;
 
 glib::wrapper! {
     /// Places the home box: at most 560 wide, centred, its field lifted.
+    /// Ctrl+Shift+Y's bar (grab.rs) is placed by it too.
     pub struct HomeLayout(ObjectSubclass<imp::HomeLayout>) @extends gtk::LayoutManager;
 }
 

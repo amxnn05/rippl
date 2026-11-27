@@ -46,6 +46,10 @@ remember your answer per site, and light/dark mode. Pinned tabs, a reading mode 
 anything on a page hidden for good with one click, and history, bookmarks and settings as pages of
 their own. Bookmarks come over from Chrome, Brave, Edge, Vivaldi, Firefox, LibreWolf or Zen.
 
+Videos: `Ctrl+Shift+Y`, paste a link from YouTube, Vimeo or any site yt-dlp knows, and Return. It
+comes down through [yt-dlp](https://github.com/yt-dlp/yt-dlp) (installed separately) as `.mp4`, or
+as `.mp3` with `Shift+Return`, into the downloads list with pause, resume and cancel.
+
 Passwords live in your system keyring (GNOME Keyring), never in rippl's files. rippl offers to save
 a sign-in only once it has worked, offers saved accounts under the box when you click it (on that
 exact site only), and never fills anything on its own.
