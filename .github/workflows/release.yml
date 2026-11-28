@@ -1,0 +1,144 @@
+# Builds rippl for macOS (one app for Apple silicon and Intel), Windows
+# (an installer) and Linux (a Flatpak), tries each once, and on a v* tag
+# publishes them as a GitHub release. The install script on the website
+# (rippl-website: public/install.sh) downloads from the latest release.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+    branches: ["release-*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - name: Build (Apple silicon and Intel)
+        run: |
+          cargo build --release --locked -p rippl-desktop --target aarch64-apple-darwin
+          cargo build --release --locked -p rippl-desktop --target x86_64-apple-darwin
+      - name: Make rippl.app
+        run: |
+          VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          APP=dist/rippl.app
+          mkdir -p $APP/Contents/MacOS $APP/Contents/Resources
+          lipo -create -output $APP/Contents/MacOS/rippl \
+            target/aarch64-apple-darwin/release/rippl-desktop target/x86_64-apple-darwin/release/rippl-desktop
+          sed "s/__VERSION__/$VERSION/g" packaging/macos/Info.plist > $APP/Contents/Info.plist
+          ICONSET=dist/rippl.iconset; mkdir -p $ICONSET
+          for s in 16 32 128 256 512; do
+            sips -z $s $s data/icons/hicolor/512x512/apps/dev.rippl.Rippl.png --out $ICONSET/icon_${s}x${s}.png >/dev/null
+            d=$((s*2)); sips -z $d $d data/icons/hicolor/512x512/apps/dev.rippl.Rippl.png --out $ICONSET/icon_${s}x${s}@2x.png >/dev/null
+          done
+          iconutil -c icns $ICONSET -o $APP/Contents/Resources/rippl.icns
+          codesign --force --deep --sign - $APP
+          cd dist && tar -czf rippl-macos-universal.tar.gz rippl.app
+          hdiutil create -volname rippl -srcfolder rippl.app -ov -format UDZO rippl-macos-universal.dmg
+      - name: Try it
+        run: |
+          RIPPL_CONTROL=7788 dist/rippl.app/Contents/MacOS/rippl https://example.com > dist/try.log 2>&1 &
+          sleep 15
+          exec 3<>/dev/tcp/127.0.0.1/7788; echo tabs >&3; read -t 10 line <&3; echo "$line"
+          echo "$line" | grep -q example.com
+          exec 3<>/dev/tcp/127.0.0.1/7788; echo "cmd settings" >&3; read -t 10 line <&3; sleep 4
+          screencapture -x dist/macos-settings.png || true
+          exec 3<>/dev/tcp/127.0.0.1/7788; echo "tabs" >&3; read -t 10 line <&3; echo "$line"
+          echo "$line" | grep -q '"title":"Settings"'
+          exec 3<>/dev/tcp/127.0.0.1/7788; echo quit >&3 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos
+          path: |
+            dist/rippl-macos-universal.tar.gz
+            dist/rippl-macos-universal.dmg
+            dist/*.png
+            dist/try.log
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --locked -p rippl-desktop
+      - name: Make the installer
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"').Matches[0].Groups[1].Value
+          New-Item -ItemType Directory -Force dist/stage | Out-Null
+          Copy-Item target/release/rippl-desktop.exe dist/stage/rippl.exe
+          choco install innosetup --no-progress -y | Out-Null
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DVersion=$version" "/DSource=..\..\dist\stage" packaging\windows\rippl.iss
+          Compress-Archive -Path dist/stage/rippl.exe -DestinationPath dist/rippl-windows-x64-portable.zip
+      - name: Try it
+        shell: bash
+        run: |
+          RIPPL_CONTROL=7788 dist/stage/rippl.exe https://example.com > dist/try.log 2>&1 &
+          sleep 20
+          exec 3<>/dev/tcp/127.0.0.1/7788; echo tabs >&3; read -t 10 line <&3; echo "$line"
+          echo "$line" | grep -q example.com
+          exec 3<>/dev/tcp/127.0.0.1/7788; echo "cmd settings" >&3; read -t 10 line <&3; sleep 5
+          powershell -Command "Add-Type -AssemblyName System.Windows.Forms,System.Drawing; \$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; \$i=New-Object System.Drawing.Bitmap \$b.Width,\$b.Height; \$g=[System.Drawing.Graphics]::FromImage(\$i); \$g.CopyFromScreen(\$b.Location,[System.Drawing.Point]::Empty,\$b.Size); \$i.Save('dist/windows-settings.png')" || true
+          exec 3<>/dev/tcp/127.0.0.1/7788; echo "tabs" >&3; read -t 10 line <&3; echo "$line"
+          echo "$line" | grep -q '"title":"Settings"'
+          exec 3<>/dev/tcp/127.0.0.1/7788; echo quit >&3 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows
+          path: |
+            dist/rippl-windows-x64-setup.exe
+            dist/rippl-windows-x64-portable.zip
+            dist/*.png
+            dist/try.log
+
+  linux:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Crates for the offline build
+        run: |
+          pip install --break-system-packages aiohttp toml tomlkit 2>/dev/null || pip install aiohttp toml tomlkit
+          curl -sSLo /tmp/flatpak-cargo-generator.py https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/cargo/flatpak-cargo-generator.py
+          python3 /tmp/flatpak-cargo-generator.py Cargo.lock -o packaging/flatpak/cargo-sources.json
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: rippl-linux-x86_64.flatpak
+          manifest-path: packaging/flatpak/dev.rippl.Rippl.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -R out
+          gh release create "$GITHUB_REF_NAME" --title "rippl ${GITHUB_REF_NAME#v}" --notes-file packaging/release-notes.md \
+            out/macos/rippl-macos-universal.tar.gz out/macos/rippl-macos-universal.dmg \
+            out/windows/rippl-windows-x64-setup.exe out/windows/rippl-windows-x64-portable.zip \
+            out/rippl-linux-x86_64-x86_64/rippl-linux-x86_64.flatpak

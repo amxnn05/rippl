@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<title>rippl</title>
+<link rel="stylesheet" href="chrome.css">
+</head>
+<body>
+<div id="app">
+  <aside id="column">
+    <div id="drag-top"></div>
+    <div id="field-row">
+      <div id="field" class="field">
+        <span id="shield-off" class="field-sign" title="Shield is off for this site" hidden>◌</span>
+        <input id="address" spellcheck="false" autocomplete="off" placeholder="Search or type an address">
+        <button id="star" class="field-knob" title="Bookmark">☆</button>
+        <div id="progress"><div id="progress-line"></div></div>
+      </div>
+      <div id="offers" class="offers" hidden></div>
+    </div>
+    <div id="nav-row">
+      <button id="back" class="knob" title="Back">‹</button>
+      <button id="forward" class="knob" title="Forward">›</button>
+      <button id="reload" class="knob" title="Reload">↻</button>
+      <span class="grow"></span>
+      <button id="site-card" class="knob" title="This site">ⓘ</button>
+    </div>
+    <div id="pins"></div>
+    <div id="tabs" class="tabs"></div>
+    <button id="new-tab" class="new-tab">+ New tab</button>
+    <div class="grow"></div>
+    <div id="player" class="player" hidden></div>
+    <div id="downloads" class="downloads" hidden>
+      <div class="heading" title="All downloads">Downloads</div>
+      <div id="download-list"></div>
+    </div>
+    <div id="notice" class="notice" hidden></div>
+    <div id="foot" class="foot">
+      <div id="spaces"></div>
+      <span class="grow"></span>
+      <button id="settings" class="knob" title="Settings">⚙</button>
+    </div>
+    <div id="column-edge" title="Drag to resize"></div>
+  </aside>
+  <main id="main">
+    <div id="top-strip" hidden>
+      <div id="top-tabs"></div>
+    </div>
+    <div id="bookmarks-bar" hidden></div>
+    <div id="bar" hidden></div>
+    <div id="find" class="find" hidden>
+      <input id="find-text" spellcheck="false" placeholder="Find in page">
+      <span id="find-count" class="dim"></span>
+      <button id="find-prev" class="knob light" title="Previous">↑</button>
+      <button id="find-next" class="knob light" title="Next">↓</button>
+      <button id="find-close" class="knob light" title="Close">×</button>
+    </div>
+    <section id="page" class="stage">
+      <div id="home" hidden>
+        <div id="home-wall"></div>
+        <div id="home-inner">
+          <div id="home-field" class="field home-field">
+            <input id="home-address" spellcheck="false" autocomplete="off" placeholder="Search or type an address">
+          </div>
+          <div id="home-offers" class="offers home-offers" hidden></div>
+          <div id="home-grid"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="chrome.js"></script>
+</body>
+</html>

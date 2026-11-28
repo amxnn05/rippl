@@ -34,7 +34,7 @@ if [ "$uninstall" = 1 ]; then
 fi
 
 if [ "${RIPPL_SKIP_BUILD:-0}" != 1 ]; then
-    cargo build --release --locked
+    cargo build --release --locked -p rippl -p rippl-web-extension
 fi
 install -Dm755 target/release/rippl "$root/bin/rippl"
 install -Dm644 target/release/librippl_web_extension.so "$root/lib/rippl/librippl_web_extension.so"

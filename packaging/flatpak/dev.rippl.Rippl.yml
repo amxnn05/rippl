@@ -7,7 +7,7 @@
 # a Flatpak build has no network, so the crates come as sources.)
 id: dev.rippl.Rippl
 runtime: org.gnome.Platform
-runtime-version: '49'
+runtime-version: '50'
 sdk: org.gnome.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
@@ -36,7 +36,7 @@ modules:
     buildsystem: simple
     build-commands:
       - cargo --offline fetch --manifest-path Cargo.toml
-      - cargo --offline build --release
+      - cargo --offline build --release -p rippl -p rippl-web-extension
       - RIPPL_SKIP_BUILD=1 sh scripts/install.sh /app
     sources:
       - type: dir

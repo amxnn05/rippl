@@ -20,7 +20,6 @@ use webkit6::prelude::*;
 use crate::browser::Browser;
 
 /// The choices, as `home_theme` takes them.
-pub(crate) const THEMES: [&str; 7] = ["off", "open-road", "mountain-lake", "northern-lights", "solid", "gradient", "image"];
 
 const W: f64 = 1920.0;
 const H: f64 = 1200.0;
