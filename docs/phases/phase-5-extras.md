@@ -42,7 +42,7 @@ Split view moved to Phase 7.
 
 ### Hide anything, for good (`Ctrl+Shift+H`, `Ctrl+Shift+U`)
 
-The same idea Curtain:
+How it works:
 
 - `Ctrl+Shift+H` starts a picker (in the isolated world) that outlines what is under the pointer.
   A click hides **what is under the click** and reports a CSS selector that matches exactly that

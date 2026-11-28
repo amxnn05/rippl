@@ -33,7 +33,7 @@ gpc = on
 # uBlock Origin's filter lists as well as EasyList's (on, default)
 ublock = on
 
-# The column as frosted glass the compositor blurs
+# The column as frosted glass the compositor blurs (off, default: solid)
 glass = off
 
 # Shift+click a link: its page in a panel over this one (on, default)

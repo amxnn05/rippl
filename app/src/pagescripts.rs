@@ -14,7 +14,7 @@
 //!   The blocking rules that go with them are compiled into Shield's filters
 //!   (`rippl_core::shield::youtube_rules`). Both scripts are off with
 //!   Shield, and on a YouTube host Shield is off for.
-//! - **Autoscroll**: a click
+//! - **Autoscroll** (`autoscroll = on`): a click
 //!   of the middle button on a page (not on a link, which it still opens in
 //!   a new tab) leaves a mark, and the page scrolls towards the pointer,
 //!   faster the further away it is. Another click, Esc or the wheel stops
@@ -23,7 +23,7 @@
 //!   page's own policy, given with each navigation: muted by default (as
 //!   WebKit's own), nothing until a click with `autoplay = never`, and with
 //!   sound for a site whose card says so (never in a private tab).
-//! - **Video keys**: Space and
+//! - **Video keys** (`video_keys = on`): Space and
 //!   ← → on a video with the browser's own controls, once it has been
 //!   clicked. Players a site draws itself handle their own keys.
 

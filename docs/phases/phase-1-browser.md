@@ -38,7 +38,7 @@ after a restart.
 |---|---|
 | Field at the top of the tab column | Like Arc: one place to type, no toolbar row stealing height |
 | `gtk::Stack` of views | Switching tabs is a visibility change; the page doesn't reload or lose its scroll |
-| User agent left as WebKitGTK writes it | It already claims Safari. it found that adding an app name made Google serve a degraded page |
+| User agent left as WebKitGTK writes it | It already claims Safari. Adding an app name makes Google serve a degraded page |
 | Session as text, not JSON | Readable by hand, no parser dependency, and it tolerates damage |
 
 ## Bugs found later and fixed

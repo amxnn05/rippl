@@ -6,14 +6,13 @@
 
 <img src="../../data/logo/rippl.svg" width="96" alt=""> <img src="../../data/logo/rippl-dark.svg" width="96" alt="">
 
-Made to sit with the icon (one bold ink shape with its letter as negative space, on a white
-plate) without copying its pill: **a ripple**. A drop, and one ring around it set a little off its
+One bold ink shape on a white plate: **a ripple**. A drop, and one ring around it set a little off its
 centre, so the ring is thicker on one side, as a wave is just after the drop lands. Ink `#171717`
 on a white plate on Apple's grid (824 of 1024, corners 22.37%, a soft shadow).
 
 Four ideas were drawn and checked at 256, 32 and 16 pixels before choosing: a drop and a centred
 ring (read as a target), a drop and two arcs (read as a sound or Wi-Fi icon), nested pills (too
-close to the), a ripple seen on the water (busy at 16). The off-centre ring is the one that
+plain), a ripple seen on the water (busy at 16). The off-centre ring is the one that
 is simple, its own, and still clear at 16 pixels: each step out from the drop's centre (the drop
 24 px off the middle, the ring's hole 34, on a 1024 canvas) gives the ring its 56–124 px weight.
 

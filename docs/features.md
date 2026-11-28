@@ -1,8 +1,6 @@
 # Every feature, and where it stands
 
-another browser is the macOS WebKit browser rippl takes its ideas and its look
-from. This page lists the features, read from its README, release notes (NOTES.md), roadmap and
-the header of each of its source files, with rippl's status for each.
+rippl's features, area by area, with the status of each on Linux. Update this page as features land.
 
 | Mark | Meaning |
 |---|---|
@@ -86,12 +84,12 @@ the header of each of its source files, with rippl's status for each.
 | Feature | rippl |
 |---|---|
 | Ad blocker before the page | ✅ EasyList, EasyPrivacy, uBlock Origin's lists |
-| YouTube ads | ✅ the scripts and rules |
+| YouTube ads | ✅ rippl's scripts and rules |
 | uBlock Origin's lists | ✅ in Shield (lists only: the extension can't run in WebKitGTK) |
 | Off per site | ✅ Ctrl+Shift+B (6 s recompile; instant 🔨) |
 | Hide anything, for good | ✅ Ctrl+Shift+H / U |
 | Your own CSS for a site, Boosts | ✅ site card |
-| Dark pages for sites without | ✅ `dusk = on` |
+| Dark pages for sites without | ✅ `dusk = on` (inverting) |
 | Click IDs off links | ✅ in every request |
 | Global Privacy Control | ✅ |
 | HTTPS first (`HTTPSFirst`) | ✅ HTTPS-only with a warning page |

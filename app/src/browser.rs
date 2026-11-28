@@ -229,7 +229,7 @@ impl Browser {
         field.add_css_class("field");
         let list = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
         list.add_css_class("tabs");
-        // The column draws it: pinned squares, the tabs, a quiet
+        // The column: pinned squares, the tabs, a quiet
         // "New tab" row, all in one scrolling area (look.rs).
         // Six to a row. A FlowBox here was given no height inside the
         // scrolling column, and cut its pins in half.

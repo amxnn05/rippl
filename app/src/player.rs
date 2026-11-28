@@ -1,5 +1,4 @@
-//! What plays in another tab, at the foot of the column (the
-//! ): the tab's mark and title, its pause, and a click on it to
+//! What plays in another tab, at the foot of the column: the tab's mark and title, its pause, and a click on it to
 //! go there. Paused from here, it stays with its play and a × to put it
 //! away, until it plays again, its page goes or the tab sleeps.
 //!

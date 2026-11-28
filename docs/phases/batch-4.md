@@ -33,7 +33,7 @@ gives the power back on battery. Smooth wheel scrolling was already on
 
 ## Autoplay (`autoplay`)
 
-the Autoplay, through WebKit's own website policies, given with each navigation
+Autoplay, through WebKit's own website policies, given with each navigation
 (`decide-policy` → `use_with_policies`):
 
 - `muted` (default, WebKit's own): videos may start without sound.
@@ -45,14 +45,14 @@ playing; site allowed → both playing; `never` → both paused.
 
 ## Middle-button autoscroll (`autoscroll = on`)
 
-the AutoScroll script, in rippl's isolated world: a middle click on a page (not on a link,
+The autoscroll script, in rippl's isolated world: a middle click on a page (not on a link,
 which still opens a new tab) leaves a round mark; the page scrolls towards the pointer, faster the
 further away; a click, Esc or the wheel stops it. Tested: 5,160 px in 1.2 s with the pointer 320
 px below the mark; Esc stopped it.
 
 ## Tabs that close themselves, and the archive (`close_after`)
 
-the  and . `close_after = 12h | 1d | 7d | 30d` (never by default).
+Tabs that close themselves, and the archive. `close_after = 12h | 1d | 7d | 30d` (never by default).
 
 - Counted from when you last left the tab, **across restarts**: the session now keeps each
   tab's time (`left <index> <unix seconds>` lines; older sessions count from the restore).
@@ -70,7 +70,7 @@ on screen stayed; a page with half a message typed stayed.
 
 ## Ctrl+Tab switcher (`tab_switcher`, on)
 
-the TabSwitcher: the space's tabs as pictures, the one you're on first, then latest left.
+The space's tabs as pictures, the one you're on first, then latest left.
 Hold Ctrl and press Tab (or arrows) to walk, let go to go there, Esc to stay, or click a card. A
 quick Ctrl+Tab goes to the previous tab without drawing anything (the cards appear after 140 ms).
 
@@ -80,7 +80,7 @@ quick Ctrl+Tab goes to the previous tab without drawing anything (the cards appe
 - Ctrl let go is seen both as a key release and as a change of modifiers.
 
 Tested with real key presses: Ctrl+Tab+Tab went to the third card, a quick Ctrl+Tab back to the
-previous tab. `tab_switcher = off`: Ctrl+Tab is the next tab, as before. Not yet: the keys on
+previous tab. `tab_switcher = off`: Ctrl+Tab is the next tab, as before. Not yet: keys on
 a card (⌃W closes it, ⌃R reloads).
 
 ## Bookmarks bar (`bookmarks_bar = on`)
@@ -92,7 +92,7 @@ tab; middle click: a new tab behind. Changes on rippl://bookmarks and the star u
 
 ## The column as icons only (`column = icons`)
 
-the SideIcons: the column 52 wide, each tab its icon or letter in a tile, the title in a
+The column 52 wide, each tab its icon or letter in a tile, the title in a
 tooltip; pins stack one per row; the foot's buttons stack. The field moves to a strip above the
 page, and what it offers floats under it over the page. The player is off in this layout.
 
@@ -104,7 +104,7 @@ from 220 px down to 96, then the row scrolls (the wheel scrolls it sideways), al
 tab you're on into view. Right-click menus hang from the strip. The new tab still puts its field
 in the middle of the page.
 
-Not yet: the sliding pill and dragging tabs along the row; downloads and spaces' buttons
+Not yet: a sliding pill and dragging tabs along the row; downloads and spaces' buttons
 are in the column only (spaces stay on Alt+1–9).
 
 ## Not tested
@@ -119,7 +119,7 @@ are in the column only (spaces stay on Alt+1–9).
 
 ## Split view, up to four pages
 
-the PaneStage: two and three pages stand side by side, four make a two-by-two grid, with
+Two and three pages stand side by side, four make a two-by-two grid, with
 dragging dividers (nested `GtkPaned`s, even shares at first). Alt-click a tab, or **Put beside
 this tab** in its menu, adds it to the split in front, up to four. Ctrl+Alt+S takes the tab in
 front out (a split left with one page ends); Ctrl+Alt+←/→ walk the panes. A split of 2–4 tabs is
@@ -138,10 +138,10 @@ refused `<Ctrl>banana`, cleared both (lines gone from the file).
 
 ## Space colours, and swiping between spaces
 
-A space's menu (right-click its button at the column's foot) has the five colours, and a
+A space's menu (right-click its button at the column's foot) has five colours, and a
 second one to run a gradient into. The window's ground (the column, the strip, the bookmarks bar,
-around the page's card, never the page) takes 7% of it in the light look and 11% in the dark, as
-the; its button at the foot takes the colour. Kept in the session (`colour <space> #… [#…]`).
+around the page's card, never the page) takes 7% of it in the light look and 11% in the dark;
+its button at the foot takes the colour. Kept in the session (`colour <space> #… [#…]`).
 
 Two fingers sideways on the column (or a sideways wheel) go to the next or previous space, one a
 stroke. **Not tested**: it needs a real touchpad.
@@ -149,15 +149,15 @@ stroke. **Not tested**: it needs a real touchpad.
 ## New tab backgrounds
 
 `home_theme = off | open-road | mountain-lake | northern-lights | solid | gradient | image`, with
-`home_colour` and `home_image`. The three walls are the HomeWalls paintings, ported to cairo
+`home_colour` and `home_image`. The three walls are paintings drawn with cairo
 (seeded, so always the same; the dark look takes the pigments down, the night scene less; the
 aurora's blur is drawn as five faint offset passes). Each is painted once at 1920×1200 into
-`~/.cache/rippl/walls/` (80–200 KB) and shown as the page's background: nothing redraws. the
-other seven walls and its stickers are not ported yet.
+`~/.cache/rippl/walls/` (80–200 KB) and shown as the page's background: nothing redraws.
+More walls and stickers are not done yet.
 
 ## Pin folders
 
-the PinFolders: a pin's menu puts it **in a new folder**, **in “…”** (one there is), or
+A pin's menu puts it **in a new folder**, **in “…”** (one there is), or
 **out of** its own. A folder stands among the pins as one square, where its first pin would be;
 a click opens it: its name (to change) and its pins (click to go, right-click for the pin's
 menu). Per space; unpinning takes a tab out. Kept in the session (`pinfolder <index> <name>`).
@@ -165,7 +165,7 @@ Its menu hangs from the pins' grid, as the column redraws (and its squares are m
 
 ## Several windows
 
-the Windows: **Ctrl+N** opens another window with tabs of its own. Every window shares one
+**Ctrl+N** opens another window with tabs of its own. Every window shares one
 engine (sign-ins, cache), Shield, history and bookmarks, passwords and settings; the first window
 sets them up, the rest borrow them, so a second window costs a window, not a browser.
 
@@ -178,7 +178,7 @@ sets them up, the rest borrow them, so a second window costs a window, not a bro
   is answered by the window its tab is in, a sign-in message goes to each window, which acts only
   on its own tab.
 - The control socket speaks to the window in front (`windows`, `window new`, `window close`).
-- Downloads are listed in the first window. the twins (the same tabs in every window) are not
+- Downloads are listed in the first window. Twins (the same tabs in every window) are not
   done.
 
 Tested: a second window opened, loaded a page and rippl://history; SIGTERM saved both; a restart

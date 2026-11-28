@@ -1,5 +1,4 @@
-//! More brought over from another browser on this machine (the
-//! ): history, the tabs it has open, and Chromium's saved
+//! More brought over from another browser on this machine: history, the tabs it has open, and Chromium's saved
 //! passwords. Only reading, from copies: nothing in the other browser
 //! changes, and it may be running.
 //!

@@ -63,7 +63,7 @@ impl Browser {
         title.add_css_class("card-title");
         card.append(&title);
 
-        // The connection says it: private, or not.
+        // The connection, said plainly: private, or not.
         let (line, class) = if url.starts_with("rippl://") {
             ("rippl's own page".to_string(), "safe")
         } else if url.starts_with("https://") {

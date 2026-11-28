@@ -30,8 +30,8 @@ the privacy gaps left by the defaults, and choose a search engine that doesn't p
 - **Seed list**: about 25 of the largest ad and tracking networks, compiled in milliseconds on first
   launch, so blocking starts before the full lists have downloaded.
 - **Launch**: compiled filters load from WebKit's store in **5 ms**. Pages wait for them, up to 1 s,
-  so even the first requests of the restored tab are blocked (the same reasoning as the
-  `Shield.whenReady`).
+  so even the first requests of the restored tab are blocked (Shield is ready before the
+  first page).
 - **Updates**: a list is fetched again when it is older than 4 days (EasyList's own "Expires"),
   checked at launch and every 6 hours. The old filter keeps blocking until the new one is compiled,
   then it is swapped for every tab at once. A page that isn't a filter list (a captive portal) is

@@ -10,7 +10,7 @@
 //! - **Your style for a site**: CSS you
 //!   write in the site card, kept per site, applied with the site's hidden
 //!   elements as one user style sheet before the page draws.
-//! - **Capture**: the whole page as a
+//! - **Capture** (Ctrl+Shift+S): the whole page as a
 //!   PNG in `~/Pictures/rippl/`, and on the clipboard.
 //! - **Save as a web archive** (Ctrl+Alt+A): the page and everything it
 //!   shows in one `.mhtml` file in Downloads, which rippl opens again as

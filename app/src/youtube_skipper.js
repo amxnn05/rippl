@@ -1,4 +1,4 @@
-// the  skipper, in rippl's own world (pagescripts.rs).
+// YouTube's ads that play anyway, skipped, in rippl's own world (pagescripts.rs).
 (function () {
   'use strict';
   if (__HOSTS__.indexOf(location.hostname) < 0) return;

@@ -271,7 +271,7 @@ impl Engine {
         settings.set_javascript_can_access_clipboard(false);
         // The user agent is left as WebKitGTK writes it: it already claims
         // to be Safari, which is what sites test against. Adding a name to
-        // it is what made Google serve a degraded page.
+        // it makes Google serve a degraded page.
 
         Engine {
             context,

@@ -26,9 +26,9 @@ goes.
    33% and 50% of it. WebKit's own default is most of the machine. Pages are never killed for
    reaching it; they drop caches sooner. The network process gets the same limits.
 5. **Heap trim**: `malloc_trim(0)` two seconds after the window loses focus, after Shield compiles
-   (Phase 3), and under critical pressure. This is the same lesson : freed
+   (Phase 3), and under critical pressure. Freed
    memory stays counted against the process until it is handed back.
-6. **Control socket** (`control.rs`), the equivalent of the , so all of this can be
+6. **Control socket** (`control.rs`), so all of this can be
    tested without sending keys. See [testing.md](../testing.md).
 
 ## Measurements (this machine, PSS, all processes)
@@ -63,7 +63,7 @@ both the NVIDIA and the AMD driver, plus LLVM.
 
 ## Not done
 
-- A picture of the page while a sleeping tab wakes. It costs memory while
+- A picture of the page while a sleeping tab wakes (some browsers show one). It costs memory while
   asleep, so it would have to be small.
 - Hibernating tabs to disk across restarts: sleeping state is in memory only, so after a restart a
   tab reloads from its URL rather than from its saved history.

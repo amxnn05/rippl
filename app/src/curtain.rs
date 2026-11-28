@@ -1,5 +1,4 @@
-//! Hide anything on a page, for good (Ctrl+Shift+H), as the
-//! Curtain does. The cookie banner, the newsletter box, the "related"
+//! Hide anything on a page, for good (Ctrl+Shift+H). The cookie banner, the newsletter box, the "related"
 //! rail: click it and it is gone, now and on every later visit to that site,
 //! before the page draws a frame.
 //!

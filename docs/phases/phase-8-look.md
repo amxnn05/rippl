@@ -1,11 +1,11 @@
-# Phase 8: Shared processes, the look, the first features
+# Phase 8: Shared processes, rippl's look, the first feature batch
 
 **Status:** done (2026-11-25)
 
 ## Goal
 
-Make the biggest memory cost smaller, make rippl look, map every features
-([features.md](../features.md)), and start porting the ones rippl lacks.
+Make the biggest memory cost smaller, give rippl its look, map every feature
+([features.md](../features.md)), and start building the ones rippl lacks.
 
 ## What was built
 
@@ -23,9 +23,9 @@ Make the biggest memory cost smaller, make rippl look, map every features
 - **Trade-off:** if that one process crashes, every tab of the site reloads together. Chrome makes the
   same trade under memory pressure. `RIPPL_NO_SHARE=1` turns sharing off.
 
-### the look (`look.rs`)
+### rippl's look (`look.rs`)
 
-Taken from the ,  and , and from its screenshot:
+The values:
 
 | | Value |
 |---|---|
@@ -36,7 +36,7 @@ Taken from the ,  and , and from its screenshot:
 | Column | 232 px; rows 28 px, 9 px corners, 12.5 px titles, 8 px between letter and title |
 | Site letter | 15 px square, 6% ink, 3 px corners, 8.5 px medium letter |
 | Pins | 30 px squares holding one letter, in a row at the top |
-| Font | Inter / Adwaita Sans, falling back to the system UI font |
+| Font | Inter / Adwaita Sans (close to SF Pro), falling back to the system UI font |
 
 - The letter comes from the name people know a site by: **W** for en.wikipedia.org, **B** for
   bbc.co.uk (`address::monogram`, tested).
@@ -56,11 +56,11 @@ Taken from the ,  and , and from its screenshot:
   variant of the GTK theme. Checked: `system` on a dark desktop → dark column and dark pages;
   `dark` → dark; `light` → light column and light pages (`matchMedia` in the page).
 - **About transparency:** Omarchy's Hyprland config makes every window slightly see-through, so the
-  wallpaper shows behind rippl's card and column. For the solid look, give the window class
+  wallpaper shows behind rippl's card and column. For a solid look, give the window class
   `dev.rippl.Rippl` full opacity in your Hyprland window rules. rippl doesn't change your
   compositor settings itself.
 
-### First features ported
+### The first features
 
 | Feature | rippl | How |
 |---|---|---|
@@ -77,7 +77,7 @@ Taken from the ,  and , and from its screenshot:
 | Check | Result |
 |---|---|
 | 5 Wikipedia tabs, shared vs not | 630 MB / 1 process vs 897 MB / 5 |
-| Screenshots, light and dark | column, pins, letters, live pill, New tab, gear draws them |
+| Screenshots, light and dark | column, pins, letters, live pill, New tab, gear |
 | Reopen a tab navigated Linux → WebKit and scrolled to 2,500 px | back at position 2, `scrollY` 2615, Back goes to "Linux - Wikipedia" |
 | `?id=7&fbclid=TRACKME&utm_source=news` | the server received `/?id=7&utm_source=news` |
 | `yt lofi beats`, `w rust language` | YouTube's results; Wikipedia's article |
@@ -95,6 +95,6 @@ Taken from the ,  and , and from its screenshot:
 
 ## Next
 
-[features.md](../features.md) lists every features with its batch. Batch 1: the
+[features.md](../features.md) lists every feature with its batch. Batch 1: the
 site card (permissions, Shield and "keep awake" for the site), duplicate tab, blocked pop-ups with
 Open, a typo-tolerant field, site search and your own keywords, field commands, print.

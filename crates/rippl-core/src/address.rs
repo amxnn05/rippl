@@ -1,6 +1,6 @@
 //! What was typed in the one field: a place to go, or words to search for.
 //!
-//! . Something only becomes an address
+//! Something only becomes an address
 //! when it clearly is one: "hello world" and "todo" are searches, while
 //! "example.com", "localhost:3000" and "192.168.1.1" are places.
 

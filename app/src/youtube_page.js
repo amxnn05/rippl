@@ -1,4 +1,4 @@
-// the  page script, ported to rippl (pagescripts.rs).
+// YouTube's ads, taken out of the player's data in the page (pagescripts.rs).
 (function () {
   'use strict';
   if (__HOSTS__.indexOf(location.hostname) < 0) return;

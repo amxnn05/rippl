@@ -5,7 +5,7 @@
 
 ## Spaces (`spaces.rs`, `rippl_core::tabs`)
 
-As the : separate sets of tabs in the one window, **each with its own cookies
+Separate sets of tabs in the one window, **each with its own cookies
 and sign-ins**.
 
 - **The first space is everything there was before**: its tabs and the store rippl always had, so
@@ -14,9 +14,9 @@ and sign-ins**.
   in to a site in one space, you aren't signed in to it in another.
 - **Switching** swaps the column's tabs and brings back the tab that space had in front. Tabs left
   behind are parked: still playing, and they sleep after the usual wait.
-- **Keys:** `Alt+1–9` go to a space (the ⌃1–⌃9; `Ctrl+1–9` are tabs, and now count within the
+- **Keys:** `Alt+1–9` go to a space (`Ctrl+1–9` are tabs, and now count within the
   space on screen). `Ctrl+Alt+T` makes a new one.
-- **The foot:** one button per space (its first letter), plus **+**. Like Arc, nothing about
+- **The foot:** one button per space (its first letter), plus **+**. Nothing about
   spaces shows until there are two: only the +.
 - **Right-click a space's button** to rename it, or delete it with its tabs. Deleting also clears its
   sign-ins and site data (WebKit's data manager, then the folder).
@@ -39,7 +39,7 @@ and sign-ins**.
 
 ## Profiles (`--profile NAME`)
 
-As the : **whole separate browsers**.
+**Whole separate browsers**.
 
 - **What's separate:** each profile has its own spaces, tabs, sign-ins, history, bookmarks and
   session, in `profiles/<name>/` under the data and cache folders.
@@ -87,9 +87,9 @@ every tab in the first space (tested).
 
 ## Not done (yet)
 
-- **Pin folders**: rippl's pins are letter squares, where the are
+- **Pin folders**: rippl's pins are letter squares, not
   rows. Folders need pins as rows first (batch 4, with the icon-only column).
 - **Send links to a space**: links from other apps arrive with default-browser
   support (Phase 9).
 - **Space colours and gradients**: batch 4, with themes.
-- **Profiles in one window**: each profile is its own window default.
+- **Profiles in one window**: each profile is its own window.

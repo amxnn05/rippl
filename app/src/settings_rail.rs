@@ -1,5 +1,4 @@
-//! Settings' sections in the column (the Settings: its sections down
-//! the left): while rippl://settings is the tab in front, the column shows
+//! Settings' sections in the column: while rippl://settings is the tab in front, the column shows
 //! them where the tabs are, under "‹ Tabs" to go back, "Settings" and Find
 //! a setting, the chosen one on a white card. A click shows that section
 //! in the page; the page's own rail stands aside. With tabs across the top
@@ -40,7 +39,7 @@ impl Rail {
         rail.append(&find);
         let mut rows = Vec::new();
         for (n, (id, name, glyph)) in CATEGORIES.iter().enumerate() {
-            // the three blocks, a hairline between them.
+            // Three blocks, a hairline between them.
             if n == 6 || n == 10 {
                 let rule = gtk::Separator::new(gtk::Orientation::Horizontal);
                 rule.add_css_class("rail-rule");

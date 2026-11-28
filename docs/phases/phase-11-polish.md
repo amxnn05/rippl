@@ -73,8 +73,8 @@ one row, and videos at their best quality and frame rate.
   rows, with the same handler as a tab row. The control socket's `select` goes around the
   pointer, which is why the tests passed.
 
-- **A new tab left the column without its field.** The field moves into the middle of a new tab
- , and the column's top stood empty. A stand-in of the same look now holds
+- **A new tab left the column without its field.** The field moves into the middle of a new tab,
+  and the column's top stood empty. A stand-in of the same look now holds
   its place there while the field is away; a click or a key in it goes to the field.
 
 - **A page loading in another tab drew its loading line on a new tab's field.** The line was only

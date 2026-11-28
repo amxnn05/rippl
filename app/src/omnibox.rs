@@ -32,8 +32,7 @@ pub enum Offer {
     Search(String),
 }
 
-/// rippl's own pages, offered by name (the address bar commands, but
-/// only ever as rows under what was typed: Return still does what it did).
+/// rippl's own pages, offered by name.
 const PAGES: &[(&str, &str)] =
     &[("history", "History"), ("bookmarks", "Bookmarks"), ("archive", "Archived tabs"), ("welcome", "Welcome"), ("passwords", "Passwords"), ("settings", "Settings")];
 

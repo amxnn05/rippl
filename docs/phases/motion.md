@@ -2,9 +2,9 @@
 
 **Status:** done (2026-11-26).
 
-the Motion, in GTK's CSS and a little script (motion.rs, elastic.js):
+rippl's motion, in GTK's CSS and a little script (motion.rs, elastic.js):
 
-| the | rippl's | Used for |
+| Motion | rippl's | Used for |
 |---|---|---|
 | `glide`: a spring, 0.34 s, damping 0.82 | `cubic-bezier(0.2, 1.3, 0.4, 1)`, 240–340 ms (a little overshoot) | what comes onto the page: popovers, peek, the Ctrl+Tab cards |
 | `settle`: a spring, 0.30 s, damping 0.86 | `cubic-bezier(0.25, 1.15, 0.4, 1)`, 300 ms | what slides into place: bars, rows, the AI panel, the new tab's field |

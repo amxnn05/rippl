@@ -22,7 +22,7 @@ the first day.
 |---|---|
 | WebKitGTK 6.0, not 4.1 | 4.1 is the GTK3 build; 6.0 is GTK4, which is current and what new work targets |
 | WebKitGTK, not WPE | WPE is lighter, but the embedder has to do its own rendering and input. Start with WebKitGTK; WPE stays an option later |
-| A separate `rippl-core` crate | Logic that needs no display can be unit-tested; that's how it keeps its behaviour pinned down |
+| A separate `rippl-core` crate | Logic that needs no display can be unit-tested, which keeps its behaviour pinned down |
 | No serde, no URL crate | Fewer dependencies, faster builds; the formats are tiny |
 
 ## Problems hit

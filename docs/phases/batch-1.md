@@ -90,8 +90,8 @@ DuckDuckGo and Brave Search offer them; the other engines don't.
 
 ## Not done (yet)
 
-- the site search turns the site into a chip in the field; rippl puts the keyword in front of
-  your words, which does the same thing more plainly.
-- it can read a site's own search (OpenSearch) to add it to the list; rippl's list is fixed
+- Site search puts the keyword in front of your words, rather than turning the site into a chip
+  in the field.
+- Reading a site's own search (OpenSearch) to add it to the list; rippl's list is fixed
   (plus your keywords).
 - The card has no per-site sound or autoplay switch yet (batch 3, with video keys).

@@ -4,10 +4,10 @@
 //!   and social networks so the site you land on can tie the visit to the
 //!   click, and to you. They do nothing for the page. rippl's page-process
 //!   extension strips them from every request before it leaves (the same
-//!   list as Brave's, which it gets from WebKit's on the Mac).
+//!   list as Brave's).
 //! - **Campaign tags** (`utm_source`, …) only say where a link was shared.
 //!   They're left on requests, since some sites need them, but taken off
-//!   when you copy an address (Ctrl+Shift+C) Copy Clean Link.
+//!   when you copy an address (Ctrl+Shift+C).
 
 /// Identify one click and, through it, one person.
 const CLICK_IDS: &[&str] = &[

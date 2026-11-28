@@ -1,4 +1,4 @@
-//! How rippl looks: the design, carried over.
+//! How rippl looks.
 //!
 //! - The page is a white **card** on a slightly off-white ground (8 px gap,
 //!   10 px corners); the column of tabs sits on that ground.
@@ -9,7 +9,7 @@
 //! - A faint **+ New tab** row closes the list; the sliders at the foot
 //!   open Settings.
 //!
-//! Every colour is one of the light/dark pairs, written once below as
+//! Every colour is one of rippl's light/dark pairs, written once below as
 //! CSS variables (GTK 4.16+), and the dark ones apply when the window has
 //! the `dark` class. `apply_look` decides: `theme = light | dark`, or for
 //! `system` the desktop's own choice, read from the XDG settings portal
@@ -26,9 +26,9 @@ use crate::config::Theme;
 
 use crate::browser::Browser;
 
-/// the palette: greys as
+/// rippl's palette: greys as
 /// light / dark pairs. The column's greys are black or white at a strength
-/// that lands on the own over the frame colour.
+/// that lands on the intended grey over the frame colour.
 const CSS: &str = r#"
 window.rippl {
   --ground: #ffffff; --frame: #f4f4f4; --ink: #171717; --muted: rgba(0,0,0,0.424);
@@ -228,7 +228,7 @@ window.rippl .ai-title { font-weight: 600; font-size: 13px; }
 window.rippl .ai-answer { background: transparent; color: var(--ink); font-size: 13px; }
 window.rippl .ai-answer text { background: transparent; }
 window.rippl .ai-ask { min-height: 32px; border-radius: 9px; }
-/* Settings' sections in the column (settings_rail.rs) rail. */
+/* Settings' sections in the column (settings_rail.rs), as a rail. */
 window.rippl .settings-rail { padding: 0 0 8px; }
 window.rippl .rail-back { min-height: 28px; padding: 0 10px; border-radius: 8px; border: none; box-shadow: none;
   background: transparent; color: var(--muted); font-size: 12.5px; }
@@ -529,7 +529,7 @@ impl Browser {
                 let face = gtk::Overlay::builder().child(&mark).build();
                 if let Some(count) = rippl_core::tabs::unread(&tab.title).filter(|_| tab.life == Life::Awake) {
                     // Centred on the letter's top right corner, a touch
-                    // outside it, as an app's count hangs from its icon in
+                    // outside it, as an app's count hangs from its icon:
                     // on a wide pin the square's corner is far off.
                     let badge = gtk::Label::builder()
                         .label(&count)

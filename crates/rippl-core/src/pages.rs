@@ -590,7 +590,7 @@ pub fn welcome(default_browser: &str, token: &str) -> String {
     frame("welcome", "Welcome to rippl", token, &body)
 }
 
-/// The settings' categories Settings window has them: id,
+/// The settings' categories: id,
 /// title, and a glyph for the sidebar.
 pub const CATEGORIES: [(&str, &str, &str); 11] = [
     ("general", "General", "⚙"),
@@ -891,7 +891,7 @@ pub fn settings(v: &SettingsView, token: &str) -> String {
     ));
     add("about", "rippl", about);
 
-    // Sections in the order within each category.
+    // Sections in their order within each category.
     const ORDER: [&str; 28] = [
         "Your browser", "Sync and other devices", "Light and dark", "Window", "Motion", "Tabs", "New tab", "Switching", "Closing",
         "Memory", "Searching", "Links", "Video", "Spaces", "Pins", "Profiles", "Your passwords", "Client certificates",

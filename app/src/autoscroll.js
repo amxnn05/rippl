@@ -1,4 +1,4 @@
-// the , in rippl's world: window.__ripplAutoScroll.
+// Middle-button autoscroll, in rippl's world: window.__ripplAutoScroll.
 (() => {
   if (window.__ripplAutoScroll) return;
   window.__ripplAutoScroll = true;

@@ -113,8 +113,8 @@ impl Browser {
             self.spaces_box.remove(&child);
         }
         let tabs = self.tabs.borrow();
-        // One space and nothing to switch: no buttons (as it shows
-        // nothing of spaces until there are two), only the +.
+        // One space and nothing to switch: no buttons (nothing of spaces
+        // shows until there are two), only the +.
         let many = tabs.spaces.len() > 1;
         for (n, space) in tabs.spaces.iter().enumerate() {
             if !many {

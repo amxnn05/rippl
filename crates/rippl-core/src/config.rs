@@ -11,7 +11,7 @@
 //! shield = on
 //! # uBlock Origin's lists as well as EasyList's (on, default) or not (off)
 //! ublock = on
-//! # the column as frosted glass the compositor blurs
+//! # the column as frosted glass the compositor blurs (off, default: solid)
 //! glass = off
 //! # darken pages that have no dark look, in the dark theme (off, default)
 //! dusk = off
@@ -186,7 +186,7 @@ fn on(value: &str) -> Option<bool> {
 /// What may stand behind the new tab's field (`home_theme`).
 pub const HOME_THEMES: [&str; 7] = ["off", "open-road", "mountain-lake", "northern-lights", "solid", "gradient", "image"];
 
-/// `close_after`'s choices Settings › Tabs offers them.
+/// `close_after`'s choices, as Settings › Tabs offers them.
 pub const CLOSE_CHOICES: [&str; 5] = ["never", "12h", "1d", "7d", "30d"];
 
 fn close_after(value: &str) -> Option<Option<Duration>> {
@@ -489,7 +489,7 @@ impl Config {
             choice("bookmarks_bar", "Bookmarks bar above the page", onoff(self.bookmarks_bar), &["on", "off"], ""),
             choice("tabs", "Tabs", if self.top_tabs { "top" } else { "side" }.into(), &["side", "top"], "Down the side, or across the top"),
             choice("column", "The column", if self.icon_column { "icons" } else { "full" }.into(), &["full", "icons"], "With titles, or icons only"),
-            choice("home_theme", "New tab background", self.home_theme.clone(), &HOME_THEMES, "Painted walls are the; solid and gradient use the colour below; image uses the file below"),
+            choice("home_theme", "New tab background", self.home_theme.clone(), &HOME_THEMES, "Painted walls are drawn by rippl; solid and gradient use the colour below; image uses the file below"),
             choice("home_colour", "New tab colour", self.home_colour.clone(), &[], "#rrggbb, for solid and gradient"),
             choice("home_image", "New tab image", self.home_image.clone(), &[], "A picture's full path, for image"),
             choice("home_grid", "New tab: the sites in the bookmark folder Home", onoff(self.home_grid), &["on", "off"], "Four to a row, sixteen at most"),

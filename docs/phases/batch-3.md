@@ -122,7 +122,7 @@ Tested:
 Tested: `p { color: rgb(1,2,3); letter-spacing: 3px }` applied after reload, together with a hidden
 element on the same site.
 
-## Capture
+## Capture (Ctrl+Shift+S)
 
 The whole page (WebKit's full-document snapshot) is saved as PNG in `~/Pictures/rippl/`, named after
 the site and the time (never overwriting), and put on the clipboard. Tested: file written.
@@ -138,7 +138,7 @@ Tested: GitHub's 32×32 icon; a column with GitHub, Wikipedia, YouTube and Reddi
 
 ## The new tab (home.rs)
 
-- **The field stands on its own in the middle of the page card** `Omnibox` on a blank
+- **The field stands on its own in the middle of the page card**, on a blank
   tab:
   - size: 560 wide (less in a narrow window, keeping 14 each side) and 50 tall;
   - look: rounded 14, a hairline, a soft shadow, 15.5 px text, "Enter a web address";
@@ -151,7 +151,7 @@ Tested: GitHub's 32×32 icon; a column with GitHub, Wikipedia, YouTube and Reddi
 - **Home grid** (`home_grid = on`, off by default): the sites of the bookmark folder
   *Home*. Four to a row, sixteen at most, tiles 50 tall with a hairline. Hidden while you type.
 - **No bookmark star** in the field when there's no page.
-- **Not copied:** the slow "breath" under the field, since an animation that never stops keeps
+- **Left out:** a slow "breath" under the field, since an animation that never stops keeps
   the frame clock running on an idle window. Painted walls (Themes) come in batch 4.
 - **Placement:** a small layout manager (`HomeLayout`), because GTK has no "at most this wide" and a
   fixed 560 would make the window at least that wide.
@@ -164,16 +164,16 @@ Checked on a white page (Wikipedia, light theme): all four corners are round.
 
 ## Glass off by default
 
-You asked for no see-through. `glass` now defaults to **off**: the column is the solid frame
+You asked for no see-through. `glass` now defaults to **off**: the column is a solid frame
 (`#131313` dark, `#f4f4f4` light) and the page card its ground (`#1c1c1c` / white). rippl's
-palette already matched the `Palette` exactly.
+palette stays as it was.
 
 What still shows the desktop through is Hyprland's rule (Omarchy gives every window a little
 transparency), not rippl. A window rule for `dev.rippl.Rippl` with opacity 1 makes it fully solid.
 
 ## YouTube's ads (`pagescripts.rs`, `rippl_core::shield::youtube_rules`)
 
-. YouTube announces its ads in the player's own data and
+YouTube announces its ads in the player's own data and
 plays them from the video's servers, so no filter list stops them.
 
 - **In the page's world, on YouTube's hosts only, before any page script:**
@@ -203,7 +203,7 @@ A video waits at 0:00 until clicked either way: that is WebKit's autoplay policy
 
 ## Peek (`peek.rs`)
 
-the (and Arc's) peek.
+A link's page in a panel over this one, as Arc's peek.
 
 - **Opening:** Shift+click a link and its page opens in a panel over the one you're reading.
   - size: 82% × 86% of the page, rounded 12, a hairline and a deep shadow;
@@ -227,7 +227,6 @@ follows WebKit's documented API: button 1 with Shift held, as a link click or a 
 
 ## Unread counts (`rippl_core::tabs::unread`)
 
-As the :
 - **The count:** read off the front of a page's title, as WhatsApp, Messenger, X and Discord put it
   there: "(3) WhatsApp" gives 3, "(12+)" gives 12+, over 99 gives 99+. A number further along
   ("Dune (2021)") is not a count.
@@ -238,12 +237,12 @@ Tested: "(5) Chat" pinned shows a 5. Six cases are in the core tests.
 
 **Fixed with it:** pins were cut in half. The FlowBox that held them got no height inside the
 scrolling column (measured: 0 px), so only the bottom of each pin showed, and that was older than
-this round. Pins are now a grid of six per row, each filling its share do; measured
+this round. Pins are now a grid of six per row, each filling its share; measured
 30 px tall.
 
 ## The player (`player.rs`)
 
-As the , off unless `player = on`, as there:
+Off unless `player = on`:
 - **What it shows:** the newest tab making sound out of sight (not on screen, not its split
   partner, this space only), as a row with a hairline above the column's foot: its icon or letter,
   its title, and a pause.
@@ -258,7 +257,7 @@ Tested with a tab playing a tone and another in front:
 
 ## Video keys (`video_keys = on`, off by default)
 
-As the , on a `<video>` or `<audio>` with the browser's own controls, once
+On a `<video>` or `<audio>` with the browser's own controls, once
 clicked:
 - Space plays or pauses;
 - ← and → go 5 s back or on.

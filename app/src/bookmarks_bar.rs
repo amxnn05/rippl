@@ -1,4 +1,4 @@
-//! The bookmarks bar: the
+//! The bookmarks bar (`bookmarks_bar = on`): the
 //! top of the bookmarks in a thin row above the page, on the window's
 //! ground. A folder opens as a menu. What the row can't hold goes into a »
 //! at its end, a menu of the rest, rather than a row that scrolls sideways

@@ -1,9 +1,9 @@
-//! Tabs closed lately, to bring back with Ctrl+Shift+T ⇧⌘T:
+//! Tabs closed lately, to bring back with Ctrl+Shift+T:
 //! the same address, back in its place, with its Back/Forward history and
 //! where it was scrolled. Never a private tab's. The last 25, in memory
 //! only: they go at quit.
 //!
-//! Also here, the small address commands it has: copy the address
+//! Also here, the small address commands: copy the address
 //! (Ctrl+Shift+C) and paste and go (Ctrl+Shift+V).
 
 use rippl_core::tabs::Life;

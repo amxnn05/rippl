@@ -53,8 +53,8 @@ mod imp {
         fn allocate(&self, widget: &gtk::Widget, width: i32, height: i32, _baseline: i32) {
             let w = (f64::from(width) * WIDE) as i32;
             let h = (f64::from(height) * TALL) as i32;
-            // it shifts it right by its buttons' half, so the page
-            // itself sits in the middle.
+            // Shifted right by its buttons' half, so the page itself sits
+            // in the middle.
             let x = (width - w) / 2 + 19;
             let y = (height - h) / 2;
             let mut child = widget.first_child();

@@ -1,8 +1,7 @@
-//! What is behind the new tab's field (the ,
-//! ): nothing, a painted
+//! What is behind the new tab's field: nothing (`home_theme = off`), a painted
 //! wall, a solid colour, a gradient, or your own image.
 //!
-//! - **Walls** are the, painted in code (here with cairo): Open Road,
+//! - **Walls** are painted in code, with cairo: Open Road,
 //!   Mountain Lake, Northern Lights. Seeded, so a wall is the same wall
 //!   every time; the dark look takes the same pigments down (a night scene
 //!   less). Painted once at 1920×1200 into rippl's cache as a PNG and shown
@@ -24,7 +23,7 @@ const H: f64 = 1200.0;
 
 type Rgb = (f64, f64, f64);
 
-/// the Pen: a pigment for the light or dark look.
+/// A pen: a pigment for the light or dark look.
 struct Pen {
     dark: bool,
     night: bool,
@@ -277,8 +276,8 @@ impl Scene<'_> {
             (0.12, 0.08, 2.1, 4.4, (0.55, 0.45, 0.92)),
             (0.32, 0.09, 1.2, 1.1, (0.40, 0.92, 0.55)),
         ];
-        // it blurs the ribbons; here each is laid down a few times,
-        // faint and a little apart, which reads as the same glow.
+        // Each ribbon is laid down a few times, faint and a little apart,
+        // which reads as a blur without blurring.
         for (y0, ht, f, ph, c) in ribbons {
             for spread in [-0.012f64, -0.006, 0.0, 0.006, 0.012] {
                 for i in 0..=60 {
@@ -324,7 +323,7 @@ impl Scene<'_> {
     }
 }
 
-/// the seed for a theme: from its name, so each wall is its own.
+/// The seed for a theme: from its name, so each wall is its own.
 fn seed(name: &str) -> u64 {
     name.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)) | 1
 }

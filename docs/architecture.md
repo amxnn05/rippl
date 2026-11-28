@@ -7,9 +7,6 @@ rippl's own UI process is about 120 MB, and Rust only makes that part smaller. M
 memory savings come from keeping **as few web processes alive as possible**, and from not letting
 ads and trackers load into the ones that are.
 
-This is the same approach as another browser, a WebKit browser for the Mac.
-rippl started as a Linux port of its ideas (see the map at the bottom).
-
 ## Processes
 
 ```
@@ -41,7 +38,7 @@ crates/rippl-core/        no GTK, no WebKit: everything here runs under `cargo t
   src/places.rs           places.sqlite: history, bookmarks, permission answers
   src/suggest.rs          ranking what the field offers; inline completion
   src/downloads.rs        safe, never-overwriting download file names
-  src/pages.rs            rippl:// pages and the reader page, as escaped HTML; Settings as the
+  src/pages.rs            rippl:// pages and the reader page, as escaped HTML; Settings' layout
   src/import.rs           bookmarks from Chromium- and Firefox-family browsers
   src/passwords.rs        origins, which pages may save, save/update/nothing
   src/settings_file.rs    change one line of the config file, keep the rest
@@ -76,7 +73,7 @@ app/src/
   split.rs                split view, 2–4 pages: place/detach views, nested panes, pane focus
   site_groups.rs          one site's tabs as one row of tiles (Ctrl+Alt+G)
   cache.rs                keeps the HTTP cache under `cache`, biggest sites first
-  look.rs                 the design: palette, column rows, letters, pins, CSS
+  look.rs                 rippl's design: palette, column rows, letters, pins, CSS
   closed.rs               reopen closed tabs, copy clean address, paste and go
   sitecard.rs             site card, tab menu, duplicate, print, blocked pop-ups
   spaces.rs               spaces: switch, new, rename, delete, move tabs; the foot's buttons
@@ -94,14 +91,14 @@ app/src/
   chrome.rs               tabs on the side, as icons, or across the top; the strip above the page
   shortcuts.rs            your own keys for commands
   space_look.rs           spaces' colours and the swipe between spaces
-  home_theme.rs           the new tab's background: the painted walls (cairo), colours, image
+  home_theme.rs           the new tab's background: painted walls (cairo), colours, image
   pin_folders.rs          folders among the pins
   windows.rs              several windows sharing one engine; their sessions
   certificates.rs         client certificates: the folder, the picker
   sync.rs                 sync through a folder: scopes, applying changes, the files
   ai.rs                   Ask about this page (panel, streamed answers), Translate page
   translate.js            Translate page's script (rippl's world): read and put back words
-  motion.rs               the springs as CSS; what animates, `enter`, reduced motion
+  motion.rs               springs as CSS; what animates, `enter`, reduced motion
   loader.rs               the loading ring in a tab's icon's place
   elastic.js              elastic page edges (rippl's world)
   desktop.rs              installed? the default browser? making it so (xdg-settings)
@@ -175,7 +172,7 @@ its `close` signal. Two rules keep that safe:
 rippl's own scripts (the reading-mode extractor, the hide picker, the sign-in form watcher) run in a separate JavaScript
 world named `rippl`. They see the same page, but the page can't see their variables, call their
 functions or post to their message handlers (`ripplHide` and `ripplPasswords` are registered only in that world). This
-is the same idea `WKContentWorld "Search"`.
+is what a WebKit content world is for.
 
 ## rippl:// pages
 
@@ -218,17 +215,3 @@ in pages. Details: [phases/phase-3-shield.md](phases/phase-3-shield.md).
 | `~/.config/rippl/shield-allow` | sites Shield is off for |
 | `$XDG_RUNTIME_DIR/rippl.sock` | control socket, only with `RIPPL_CONTROL=1` |
 
-## Map from the Mac browser (macOS) to rippl (Linux)
-
-| the Mac browser (Swift, WKWebView) | rippl (Rust, webkit6) |
-|---|---|
-| `WKWebView` | `webkit6::WebView` |
-| shared `WKProcessPool` | one `WebContext` |
-| `WKWebsiteDataStore` / `.nonPersistent()` | `NetworkSession::new(data, cache)` / `new_ephemeral()` |
-| `WKContentRuleListStore` | `UserContentFilterStore` (same JSON format) |
-| `interactionState` | `session_state()` / `restore_session_state()` |
-| DispatchSource memory pressure | PSI, `/proc/pressure/memory` |
-| `malloc_zone_pressure_relief` | `malloc_trim(0)` |
-|  socket | `control.rs` socket |
-| (none on macOS) | `MemoryPressureSettings`: a memory limit for each web process |
-| `WKWebExtension` (Chrome extensions) | none in WebKitGTK, so no extensions |

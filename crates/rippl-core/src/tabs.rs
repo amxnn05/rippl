@@ -9,7 +9,7 @@
 //! - **Asleep**: had a view, gave it back. Keeps its serialized session state
 //!   (back/forward list, scroll) so waking puts it back where it was.
 //!
-//! The same rules : a tab sleeps after `wait`
+//! The rules: a tab sleeps after `wait`
 //! without being looked at, except the tab on screen, pinned tabs, and tabs
 //! that would lose something by sleeping (sound playing, camera or mic in use).
 

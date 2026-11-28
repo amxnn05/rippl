@@ -1,4 +1,4 @@
-//! The new tab draws it.
+//! The new tab: the field in the middle of the page, the Home grid under it.
 //!
 //! A tab with nowhere to be yet has no page: the address field stands on
 //! its own in the middle of the page card, 560 wide (less in a narrow
@@ -15,7 +15,7 @@
 //! the same look holds its place there, so the column never loses its
 //! field; clicking it is clicking the field.
 //!
-//! it breathes a faint glow under the field; rippl doesn't, as an
+//! No glow breathes under the field: an
 //! animation that never stops costs a frame clock on an idle window.
 
 use webkit6::prelude::*;
@@ -79,7 +79,7 @@ mod imp {
     }
 }
 
-/// the `Metrics.fieldWidth`.
+/// The field's width on the new tab.
 const FIELD_WIDTH: i32 = 560;
 /// The field's height, and how far its middle sits above the page's.
 const FIELD_HEIGHT: i32 = 50;

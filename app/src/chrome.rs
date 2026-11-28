@@ -1,6 +1,6 @@
 //! Where the tabs and the field are: down the side (the column, as ever),
-//! the column as icons only,
-//! or tabs across the top.
+//! the column as icons only (`column = icons`),
+//! or tabs across the top (`tabs = top`).
 //!
 //! - **Icons only**: the column 52 wide, each tab its site's icon or letter
 //!   in a small tile, its title a tooltip, nothing that grows or slides out

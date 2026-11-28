@@ -1,5 +1,5 @@
-//! Ctrl+Tab: the tabs of the space on screen as pictures (the
-//! ), the one you are on first, then the ones you last
+//! Ctrl+Tab: the tabs of the space on screen as pictures, the one you are
+//! on first, then the ones you last
 //! left, latest first. Tab (or →) walks on, Shift+Tab (or ←) back; letting
 //! go of Ctrl goes to the one picked, Esc stays where you were, and a click
 //! picks one. A quick Ctrl+Tab is the tab you were on before, and never

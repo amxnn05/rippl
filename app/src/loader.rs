@@ -1,5 +1,5 @@
-//! The ring a tab shows in its icon's place while its page loads (the
-//! loading ring, "in the mark's place, as on a pin"): a thin arc going
+//! The ring a tab shows in its icon's place while its page loads (in the
+//! mark's place, as on a pin): a thin arc going
 //! round a faint track, in the tab's own ink. Every ring is timed off the
 //! frame clock, so all loading tabs turn together, and a redrawn column
 //! doesn't make one jump. It costs frames only while something loads: the

@@ -1,21 +1,21 @@
-# Feature batch 6: Settings has it, the AI add-on, Translate page, agents over MCP
+# Feature batch 6: Settings laid out anew, the AI add-on, Translate page, agents over MCP
 
 **Status:** done (2026-11-26). Plan: [features.md](../features.md).
 
-## Settings, laid out as the
+## Settings, laid out anew
 
-rippl://settings (Ctrl+, or the gear) is now the Settings tab:
+rippl://settings (Ctrl+, or the gear) is now laid out as a settings window:
 
 - **The sections are in the column**, where the tabs are, while Settings is the tab in front
   (settings_rail.rs): **‹ Tabs** at the top (back to your tabs; going to Settings again brings
-  the sections back), "Settings", **Find a setting**, then the sections in the three blocks,
+  the sections back), "Settings", **Find a setting**, then the sections in three blocks,
   the chosen one on a white card. A click shows that section in the page; the page's own rail
   stands aside (the page says so before it is drawn, so it never flashes). Going to a section
   from the page moves the column's mark too. With tabs across the top or the column as icons,
   where there is no column of titles, the page keeps its own rail:
 - **The page's own rail** down the left, the page's whole height (196 wide, a faint wash, a hairline beside
   it): "Settings", a **Find a setting** field (Ctrl+F goes to it on this page; Esc empties it),
-  then the sections in the three blocks: General, Appearance, Themes, Tabs, Browsing,
+  then the sections in three blocks: General, Appearance, Themes, Tabs, Browsing,
   Spaces & Pins · Passwords, Privacy, AI, Keyboard & Mouse · About. The chosen one sits on a
   white card. While finding, each section shows how many of its settings match.
 - **The section** on the right, at most 600 wide: its icon and title, then groups (a small
@@ -29,8 +29,8 @@ rippl://settings (Ctrl+, or the gear) is now the Settings tab:
   key: press it (Esc stops). **+** adds another; **Reset** gives a command its own keys back. While
   it listens, rippl's own shortcuts step aside (they would take Ctrl+T before the page saw it)
   and come back when the key is saved or Esc is pressed.
-- The other rippl pages (History, Bookmarks, Archive, Passwords) keep their links; Settings
-   has none above it.
+- The other rippl pages (History, Bookmarks, Archive, Passwords) keep their links; Settings has none
+  above it.
 
 Tested: the column showed the sections in the tabs' place, a section chosen there showed in the
 page, Find a setting there found "Tabs › Memory" for "sleep", and ‹ Tabs gave the tabs back.
@@ -39,7 +39,7 @@ found Privacy › Connection › Proxy.
 
 ## The AI add-on (`ai`)
 
-the , , , with a model running on this computer:
+With a model running on this computer:
 Ollama, llama.cpp's `llama-server`, LM Studio, through the OpenAI-style chat API they all speak.
 Off until `ai = on`; nothing is sent before you ask, and then only the page you asked about, to
 `ai_endpoint` (Ollama's address by default: `http://127.0.0.1:11434/v1`), model `ai_model`.
@@ -51,7 +51,7 @@ Off until `ai = on`; nothing is sent before you ask, and then only the page you 
 
 ## Translate page (Ctrl+Shift+L, `translate_to`)
 
-the , with the same local model instead of Apple's: a script in rippl's world
+With the same local model: a script in rippl's world
 reads the page's words (text and the title, alt, placeholder and aria-label attributes;
 on-screen first; code, fields, editable areas and `translate="no"` left alone), sends them in
 slices of 40 as a JSON array, and puts each translation back in the same text node or attribute
@@ -66,7 +66,7 @@ No model is installed on this machine, and none was downloaded.
 
 ## Agents over MCP (`agents`, `rippl --mcp`)
 
-the  and search-mcp. `agents = on` (off by default; Settings › About ›
+`agents = on` (off by default; Settings › About ›
 Developer) opens rippl's socket for an agent's commands alone; `rippl --mcp` is the MCP server an
 agent runs (stdio, one JSON-RPC message a line): `claude mcp add rippl -- rippl --mcp`.
 

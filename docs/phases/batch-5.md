@@ -8,12 +8,11 @@ Nothing to build: WebKitGTK 2.54 has MPRIS built in (its MediaSession feature, o
 plays registers `org.mpris.MediaPlayer2.dev.rippl.Rippl…` with the identity "rippl", the page's
 title and the media's length, and the desktop's play/pause key reaches it. Measured with `busctl`:
 `PlayPause` paused a playing video; once paused, WebKit takes rippl off the bus within seconds,
-so the keys go back to Spotify or whatever played before: the problem the 
-works around on the Mac doesn't happen here.
+so the keys go back to Spotify or whatever played before: the problem other browsers work around on the Mac doesn't happen here.
 
 ## Proxy (`proxy`)
 
-the . `proxy = system` (default: the desktop's settings), `direct`, or
+`proxy = system` (default: the desktop's settings), `direct`, or
 `http://host:port`, `socks5://host:port` (`socks4`, `https` too; a user name may come before an
 `@`, never a password: the config is plain text). It goes on **every** network session (the
 first space's, each space's, each private tab's, `Engine::set_proxy`) and on rippl's own
@@ -26,7 +25,7 @@ went round it.
 
 ## Client certificates
 
-the . Linux has no keychain of identities, so rippl keeps them in
+Linux has no keychain of identities, so rippl keeps them in
 `~/.local/share/rippl/certificates/`: each file a certificate with its key (`.pem`, or `.p12` /
 `.pfx` without a password). When a site asks (WebKit's `authenticate` signal,
 `ClientCertificateRequested`), a dialog names the site and lists each identity ("Alice Tester —
@@ -39,7 +38,7 @@ server saw "Alice Tester"; the dialog shows as above.
 
 ## Email links in a webmail (`webmail`)
 
-the . `webmail = none` (default: your mail app, through the desktop), `gmail`,
+`webmail = none` (default: your mail app, through the desktop), `gmail`,
 `outlook`, `fastmail`, `proton`. A `mailto:` link opens the compose page in a new tab with the
 draft filled in. The mailto is read as RFC 6068 has it (`rippl_core::mail`): `+` stays a plus,
 CRLF becomes a line break, the first subject and body count, at most 50 of each kind of address;
@@ -83,7 +82,7 @@ bytes=1376256-`, and the finished 4 MB file was identical to the original, byte 
 
 ## Sync through a folder (`sync_folder`)
 
-the  and : no account, no server. `sync_folder = <path>`: any
+No account, no server. `sync_folder = <path>`: any
 folder that Syncthing, Nextcloud, Dropbox or a shared disk keeps the same on your devices. Each
 device writes `<folder>/rippl sync/<profile>/<device id>.json` (only it writes that file) and
 reads the others', at start, every two minutes, and when the setting changes.

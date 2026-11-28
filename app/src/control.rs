@@ -1,4 +1,4 @@
-//! Driving rippl from a script  does: for tests,
+//! Driving rippl from a script: for tests,
 //! measurements and, later, agents. Off unless RIPPL_CONTROL=1.
 //!
 //! A Unix socket at `$XDG_RUNTIME_DIR/rippl.sock`, mode 0600 inside a

@@ -1,5 +1,4 @@
-//! Split view: up to four tabs on screen at once (the 
-//! and ), dividers between them.
+//! Split view: up to four tabs on screen at once, dividers between them.
 //!
 //! - Ctrl+Alt+S splits the tab in front with the tab you were on before
 //!   it, or takes it out of its split. Alt-click on a tab in the column

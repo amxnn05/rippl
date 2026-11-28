@@ -1,8 +1,7 @@
-//! Spaces' colours and the swipe between spaces (the 
-//! colours,  and ).
+//! Spaces' colours and the swipe between spaces.
 //!
 //! - **Colour**: a space's menu (right-click its button at the column's
-//!   foot) offers the five colours, and a second one to make a
+//!   foot) offers five colours, and a second one to make a
 //!   gradient. The chrome behind the tabs wears it faintly: the column,
 //!   the strip above the page, the bookmarks bar and the ground around the
 //!   page's card, never the page itself. 7% of the colour on the light
@@ -22,7 +21,7 @@ use webkit6::{glib, gtk};
 
 use crate::browser::Browser;
 
-/// the palette: blue, green, orange, red, violet.
+/// The palette: blue, green, orange, red, violet.
 pub(crate) const COLOURS: [(&str, &str); 5] =
     [("Blue", "#4285f5"), ("Green", "#33a873"), ("Orange", "#f59e33"), ("Red", "#e65466"), ("Violet", "#9e66e6")];
 /// How much of the colour the chrome wears.
