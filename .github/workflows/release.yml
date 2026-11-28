@@ -141,4 +141,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" --title "rippl ${GITHUB_REF_NAME#v}" --notes-file packaging/release-notes.md \
             out/macos/rippl-macos-universal.tar.gz out/macos/rippl-macos-universal.dmg \
             out/windows/rippl-windows-x64-setup.exe out/windows/rippl-windows-x64-portable.zip \
-            out/rippl-linux-x86_64-x86_64/rippl-linux-x86_64.flatpak
+            out/rippl-linux-x86_64-x86_64.flatpak/rippl-linux-x86_64.flatpak
