@@ -11,9 +11,10 @@
 //! it on. A server that won't answer a range sends the whole file again,
 //! which then starts over. The proxy setting applies.
 //!
-//! Nothing about downloads is kept after quitting: the files are in your
-//! Downloads folder, and that is the record (a `.part` left there can be
-//! deleted).
+//! Each one that ends (done or failed) goes on the list rippl://downloads
+//! shows (`downloads.log` in rippl's data folder, the newest 500, never a
+//! private tab's): its name, where it came from and where it went. Nothing
+//! else is kept; a `.part` left in Downloads can be deleted.
 //!
 //! Videos (Ctrl+Shift+Y, grab.rs) come down through yt-dlp, run as a
 //! process of its own, and are listed here the same way: its progress lines
@@ -25,6 +26,8 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 
+use rippl_core::downloads::{read_log, write_log, Entry};
+use rippl_core::pages::LiveDownload;
 use rippl_core::ytdlp::{self, Format, Line};
 use webkit6::prelude::*;
 use webkit6::{gio, glib, gtk, Download};
@@ -45,6 +48,8 @@ struct Item {
     /// The file it ends up as, and the bytes it will have.
     dest: PathBuf,
     total: u64,
+    /// From a private tab: never on the list.
+    private: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -110,7 +115,19 @@ pub struct Downloads {
     items: RefCell<Vec<Item>>,
     grabs: RefCell<Vec<Grab>>,
     next_grab: Cell<u32>,
+    /// What rippl://downloads lists, oldest first (`downloads.log`).
+    kept: RefCell<Vec<Entry>>,
+    /// `history = on`: the list is kept; off, nothing new goes on it.
+    pub keep_list: Cell<bool>,
     me: RefCell<Weak<Downloads>>,
+}
+
+fn log_path() -> PathBuf {
+    crate::engine::data_dir().join("downloads.log")
+}
+
+fn now() -> i64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)
 }
 
 /// `~/Downloads`, or where the user's XDG settings put it.
@@ -124,6 +141,8 @@ impl Downloads {
         area.add_css_class("downloads");
         let heading = gtk::Label::builder().label("Downloads").xalign(0.0).build();
         heading.add_css_class("heading");
+        heading.set_cursor_from_name(Some("pointer"));
+        heading.set_tooltip_text(Some("All downloads (Ctrl+J)"));
         let rows = gtk::Box::new(gtk::Orientation::Vertical, 2);
         area.append(&heading);
         area.append(&rows);
@@ -136,6 +155,8 @@ impl Downloads {
             items: RefCell::new(Vec::new()),
             grabs: RefCell::new(Vec::new()),
             next_grab: Cell::new(1),
+            keep_list: Cell::new(true),
+            kept: RefCell::new(read_log(&std::fs::read_to_string(log_path()).unwrap_or_default())),
             me: RefCell::new(Weak::new()),
         });
         *downloads.me.borrow_mut() = Rc::downgrade(&downloads);
@@ -166,7 +187,13 @@ impl Downloads {
         line.append(&pause);
         line.append(&close);
         let bar = gtk::ProgressBar::new();
-        let status = gtk::Label::builder().xalign(0.0).build();
+        // Ellipsized, as the name: a status growing as it runs ("12 MB of
+        // 400 MB · 2 MB/s") would otherwise widen the whole column.
+        let status = gtk::Label::builder()
+            .xalign(0.0)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .max_width_chars(1)
+            .build();
         status.add_css_class("dim");
         row.append(&line);
         row.append(&bar);
@@ -186,6 +213,7 @@ impl Downloads {
     pub fn started(&self, download: &Download) {
         let Row { row, label, pause, close, bar, status } = self.new_row("Starting…");
         let view = download.web_view();
+        let private = view.as_ref().and_then(|v| v.network_session()).is_some_and(|s| s.is_ephemeral());
         self.items.borrow_mut().push(Item {
             download: download.clone(),
             row: row.clone(),
@@ -199,6 +227,7 @@ impl Downloads {
             pause: pause.clone(),
             dest: PathBuf::new(),
             total: 0,
+            private,
         });
         let weak = self.me.borrow().clone();
         let d = download.clone();
@@ -252,7 +281,12 @@ impl Downloads {
             done_bar.set_visible(false);
             done_status.set_label("Done. Click to open");
             item.pause.set_visible(false);
+            let entry = (!item.private).then(|| Entry { when: now(), done: true, name: item.name.clone(), path: path.to_string_lossy().into_owned(), url: item.url.clone(), note: String::new() });
             item.state = State::Done(path);
+            drop(items);
+            if let Some(e) = entry {
+                this.record(e);
+            }
         });
 
         let weak = self.me.borrow().clone();
@@ -272,7 +306,12 @@ impl Downloads {
             };
             bar.set_visible(false);
             status.set_label(&why);
+            let entry = (!item.private).then(|| Entry { when: now(), done: false, name: item.name.clone(), path: String::new(), url: item.url.clone(), note: why.clone() });
             item.state = State::Failed(why);
+            drop(items);
+            if let Some(e) = entry {
+                this.record(e);
+            }
         });
 
         // Click a finished download: open it with its default app.
@@ -435,15 +474,23 @@ impl Downloads {
                     let Some(item) = items.iter_mut().find(|i| i.download == d) else { return };
                     item.bar.set_visible(false);
                     item.pause.set_visible(false);
-                    match moved {
+                    let entry = match moved {
                         Ok(()) => {
                             item.status.set_label("Done. Click to open");
+                            let e = Entry { when: now(), done: true, name: item.name.clone(), path: final_path.to_string_lossy().into_owned(), url: item.url.clone(), note: String::new() };
                             item.state = State::Done(final_path);
+                            e
                         }
                         Err(e) => {
                             item.status.set_label(&e.to_string());
                             item.state = State::Failed(e.to_string());
+                            Entry { when: now(), done: false, name: item.name.clone(), path: String::new(), url: item.url.clone(), note: e.to_string() }
                         }
+                    };
+                    let private = item.private;
+                    drop(items);
+                    if !private {
+                        this.record(entry);
                     }
                 }
                 Err(_) if cancel.is_cancelled() => {} // paused again, or taken away
@@ -468,6 +515,91 @@ impl Downloads {
             self.rows.remove(&row);
         }
         self.refresh_visible();
+    }
+
+    /// A video's line on the list.
+    fn grab_entry(&self, id: u32, done: bool, path: &str, why: &str) -> Option<Entry> {
+        let grabs = self.grabs.borrow();
+        let g = grabs.iter().find(|g| g.id == id)?;
+        let name = if g.name.is_empty() { g.url.clone() } else { g.name.clone() };
+        // "yt-dlp" in the note: Try again goes back to yt-dlp.
+        let note = if done { format!("{} (yt-dlp)", g.format.key()) } else { format!("{why} (yt-dlp)") };
+        Some(Entry { when: now(), done, name, path: path.to_string(), url: g.url.clone(), note })
+    }
+
+    /// Puts `e` on the list, and the list in its file.
+    fn record(&self, e: Entry) {
+        if !self.keep_list.get() {
+            return;
+        }
+        self.kept.borrow_mut().push(e);
+        self.save_kept();
+    }
+
+    fn save_kept(&self) {
+        let text = write_log(&self.kept.borrow());
+        let path = log_path();
+        if let Some(dir) = path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        if let Err(e) = std::fs::write(&path, text) {
+            eprintln!("rippl: could not keep the downloads list: {e}");
+        }
+    }
+
+    /// The list, oldest first.
+    pub fn kept(&self) -> Vec<Entry> {
+        self.kept.borrow().clone()
+    }
+
+    /// The kept download a page button names (`when\nurl`).
+    pub fn find_kept(&self, key: &str) -> Option<Entry> {
+        let (when, url) = key.split_once('\n')?;
+        let when: i64 = when.parse().ok()?;
+        self.kept.borrow().iter().rev().find(|e| e.when == when && e.url == url).cloned()
+    }
+
+    pub fn forget_kept(&self, key: &str) {
+        if let Some(e) = self.find_kept(key) {
+            self.kept.borrow_mut().retain(|k| k != &e);
+            self.save_kept();
+        }
+    }
+
+    /// Downloads `e` again: a video through yt-dlp, else from its address
+    /// in the default store.
+    pub fn again(&self, e: &Entry, format: Format) -> Result<(), String> {
+        if e.note.ends_with("(yt-dlp)") {
+            let format = if e.note.starts_with("audio") { Format::Audio } else if e.note.starts_with("video") { Format::Video } else { format };
+            return self.grab(&e.url, format);
+        }
+        let session = self.session.borrow().clone().ok_or("nothing to download it with")?;
+        session.download_uri(&e.url);
+        Ok(())
+    }
+
+    pub fn clear_kept(&self) {
+        self.kept.borrow_mut().clear();
+        self.save_kept();
+    }
+
+    /// What is coming in now (or paused), for rippl://downloads.
+    pub fn live(&self) -> Vec<LiveDownload> {
+        let items = self.items.borrow();
+        let grabs = self.grabs.borrow();
+        let webkit = items.iter().filter(|i| !matches!(i.state, State::Done(_) | State::Failed(_))).map(|i| LiveDownload {
+            name: if i.name.is_empty() { "Starting…".into() } else { i.name.clone() },
+            status: i.status.text().to_string(),
+            fraction: i.bar.fraction(),
+            paused: matches!(i.state, State::Paused(_)),
+        });
+        let videos = grabs.iter().filter(|g| matches!(g.state, GrabState::Running | GrabState::Paused)).map(|g| LiveDownload {
+            name: if g.name.is_empty() { g.url.clone() } else { g.name.clone() },
+            status: g.widgets.status.text().to_string(),
+            fraction: g.fraction,
+            paused: g.state == GrabState::Paused,
+        });
+        webkit.chain(videos).collect()
     }
 
     /// One line per download, for the control socket: WebKit's first, then
@@ -709,6 +841,9 @@ impl Downloads {
             g.fraction = 1.0;
             (g.widgets.clone(), path)
         };
+        if let Some(e) = self.grab_entry(id, true, &path.to_string_lossy(), "") {
+            self.record(e);
+        }
         w.bar.set_visible(false);
         w.pause.set_visible(false);
         w.status.set_label(if path.is_dir() { "Done. Click to open the folder" } else { "Done. Click to open" });
@@ -722,6 +857,9 @@ impl Downloads {
             g.process = None;
             g.widgets.clone()
         };
+        if let Some(e) = self.grab_entry(id, false, "", why) {
+            self.record(e);
+        }
         w.bar.set_visible(false);
         w.pause.set_visible(false);
         w.status.set_label(why);
@@ -912,6 +1050,22 @@ fn duration(secs: u64) -> String {
         0..60 => format!("{secs} s"),
         60..3600 => format!("{} min", secs / 60),
         _ => format!("{} h {} min", secs / 3600, secs % 3600 / 60),
+    }
+}
+
+impl crate::browser::Browser {
+    /// A click on the column's "Downloads" heading: every download, on
+    /// rippl://downloads.
+    pub(crate) fn wire_downloads_page(&self) {
+        let Some(heading) = self.downloads.area.first_child() else { return };
+        let click = gtk::GestureClick::new();
+        let weak = self.weak();
+        click.connect_released(move |_, _, _, _| {
+            if let Some(b) = weak.upgrade() {
+                glib::idle_add_local_once(move || b.open_internal("downloads"));
+            }
+        });
+        heading.add_controller(click);
     }
 }
 

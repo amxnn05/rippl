@@ -132,21 +132,19 @@ impl Browser {
             button.set_focusable(false);
             button.set_tooltip_text(Some(&format!("{} (Alt+{})", space.name, n + 1)));
             let id = space.id;
-            let click = gtk::GestureClick::builder().button(0).build();
+            // A left click is the button's own (a gesture on a button never
+            // sees it: the button claims it first); the right one is ours.
+            let weak = self.weak();
+            button.connect_clicked(move |_| {
+                let Some(b) = weak.upgrade() else { return };
+                glib::idle_add_local_once(move || b.switch_space(id));
+            });
+            let click = gtk::GestureClick::builder().button(3).build();
             let weak = self.weak();
             click.connect_released(move |gesture, _, _, _| {
                 let Some(b) = weak.upgrade() else { return };
-                let right = gesture.current_button() == 3;
-                let anchor = gesture.widget();
-                glib::idle_add_local_once(move || {
-                    if right {
-                        if let Some(w) = anchor {
-                            b.space_menu(id, &w);
-                        }
-                    } else {
-                        b.switch_space(id);
-                    }
-                });
+                let Some(w) = gesture.widget() else { return };
+                glib::idle_add_local_once(move || b.space_menu(id, &w));
             });
             button.add_controller(click);
             self.spaces_box.append(&button);

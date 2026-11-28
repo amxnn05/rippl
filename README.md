@@ -91,7 +91,7 @@ To run it from the source folder without installing: `cargo build --release && .
 (the web extension is built beside the binary; rippl finds it there).
 
 `Ctrl+L` address · `Ctrl+T` new tab · `Ctrl+W` close · `Ctrl+Shift+N` private tab · `Ctrl+Tab` tab switcher ·
-`Ctrl+1`–`9` jump · `Alt+←/→` back/forward · `Ctrl+F` find · `Ctrl+D` bookmark · `Ctrl+H` history ·
+`Ctrl+1`–`9` jump · `Alt+←/→` back/forward · `Ctrl+F` find · `Ctrl+D` bookmark · `Ctrl+H` history · `Ctrl+J` downloads ·
 `Ctrl+Shift+P` pin · `Ctrl+Alt+S` split view · `Ctrl+Alt+G` group this site · `Ctrl+Shift+Y` download a video · `Ctrl+Alt+P` passwords · `F9` reading mode · `Ctrl+Shift+H` hide something · `Ctrl+,` settings ·
 `Ctrl+Shift+B` Shield off for this site · `Ctrl+S` hide tabs.
 All keys and settings: [docs/configuration.md](docs/configuration.md).

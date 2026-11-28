@@ -85,6 +85,67 @@ one row, and videos at their best quality and frame rate.
   frame-time based, so it doesn't jump in WebKit's few steps; a finished load sweeps to the end
   before the line goes. `motion = reduced` sets it directly.
 
+- **A setting changed said "Saved." every time.** The change shows for itself; a note is left
+  only for what it can't show (a restart needed, open pages unchanged).
+
+- **The column widened while a download ran.** A download's status line ("12.3 MB of 412 MB ·
+  2.1 MB/s · 3 min left", or yt-dlp's errors) had no width limit, so the column grew to fit it
+  and changed width as the numbers did. It is ellipsized now, as the name was.
+
+- **A click on a space at the column's foot didn't switch to it** (a pin's left click had the
+  same fault). A click gesture on a `GtkButton` never sees the left click released: the button
+  claims it first. Spaces now switch on the button's own `clicked`; pins (`Browser::on_click`)
+  take theirs from `clicked` too, with Alt noted on the way down. Right and middle clicks stay
+  with the gesture. The control socket's `space` goes around the pointer, which is why tests
+  passed.
+
+## A downloads page
+
+`rippl://downloads` (`Ctrl+J`, or a click on *Downloads* at the column's foot) is a page of its
+own, in Settings' look, without the History/Bookmarks bar: what is coming in now, with its
+progress (the page reloads every 1.5 s while something is), then every download kept, newest
+first, each with a tile for its kind. A finished one: *Open*, *Show in folder*, ×. A failed one:
+*Try again* (a video goes back to yt-dlp, in the format it had), ×. *Clear list* empties it; the
+files stay. The list is `downloads.log` in rippl's data folder (`rippl_core::downloads::Entry`,
+the newest 500), written when a download ends; never from a private tab, and not while
+`history = off`.
+
+## Motion, retuned (after the first push)
+
+Checked against Emil Kowalski's animation rules (frequency, easing, physicality):
+
+- **What keys open many times a day moves least.** A new tab's field (Ctrl+T) no longer rises
+  for 380 ms with a bounce; it is just there, and the offers under it fade in 120 ms. Ctrl+Tab's
+  layer fades in 120 ms instead of popping for 280 ms, and its cards change at once while Tab is
+  held. Ctrl+F's bar drops in 180 ms, the video bar's field in 180 ms, both without overshoot.
+- **Exits are never `ease-in`.** A notice leaving, a closed tab's row and a group's tile used a
+  curve that starts slow, at the moment you watch; they now take 150 ms with a strong ease-out.
+- **One curve, as a CSS variable:** `--ease-out` `cubic-bezier(0.23, 1, 0.32, 1)` for everything
+  that enters or leaves. It settles without overshoot, like Apple's critically damped spring
+  (damping 1): nothing in rippl's chrome is flung, so nothing bounces; the page's elastic edges
+  keep theirs. Popovers grow from their top, where their trigger is (`transform-origin`).
+- **Presses answer at once:** 97% in 100 ms on press, back in 160 ms on release, without
+  overshooting; group tiles give too.
+- **Tracking by size** (Apple's typography): small bold labels (group headings, the downloads
+  heading, letter marks, badges) +0.02em; the switcher's 28 px letter −0.02em; the new tab's field
+  −0.01em.
+- **One dim for every layer that takes the focus** (the video bar, Ctrl+Tab, peek): a soft grey
+  wash, lighter around the middle, in place of two black tints and a near-invisible one.
+- **Leaving the way they came** (Apple's spatial consistency): peek shrinks back as its dim
+  lifts, and the AI panel slides out to the right it came from (`Browser::leave`, 150 ms).
+  Opened again while leaving, they stay; a new peek replaces a leaving one at once.
+- **Depth by size:** three shadows (`--lift-1` field and offers, `--lift-2` popovers, `--lift-3`
+  peek and the switcher), each a contact shadow plus an ambient one, deeper in dark. In dark,
+  floating surfaces also catch a faint light on their top edge (`--edge`), and the bars over
+  the page (find, a question, notices) carry a hairline so they hold on a dark page.
+- **Hit targets:** the player's buttons 20 px (were 15), a tab's × 20 px.
+- **The desktop's "reduce animation"** (`gtk-enable-animations` off, read once at start) now
+  makes rippl's motion reduced as well, elastic edges included.
+- **A theme change eases** (240 ms) instead of flashing from light to dark.
+- **Internal pages** (Settings, History, the welcome): the same ease-out without overshoot, a
+  faster press, Settings' switches glide (220 ms) with a softer knob shadow, and large titles
+  tracked tighter (−0.015em to −0.022em, reading mode's title too).
+
 ## Measurements
 
 This machine, debug build, local test server, scratch profile:

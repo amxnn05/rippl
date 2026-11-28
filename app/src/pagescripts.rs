@@ -106,7 +106,7 @@ impl Browser {
             }
         }
         // Elastic edges (motion.rs), with motion on.
-        if config.elastic && config.motion_full {
+        if config.elastic && config.motion_full && crate::motion::desktop_animates() {
             scripts.push(UserScript::for_world(
                 ELASTIC,
                 UserContentInjectedFrames::TopFrame,

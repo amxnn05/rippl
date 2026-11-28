@@ -151,8 +151,12 @@ impl Browser {
         if !self.ai.panel.is_visible() && !self.ai_ready() {
             return;
         }
-        let show = !self.ai.panel.is_visible();
-        self.ai.panel.set_visible(show);
+        let show = !self.ai.panel.is_visible() || self.ai.panel.has_css_class("leaving");
+        if show {
+            Browser::arrive(&self.ai.panel);
+        } else {
+            self.leave(&self.ai.panel);
+        }
         if show {
             if self.ai.answer.buffer().char_count() == 0 {
                 let c = self.config.borrow();
@@ -175,7 +179,7 @@ impl Browser {
         }
         let cancel = gio::Cancellable::new();
         *self.ai.asking.borrow_mut() = Some(cancel.clone());
-        self.ai.panel.set_visible(true);
+        Browser::arrive(&self.ai.panel);
         self.ai.say(if question.is_empty() { "Reading the page…" } else { "Thinking…" });
         let question = question.to_string();
         let weak = self.weak();

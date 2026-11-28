@@ -101,7 +101,7 @@ Control.
 | Split tabs 2+1, sleep timer 6 s, 16 s idle | **both split tabs awake**, the third asleep |
 | Another tab, then back | single, then the pair again |
 | `Ctrl+Alt+S` on a pair | separated |
-| Search engine changed on the settings page | "Saved."; file has `search = brave`; the next search went to Brave Search |
+| Search engine changed on the settings page | saved (no note since phase 11); file has `search = brave`; the next search went to Brave Search |
 | `sleep = 0` on the settings page | refused: "\"0\" isn't a value for sleep" |
 | Move a bookmark to `Reading/Later` | grouped under that folder |
 | Memory with the extension | no measurable difference |

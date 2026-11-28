@@ -84,7 +84,7 @@ fn frame(page: &str, title: &str, token: &str, body: &str) -> String {
 body {{ font: 15px/1.45 system-ui, sans-serif; max-width: 860px; margin: 32px auto; padding: 0 20px; }}
 nav a {{ margin-right: 16px; color: inherit; opacity: .6; text-decoration: none; }}
 nav a.here {{ opacity: 1; font-weight: 600; }}
-h1 {{ font-size: 22px; margin: 22px 0 14px; }} h2 {{ font-size: 16px; margin: 28px 0 8px; }}
+h1 {{ font-size: 22px; line-height: 1.2; letter-spacing: -.015em; margin: 22px 0 14px; }} h2 {{ font-size: 16px; letter-spacing: -.005em; margin: 28px 0 8px; }}
 .row {{ display: flex; align-items: center; gap: 12px; padding: 7px 4px; border-bottom: 1px solid var(--line); }}
 .row .main {{ flex: 1; min-width: 0; }}
 .row .main a {{ color: inherit; text-decoration: none; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
@@ -115,7 +115,7 @@ body.page-welcome {{ max-width: 600px; margin: 0 auto; padding: 56px 24px; font:
 @media (prefers-color-scheme: dark) {{ body.page-welcome {{
   --ground: #1c1c1c; --ink: #ededed; --muted: rgba(255,255,255,.55); --hairline: #333333; --wash: rgba(255,255,255,.087); --hover: rgba(255,255,255,.06); }} }}
 .welcome .logo {{ width: 96px; height: 96px; display: block; margin: 0 auto 18px; }}
-.welcome h1 {{ text-align: center; font-size: 24px; margin: 0 0 8px; }}
+.welcome h1 {{ text-align: center; font-size: 24px; line-height: 1.15; letter-spacing: -.02em; margin: 0 0 8px; }}
 .welcome .lede {{ text-align: center; color: var(--muted); margin: 0 auto 28px; max-width: 460px; font-size: 14px; }}
 .welcome .card {{ border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; }}
 .welcome .keys {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; margin: 26px 4px; }}
@@ -125,23 +125,24 @@ body.page-welcome {{ max-width: 600px; margin: 0 auto; padding: 56px 24px; font:
   border-radius: 7px; padding: 4px 10px; text-decoration: none; cursor: pointer; }}
 .welcome .button.primary {{ background: var(--ink); color: var(--ground); border-color: var(--ink); padding: 8px 18px; font-size: 13.5px; }}
 .done {{ color: var(--muted); font-size: 12px; }}
-/* Motion, as rippl's own (motion.rs): sections slide in, rows answer the
-   pointer, buttons give; the welcome's parts rise one after another. */
+/* Motion, as rippl's own (motion.rs): one strong ease-out, no overshoot
+   (nothing here was flung); a press gives at once and lets go gently; the
+   welcome's parts, seen once, rise one after another. */
 @keyframes in-up {{ from {{ opacity: 0; transform: translateY(8px); }} to {{ opacity: 1; transform: none; }} }}
-@keyframes in-pop {{ from {{ opacity: 0; transform: scale(.92); }} to {{ opacity: 1; transform: none; }} }}
-.settings .cat:not([hidden]) {{ animation: in-up .28s cubic-bezier(.25,1.15,.4,1); }}
+@keyframes in-pop {{ from {{ opacity: 0; transform: scale(.95); }} to {{ opacity: 1; transform: none; }} }}
+.settings .cat:not([hidden]) {{ animation: in-up .24s cubic-bezier(.23,1,.32,1); }}
 .setting {{ transition: background-color .14s ease-out; }}
 .settings .card .setting:hover {{ background: var(--hover); }}
-button, a.button, .row {{ transition: background-color .14s ease-out, border-color .14s ease-out, transform .16s cubic-bezier(.2,1.3,.4,1); }}
-button:active, a.button:active {{ transform: scale(.97); }}
+button, a.button, .row {{ transition: background-color .14s ease, border-color .14s ease, transform .16s cubic-bezier(.23,1,.32,1); }}
+button:active, a.button:active {{ transform: scale(.97); transition-duration: .14s, .14s, .1s; }}
 .settings aside a {{ transition: background-color .2s ease-out, color .14s ease-out, box-shadow .24s ease-out; }}
-.toast {{ animation: in-up .3s cubic-bezier(.25,1.2,.4,1); }}
-.welcome .logo {{ animation: in-pop .5s cubic-bezier(.2,1.35,.4,1) both; }}
-.welcome h1 {{ animation: in-up .45s .08s cubic-bezier(.25,1.15,.4,1) both; }}
-.welcome .lede {{ animation: in-up .45s .14s cubic-bezier(.25,1.15,.4,1) both; }}
-.welcome .card {{ animation: in-up .5s .2s cubic-bezier(.25,1.15,.4,1) both; }}
-.welcome .keys {{ animation: in-up .5s .28s cubic-bezier(.25,1.15,.4,1) both; }}
-.welcome .go {{ animation: in-up .5s .34s cubic-bezier(.25,1.15,.4,1) both; }}
+.toast {{ animation: in-up .26s cubic-bezier(.23,1,.32,1); }}
+.welcome .logo {{ animation: in-pop .5s cubic-bezier(.23,1,.32,1) both; }}
+.welcome h1 {{ animation: in-up .45s .08s cubic-bezier(.23,1,.32,1) both; }}
+.welcome .lede {{ animation: in-up .45s .14s cubic-bezier(.23,1,.32,1) both; }}
+.welcome .card {{ animation: in-up .5s .2s cubic-bezier(.23,1,.32,1) both; }}
+.welcome .keys {{ animation: in-up .5s .28s cubic-bezier(.23,1,.32,1) both; }}
+.welcome .go {{ animation: in-up .5s .34s cubic-bezier(.23,1,.32,1) both; }}
 .row:hover {{ background: #8881; }}
 @media (prefers-reduced-motion: reduce) {{ *, *::before, *::after {{ animation: none !important; transition: none !important; }} }}
 .settings {{ display: flex; min-height: 100vh; }}
@@ -168,7 +169,7 @@ body.rail-in-column .settings aside {{ display: none; }}
 .settings .glyph {{ width: 16px; text-align: center; font-size: 12px; }}
 .settings main {{ flex: 1; min-width: 0; padding: 26px 24px 24px; }}
 .settings .column {{ max-width: 600px; margin: 0 auto; }}
-.settings header {{ display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; margin-bottom: 18px; }}
+.settings header {{ display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; letter-spacing: -.01em; margin-bottom: 18px; }}
 .settings header .glyph {{ font-size: 15px; width: auto; }}
 .settings .group {{ margin-bottom: 22px; }}
 .settings .group h2 {{ display: flex; align-items: center; gap: 6px; margin: 0 0 8px 2px; font-size: 10.5px; font-weight: 600; letter-spacing: .5px;
@@ -194,10 +195,44 @@ kbd {{ font: 11.5px "Inter", system-ui, sans-serif; padding: 2px 7px; border-rad
 a.button {{ text-decoration: none; }}
 .switch {{ position: relative; width: 34px; height: 20px; flex: none; }}
 .switch input {{ opacity: 0; width: 0; height: 0; }}
-.switch span {{ position: absolute; inset: 0; border-radius: 10px; background: var(--wash); box-shadow: inset 0 0 0 1px var(--hairline); transition: background .15s; cursor: pointer; }}
-.switch span::after {{ content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }}
+.switch span {{ position: absolute; inset: 0; border-radius: 10px; background: var(--wash); box-shadow: inset 0 0 0 1px var(--hairline); transition: background .2s ease; cursor: pointer; }}
+.switch span::after {{ content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2), 0 2px 6px rgba(0,0,0,.12); transition: transform .22s cubic-bezier(.23,1,.32,1); }}
 .switch input:checked + span {{ background: var(--ink); }}
 .switch input:checked + span::after {{ transform: translateX(14px); background: var(--ground); }}
+/* rippl://downloads: a page of its own, in Settings' look (no nav). */
+body.page-downloads {{ max-width: 680px; margin: 0 auto; padding: 48px 24px 64px;
+  font: 13px/1.4 "Inter", "Adwaita Sans", system-ui, sans-serif;
+  --ground: #ffffff; --ink: #171717; --muted: rgba(0,0,0,.46); --hairline: #e8e8e8; --wash: rgba(0,0,0,.063); --hover: rgba(0,0,0,.04); --tile: rgba(0,0,0,.035);
+  background: var(--ground); color: var(--ink); }}
+@media (prefers-color-scheme: dark) {{ body.page-downloads {{
+  --ground: #1c1c1c; --ink: #ededed; --muted: rgba(255,255,255,.55); --hairline: #333333; --wash: rgba(255,255,255,.087); --hover: rgba(255,255,255,.06); --tile: rgba(255,255,255,.05); }} }}
+body.page-downloads > nav {{ display: none; }}
+.dl-head {{ display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }}
+.dl-head h1 {{ margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.015em; }}
+.dl-head .count {{ color: var(--muted); font-size: 13px; }}
+.dl-head .clear {{ margin-left: auto; }}
+.dl-lede {{ color: var(--muted); font-size: 12px; margin: 0 0 22px; }}
+.dl-label {{ font-size: 10.5px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin: 22px 2px 8px; }}
+.dl-card {{ border-radius: 12px; box-shadow: 0 0 0 1px var(--hairline); overflow: hidden; }}
+.dl {{ display: flex; align-items: center; gap: 12px; padding: 10px 12px; transition: background-color .14s ease; }}
+.dl + .dl {{ border-top: 1px solid var(--hairline); }}
+.dl:hover {{ background: var(--hover); }}
+.dl .kind {{ flex: none; width: 34px; height: 34px; border-radius: 8px; background: var(--tile); display: grid; place-items: center;
+  font-size: 9.5px; font-weight: 700; letter-spacing: .03em; color: var(--muted); text-transform: uppercase; }}
+.dl .main {{ flex: 1; min-width: 0; }}
+.dl .name {{ font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+.dl .sub {{ color: var(--muted); font-size: 11.5px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+.dl .sub .failed {{ color: #e5484d; }}
+.dl .actions {{ display: flex; gap: 6px; flex: none; opacity: .0; transition: opacity .14s ease; }}
+.dl:hover .actions, .dl:focus-within .actions, .dl.failed .actions {{ opacity: 1; }}
+.dl .actions button, .dl-head .clear {{ font: 12px "Inter", system-ui, sans-serif; color: var(--ink); background: var(--ground);
+  border: 1px solid var(--hairline); border-radius: 7px; padding: 3px 10px; cursor: pointer; }}
+.dl .actions button:hover, .dl-head .clear:hover {{ background: var(--wash); border-color: var(--hairline); }}
+.dl .bar {{ height: 3px; margin-top: 7px; border-radius: 2px; background: var(--wash); overflow: hidden; }}
+.dl .bar i {{ display: block; height: 100%; border-radius: 2px; background: #4285f5; transition: width .3s cubic-bezier(.23,1,.32,1); }}
+.dl .bar.unknown i {{ width: 30%; }}
+.dl-empty {{ color: var(--muted); text-align: center; padding: 48px 12px; }}
+.dl-empty .kind {{ margin: 0 auto 10px; width: 44px; height: 44px; border-radius: 12px; background: var(--tile); display: grid; place-items: center; font-size: 18px; }}
 .toast {{ padding: 8px 12px; border-radius: 8px; background: var(--wash); font-size: 12.5px; margin: 0 0 16px; }}
 }}
 </style></head><body class="page-{page}">
@@ -280,6 +315,91 @@ pub fn history(places: &[Place], q: &str, now: i64, token: &str) -> String {
     }
     body.push_str(r#"<h2>Clear</h2><p><button class="danger" data-do="clear" data-confirm="Forget all history? Bookmarks stay.">Clear all history</button></p>"#);
     frame("history", "History", token, &body)
+}
+
+/// A download still coming in, for rippl://downloads.
+pub struct LiveDownload {
+    pub name: String,
+    /// Its status line, as the column shows it ("12 MB of 400 MB").
+    pub status: String,
+    /// 0 to 1, or below 0 when unknown.
+    pub fraction: f64,
+    pub paused: bool,
+}
+
+/// The kind of file, as a short label for its tile: the extension.
+fn kind_of(name: &str) -> String {
+    match name.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() && (1..=4).contains(&ext.len()) && ext.chars().all(|c| c.is_ascii_alphanumeric()) => ext.to_ascii_lowercase(),
+        _ => "file".into(),
+    }
+}
+
+/// rippl://downloads: a page of its own. What is coming in now, then every
+/// download kept (`downloads::Entry`), newest first.
+pub fn downloads(live: &[LiveDownload], kept: &[crate::downloads::Entry], now: i64, token: &str) -> String {
+    let count = match kept.len() {
+        0 => String::new(),
+        1 => "1 file".into(),
+        n => format!("{n} files"),
+    };
+    let clear = if kept.is_empty() {
+        ""
+    } else {
+        r#"<button class="clear" data-do="clear" data-confirm="Clear the list? The files stay in your Downloads folder.">Clear list</button>"#
+    };
+    let mut body = format!(
+        r#"<div class="dl-head"><h1>Downloads</h1><span class="count">{count}</span>{clear}</div><p class="dl-lede">Saved to your Downloads folder. This list stays on this computer; private tabs' downloads aren't on it.</p>"#
+    );
+    if !live.is_empty() {
+        body.push_str(r#"<div class="dl-label">Now</div><div class="dl-card">"#);
+        for d in live {
+            let bar = if d.fraction >= 0.0 {
+                format!(r#"<div class="bar"><i style="width: {:.1}%"></i></div>"#, d.fraction.clamp(0.0, 1.0) * 100.0)
+            } else {
+                r#"<div class="bar unknown"><i></i></div>"#.into()
+            };
+            body.push_str(&format!(
+                r#"<div class="dl live"><span class="kind">{kind}</span><div class="main"><div class="name">{name}</div><div class="sub">{state}{status}</div>{bar}</div></div>"#,
+                kind = escape(&kind_of(&d.name)),
+                name = escape(&d.name),
+                state = if d.paused { "Paused · " } else { "" },
+                status = escape(&d.status),
+            ));
+        }
+        body.push_str("</div>");
+        // While something comes in, the page keeps up with it.
+        body.push_str("<script>setTimeout(() => location.reload(), 1500)</script>");
+    }
+    if kept.is_empty() {
+        if live.is_empty() {
+            body.push_str(r#"<div class="dl-empty"><div class="kind">↓</div>Nothing downloaded yet.</div>"#);
+        }
+    } else {
+        body.push_str(r#"<div class="dl-label">Earlier</div><div class="dl-card">"#);
+        for e in kept.iter().rev() {
+            let key = escape(&format!("{}\n{}", e.when, e.url));
+            let (actions, sub) = if e.done {
+                (
+                    format!(r#"<button data-do="open" data-arg="{key}">Open</button><button data-do="folder" data-arg="{key}">Show in folder</button><button data-do="forget" data-arg="{key}" title="Take it off the list">×</button>"#),
+                    format!("{} · {}", ago(e.when, now), escape(crate::suggest::bare(&e.url))),
+                )
+            } else {
+                (
+                    format!(r#"<button data-do="again" data-arg="{key}">Try again</button><button data-do="forget" data-arg="{key}" title="Take it off the list">×</button>"#),
+                    format!(r#"<span class="failed">{}</span> · {}"#, escape(&e.note), ago(e.when, now)),
+                )
+            };
+            body.push_str(&format!(
+                r#"<div class="dl{failed}"><span class="kind">{kind}</span><div class="main"><div class="name">{name}</div><div class="sub">{sub}</div></div><div class="actions">{actions}</div></div>"#,
+                failed = if e.done { "" } else { " failed" },
+                kind = escape(&kind_of(&e.name)),
+                name = escape(&e.name),
+            ));
+        }
+        body.push_str("</div>");
+    }
+    frame("downloads", "Downloads", token, &body)
 }
 
 /// The tabs rippl closed by itself, newest first.
@@ -945,7 +1065,7 @@ body {{ font: 19px/1.65 Charter, "Iowan Old Style", Georgia, serif; max-width: 6
 @media (prefers-color-scheme: light) {{ body {{ background: #fbfaf7; color: #1f1f1f; }} }}
 @media (prefers-color-scheme: dark) {{ body {{ background: #1c1c1e; color: #e6e6e6; }} }}
 .site {{ font: 14px system-ui, sans-serif; opacity: .6; text-transform: uppercase; letter-spacing: .05em; }}
-h1.title {{ font-size: 34px; line-height: 1.2; margin: 8px 0 6px; }}
+h1.title {{ font-size: 34px; line-height: 1.15; letter-spacing: -.022em; margin: 8px 0 6px; }}
 .byline {{ font: 15px system-ui, sans-serif; opacity: .7; margin-bottom: 32px; }}
 img, figure {{ max-width: 100%; height: auto; }} figure {{ margin: 24px 0; }}
 figcaption {{ font: 14px system-ui, sans-serif; opacity: .7; }}
@@ -969,6 +1089,22 @@ a {{ color: inherit; }}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_downloads_page_lists_newest_first_and_escapes() {
+        use crate::downloads::Entry;
+        let old = Entry { when: 100, done: true, name: "old.pdf".into(), path: "/d/old.pdf".into(), url: "https://a.org/old.pdf".into(), note: String::new() };
+        let new = Entry { when: 200, done: false, name: "<new>.zip".into(), path: String::new(), url: "https://b.org/n".into(), note: "Cancelled".into() };
+        let page = downloads(&[], &[old, new], 300, "ab12");
+        assert!(page.find("&lt;new&gt;.zip").unwrap() < page.find("old.pdf").unwrap());
+        assert!(page.contains("Try again") && page.contains("Show in folder"));
+        assert!(!page.contains("location.reload"));
+        let live = LiveDownload { name: "big.iso".into(), status: "1 MB of 9 MB".into(), fraction: 0.11, paused: false };
+        let page = downloads(&[live], &[], 300, "ab12");
+        assert!(page.contains("big.iso") && page.contains("location.reload") && page.contains("width: 11.0%"));
+        assert_eq!(kind_of("a.tar.gz"), "gz");
+        assert_eq!(kind_of("README"), "file");
+    }
 
     #[test]
     fn keys_as_people_write_them() {

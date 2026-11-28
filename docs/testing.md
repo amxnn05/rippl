@@ -82,6 +82,7 @@ scripts/ctl.sh move-to-space <tab index> <space id>
 scripts/ctl.sh group <tab index> <name>   # a new group; join <tab index> <group id>; fold <group id>
 scripts/ctl.sh groups                       # with site=<host> for a site group
 scripts/ctl.sh group-site <tab index>       # as Ctrl+Alt+G on that tab: Grouped / Ungrouped / Alone
+scripts/ctl.sh peek <url> | peek close     # peek a link from the front tab; put it away (shown=true while it leaves)
 scripts/ctl.sh rows                 # what the column shows, as text
 ```
 

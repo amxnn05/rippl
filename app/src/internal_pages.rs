@@ -103,6 +103,7 @@ impl Browser {
                 };
                 pages::history(&places, &q, now(), &self.token)
             }
+            "downloads" => pages::downloads(&self.downloads.live(), &self.downloads.kept(), now(), &self.token),
             "welcome" => {
                 let state = match crate::desktop::default_browser() {
                     crate::desktop::Default::Yes => "yes",
@@ -202,6 +203,7 @@ impl Browser {
             });
         }
         let result: Result<String, String> = match (page, act) {
+            ("downloads", act) => self.download_action(act, arg),
             ("history", "forget") => self.places.forget(arg).map(|_| String::new()).map_err(|e| e.to_string()),
             ("archive", "forget") => self.places.unarchive(Some(arg)).map(|_| String::new()).map_err(|e| e.to_string()),
             ("archive", "clear") => self.places.unarchive(None).map(|_| String::new()).map_err(|e| e.to_string()),
@@ -281,7 +283,8 @@ impl Browser {
     }
 
     /// One setting changed on rippl://settings: saved, and applied now
-    /// where it can be.
+    /// where it can be. The note is only for what the change can't show
+    /// itself (a restart needed, open pages unchanged); else empty.
     pub(crate) fn change_setting(&self, key: &str, value: &str) -> Result<String, String> {
         self.config.borrow_mut().set(key, value)?;
         let config = self.config.borrow().clone();
@@ -289,11 +292,12 @@ impl Browser {
             "theme" | "glass" => self.apply_look(),
             "icons" => self.render(),
             "home_grid" => self.fill_home_grid(),
+            "history" => self.downloads.keep_list.set(config.history),
             "bookmarks_bar" => self.fill_bookmarks_bar(),
             "tabs" | "column" => self.apply_chrome(),
             k if k.starts_with("shortcut.") => self.apply_shortcut(&k["shortcut.".len()..]),
             "home_theme" | "home_colour" | "home_image" => self.apply_home_theme(),
-            "sync_folder" => return Ok(format!("Saved. {}", self.sync_now())),
+            "sync_folder" => return Ok(self.sync_now()),
             "agents" => {
                 if config.agents
                     && let Some(me) = crate::windows::all().into_iter().next()
@@ -303,7 +307,7 @@ impl Browser {
             }
             "proxy" => {
                 self.engine.set_proxy(config.proxy.clone());
-                return Ok("Saved. New connections go this way now, open pages included; private tabs already open keep the old way.".into());
+                return Ok("New connections go this way now, open pages included; private tabs already open keep the old way.".into());
             }
             "motion" => {
                 self.apply_motion();
@@ -312,15 +316,52 @@ impl Browser {
             "elastic" => self.install_page_scripts(),
             "frame_rate" => {
                 self.engine.set_full_rate(config.full_rate);
-                return Ok("Saved. Pages loaded from now on use it; reload a page to change it there.".into());
+                return Ok("Pages loaded from now on use it; reload a page to change it there.".into());
             }
             "video_keys" | "autoscroll" => self.install_page_scripts(),
             "player" => self.render_player(),
             "gpc" | "https_only" => self.engine.send_settings(config.gpc, config.https_only),
-            "shield" | "ublock" => return Ok("Saved. Blocking changes after rippl restarts.".into()),
+            "shield" | "ublock" => return Ok("Blocking changes after rippl restarts.".into()),
             _ => {}
         }
-        Ok("Saved.".into())
+        // Nothing to say: the change shows for itself.
+        Ok(String::new())
+    }
+
+    /// A button on rippl://downloads. What goes wrong comes as a notice:
+    /// the page has no place for a note.
+    fn download_action(&self, act: &str, arg: &str) -> Result<String, String> {
+        let open = |path: &std::path::Path| {
+            let uri = gio::prelude::FileExt::uri(&gio::File::for_path(path));
+            gio::AppInfo::launch_default_for_uri(&uri, None::<&gio::AppLaunchContext>).map_err(|e| e.to_string())
+        };
+        let result = match act {
+            "clear" => {
+                self.downloads.clear_kept();
+                Ok(())
+            }
+            "forget" => {
+                self.downloads.forget_kept(arg);
+                Ok(())
+            }
+            _ => match self.downloads.find_kept(arg) {
+                None => Err("That download isn't on the list any more".to_string()),
+                Some(e) => {
+                    let path = PathBuf::from(&e.path);
+                    match act {
+                        "open" if path.exists() => open(&path),
+                        "open" | "folder" if !path.exists() => Err(format!("{} isn't there any more", e.name)),
+                        "folder" => open(path.parent().unwrap_or(&path)),
+                        "again" => self.downloads.again(&e, self.config.borrow().grab_format),
+                        _ => Err(format!("unknown action {act}")),
+                    }
+                }
+            },
+        };
+        if let Err(why) = result {
+            self.notice(&why);
+        }
+        Ok(String::new())
     }
 
     /// Imports bookmarks and history from the `index`th browser found.

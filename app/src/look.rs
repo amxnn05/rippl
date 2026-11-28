@@ -35,6 +35,13 @@ window.rippl {
   --faint: rgba(0,0,0,0.131); --hairline: #e8e8e8; --wash: rgba(0,0,0,0.063);
   --hover: rgba(0,0,0,0.042); --tile: rgba(0,0,0,0.031); --pin-live: rgba(0,0,0,0.10);
   --mark: rgba(23,23,23,0.06); --accent: #171717;
+  /* Depth (Apple: bigger surfaces read thicker). Each is a tight contact
+     shadow plus a soft ambient one; the edge is light catching the top of
+     a floating surface, which only shows in dark. */
+  --lift-1: 0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08);
+  --lift-2: 0 1px 3px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.14);
+  --lift-3: 0 2px 6px rgba(0,0,0,0.10), 0 20px 48px rgba(0,0,0,0.22);
+  --edge: inset 0 0 0 0 transparent;
 }
 /* Dark: set by rippl (apply_look), not by a media query, which GTK
    doesn't evaluate from the desktop's preference without libadwaita. */
@@ -43,6 +50,10 @@ window.rippl.dark {
   --faint: rgba(255,255,255,0.265); --hairline: #333333; --wash: rgba(255,255,255,0.087);
   --hover: rgba(255,255,255,0.06); --tile: rgba(255,255,255,0.043); --pin-live: rgba(255,255,255,0.124);
   --mark: rgba(237,237,237,0.06); --accent: #ededed;
+  --lift-1: 0 1px 2px rgba(0,0,0,0.30), 0 4px 12px rgba(0,0,0,0.30);
+  --lift-2: 0 1px 3px rgba(0,0,0,0.35), 0 8px 24px rgba(0,0,0,0.40);
+  --lift-3: 0 2px 6px rgba(0,0,0,0.40), 0 20px 48px rgba(0,0,0,0.50);
+  --edge: inset 0 1px 0 rgba(255,255,255,0.07);
 }
 
 /* Glass: the column's ground lets the desktop
@@ -71,7 +82,7 @@ window.rippl .pin.front { background: var(--pin-live); color: var(--ink); }
 window.rippl .pin.asleep { opacity: 0.6; }
 window.rippl .pin .unread { background: #ed3d36; color: white; font-size: 9px; font-weight: 700;
   min-width: 13px; min-height: 13px; padding: 0 3px; border-radius: 7px;
-  box-shadow: 0 0 0 1.5px var(--frame); }
+  box-shadow: 0 0 0 1.5px var(--frame); letter-spacing: 0.02em; }
 
 /* Tab rows. */
 window.rippl .tabs, window.rippl .tabs row { background: transparent; }
@@ -84,7 +95,7 @@ window.rippl .tabs row.asleep:hover { opacity: 1; }
 window.rippl .tabs row.split { box-shadow: inset 2px 0 0 var(--accent); }
 window.rippl .tabs row.in-group { margin-left: 12px; }
 window.rippl .tabs row.group-head { min-height: 24px; color: var(--muted); font-size: 11.5px; font-weight: 600;
-  padding: 6px 6px 0 8px; }
+  padding: 6px 6px 0 8px; letter-spacing: 0.02em; }
 window.rippl .tabs row.group-head:hover { background: transparent; color: var(--ink); }
 /* The field's loading line: a soft blue glow that fades out at both
    ends, not a hard bar. */
@@ -109,12 +120,12 @@ window.rippl .stack-tile.asleep { opacity: 0.6; }
 window.rippl .stack-tile.asleep:hover { opacity: 1; }
 window.rippl .stack-tile.split { box-shadow: inset 0 -2px 0 var(--accent); }
 window.rippl .stack-tile.front.split { box-shadow: inset 0 -2px 0 var(--accent), inset 0 0 0 1px var(--faint); }
-window.rippl .stack-tile .mark { min-width: 14px; min-height: 14px; font-size: 10px; font-weight: 600; background: transparent; }
+window.rippl .stack-tile .mark { min-width: 14px; min-height: 14px; font-size: 10px; font-weight: 600; background: transparent; letter-spacing: 0.02em; }
 window.rippl .foot .space { min-width: 22px; min-height: 22px; padding: 0; border-radius: 6px; border: none;
   box-shadow: none; background: transparent; color: var(--faint); font-size: 11px; font-weight: 600; }
 window.rippl .foot .space:hover { color: var(--ink); background: var(--hover); }
 window.rippl .foot .space.here { color: var(--ink); background: var(--wash); }
-window.rippl .tabs row button.close { opacity: 0; min-height: 18px; min-width: 18px; padding: 0; color: var(--muted); }
+window.rippl .tabs row button.close { opacity: 0; min-height: 20px; min-width: 20px; border-radius: 6px; padding: 0; color: var(--muted); }
 window.rippl .tabs row:hover button.close { opacity: 0.8; }
 /* Loading: the ring in the ×'s place, giving way to it under the pointer. */
 window.rippl .tabs row .loader, window.rippl .top-tab .loader { transition: opacity 140ms ease-out; }
@@ -123,7 +134,7 @@ window.rippl .top-tab.loading:not(:hover) .close { opacity: 0; }
 
 /* The site's letter in a faint square. */
 window.rippl .mark { min-width: 15px; min-height: 15px; border-radius: 3px; background: var(--mark);
-  color: var(--muted); font-size: 8.5px; font-weight: 500; }
+  color: var(--muted); font-size: 8.5px; font-weight: 500; letter-spacing: 0.02em; }
 window.rippl .tabs row.front .mark { color: var(--ink); }
 window.rippl .tabs .icon { border-radius: 3px; }
 window.rippl .css-edit { border-radius: 8px; box-shadow: 0 0 0 1px var(--hairline); }
@@ -142,17 +153,22 @@ window.rippl .stage { background: var(--ground); border-radius: 10px; margin: 8p
 /* The new tab: the field on its own in the middle of the page. */
 window.rippl .field.home-field { min-height: 50px; padding: 0 22px; border-radius: 14px; font-size: 15.5px;
   background: var(--ground); color: var(--ink);
-  box-shadow: 0 0 0 1px var(--hairline), 0 8px 24px rgba(0,0,0,0.06); }
+  box-shadow: var(--edge), 0 0 0 1px var(--hairline), var(--lift-1); letter-spacing: -0.01em; }
 window.rippl .field.home-field:focus-within { background: var(--ground);
-  box-shadow: 0 0 0 1px var(--hairline), 0 8px 24px rgba(0,0,0,0.06); }
+  box-shadow: var(--edge), 0 0 0 1px var(--hairline), var(--lift-2); }
 window.rippl .field.home-field > text > placeholder { color: var(--faint); }
 window.rippl .field.home-field > image { color: var(--faint); }
 window.rippl .home-offers { background: var(--ground); border-radius: 14px; padding: 6px;
-  box-shadow: 0 0 0 1px var(--hairline), 0 6px 20px rgba(0,0,0,0.07); }
+  box-shadow: var(--edge), 0 0 0 1px var(--hairline), var(--lift-1); }
 window.rippl .home-offers row { padding: 9px 12px; font-size: 13px; }
 window.rippl .home-grid { margin-top: 2px; }
 /* Ctrl+Shift+Y (grab.rs): the new tab's field over a light dim, a card under it. */
-window.rippl .grab-dim { background: rgba(0,0,0,0.12); }
+/* Every layer that takes the focus (the video bar, Ctrl+Tab, peek) dims
+   the page the same way: a soft grey wash, lighter around the middle. */
+window.rippl .grab-dim, window.rippl .switcher-dim, window.rippl .peek-dim { background-color: alpha(#8a8a92,0.30);
+  background-image: radial-gradient(ellipse at 50% 42%, alpha(#8a8a92,0.18), alpha(#8a8a92,0) 75%); }
+window.rippl.dark .grab-dim, window.rippl.dark .switcher-dim, window.rippl.dark .peek-dim { background-color: alpha(#26262a,0.62);
+  background-image: radial-gradient(ellipse at 50% 42%, alpha(#3a3a40,0.30), alpha(#3a3a40,0) 75%); }
 window.rippl .grab-note { padding: 10px 14px; }
 window.rippl .grab-note label { color: var(--muted); font-size: 12.5px; }
 window.rippl .grab-note label.grab-error { color: #b45309; }
@@ -227,16 +243,14 @@ window.rippl .rail-row:hover { background: var(--hover); color: var(--ink); }
 window.rippl .rail-row.here { background: var(--ground); color: var(--ink); font-weight: 500;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px var(--hairline); }
 window.rippl .rail-glyph { font-size: 12px; }
-window.rippl .switcher-dim { background: rgba(0,0,0,0.22); }
 window.rippl .switcher { background: var(--ground); border-radius: 14px; padding: 18px;
-  box-shadow: 0 0 0 1px var(--hairline), 0 10px 30px rgba(0,0,0,0.25); }
+  box-shadow: var(--edge), 0 0 0 1px var(--hairline), var(--lift-3); }
 window.rippl .switch-card { padding: 6px; border-radius: 10px; font-size: 12px; color: var(--ink); }
 window.rippl .switch-card.chosen { background: var(--wash); }
 window.rippl .switch-face { border-radius: 7px; background: var(--frame); box-shadow: inset 0 0 0 1px var(--hairline); }
-window.rippl .switch-mark { font-size: 28px; font-weight: 600; opacity: 0.6; }
-window.rippl .peek-dim { background: rgba(0,0,0,0.22); }
+window.rippl .switch-mark { font-size: 28px; font-weight: 600; opacity: 0.6; letter-spacing: -0.02em; }
 window.rippl .peek-panel { background: var(--ground); border-radius: 12px;
-  box-shadow: 0 0 0 1px var(--hairline), 0 10px 30px rgba(0,0,0,0.25); }
+  box-shadow: var(--edge), 0 0 0 1px var(--hairline), var(--lift-3); }
 window.rippl .peek-knob { min-width: 28px; min-height: 28px; padding: 0; border-radius: 14px; border: none;
   background: var(--ground); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hairline); }
 window.rippl .peek-knob:hover { background: var(--hover); }
@@ -245,7 +259,7 @@ window.rippl .peek-knob:hover { background: var(--hover); }
 window.rippl .player { min-height: 28px; padding: 0 7px 0 10px; border-radius: 9px; margin: 0 0 4px 0;
   box-shadow: inset 0 0 0 1px var(--hairline); color: var(--muted); font-size: 12.5px; }
 window.rippl .player:hover { background: var(--hover); color: var(--ink); }
-window.rippl .player-button { min-width: 15px; min-height: 15px; padding: 0; border-radius: 8px; border: none;
+window.rippl .player-button { min-width: 20px; min-height: 20px; padding: 0; border-radius: 10px; border: none;
   background: transparent; color: var(--muted); box-shadow: none; -gtk-icon-size: 9px; }
 window.rippl .player-button:hover { background: var(--wash); }
 window.rippl paned.split > separator { background: var(--hairline); min-width: 6px; min-height: 6px; }
@@ -260,13 +274,14 @@ window.rippl .dim { color: var(--muted); font-size: 11.5px; }
 
 /* Downloads at the foot of the column. */
 window.rippl .downloads { padding: 6px 4px 0 6px; border-top: 1px solid var(--hairline); }
-window.rippl .downloads .heading { color: var(--muted); font-size: 11.5px; font-weight: 600; }
+window.rippl .downloads .heading { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em; }
 window.rippl .download { padding: 4px 2px; font-size: 12.5px; }
 window.rippl .download button.close { min-height: 18px; min-width: 18px; padding: 0; opacity: 0.7; }
 
 /* Over the page: dark, opaque, white text, whatever the page or theme. */
 window.rippl .find, window.rippl .ask, window.rippl .toast { background: rgba(28,28,30,0.96); color: white;
-  border-radius: 12px; padding: 6px 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.25); font-size: 13px; }
+  border-radius: 12px; padding: 6px 10px; font-size: 13px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 0 1px rgba(255,255,255,0.06), 0 1px 3px rgba(0,0,0,0.2), 0 8px 24px rgba(0,0,0,0.28); }
 window.rippl .toast { border-radius: 18px; padding: 8px 16px; }
 window.rippl .status { background: var(--ground); color: var(--muted); border-radius: 7px; padding: 3px 8px;
   font-size: 11.5px; box-shadow: 0 0 0 1px var(--hairline); }
@@ -275,7 +290,7 @@ window.rippl .accounts row { padding: 6px 12px; border-radius: 6px; }
 
 /* The site card and the tab menu. */
 window.rippl popover.card > contents, window.rippl popover.tab-menu > contents { background: var(--ground);
-  color: var(--ink); border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,0.18), 0 0 0 1px var(--hairline); }
+  color: var(--ink); border-radius: 12px; box-shadow: var(--edge), 0 0 0 1px var(--hairline), var(--lift-2); }
 window.rippl .card-title { font-weight: 600; font-size: 14px; }
 window.rippl .safe { color: #15803d; font-size: 12px; }
 window.rippl .unsafe { color: #b45309; font-size: 12px; }
@@ -763,30 +778,59 @@ impl Browser {
         self.rendered_once.set(true);
     }
 
+    /// A tab's widget answering the pointer: a click selects (or, on the
+    /// tab in front, opens its site card), Alt+click splits, a middle click
+    /// closes, a right click opens its menu.
     pub(crate) fn on_click(&self, widget: &impl IsA<gtk::Widget>, id: rippl_core::tabs::TabId) {
+        // A button (a pin) claims its left click before any gesture of
+        // ours sees it released: that one comes through `clicked`, with Alt
+        // noted on the way down (capture, before the button claims).
+        let button = widget.dynamic_cast_ref::<gtk::Button>().cloned();
+        if let Some(button) = &button {
+            let alt = std::rc::Rc::new(std::cell::Cell::new(false));
+            let down = gtk::GestureClick::builder().button(1).build();
+            down.set_propagation_phase(gtk::PropagationPhase::Capture);
+            let held = alt.clone();
+            down.connect_pressed(move |g, _, _, _| held.set(g.current_event_state().contains(gdk::ModifierType::ALT_MASK)));
+            button.add_controller(down);
+            let weak = self.weak();
+            button.connect_clicked(move |w| {
+                let Some(b) = weak.upgrade() else { return };
+                let (front, alt, anchor) = (b.front() == Some(id), alt.get(), w.clone().upcast::<gtk::Widget>());
+                glib::idle_add_local_once(move || b.tab_clicked(id, 1, alt, front, Some(anchor)));
+            });
+        }
+        let is_button = button.is_some();
         let click = gtk::GestureClick::builder().button(0).build();
         let weak = self.weak();
         click.connect_released(move |gesture, _, _, _| {
             let Some(b) = weak.upgrade() else { return };
-            let button = gesture.current_button();
+            let which = gesture.current_button();
+            if is_button && which == 1 {
+                return;
+            }
             let alt = gesture.current_event_state().contains(gdk::ModifierType::ALT_MASK);
             // Deferred: the widget this gesture belongs to is about to be
             // replaced by the redraw that selecting does.
             let front = b.front() == Some(id);
             let anchor = gesture.widget();
-            glib::idle_add_local_once(move || match (button, alt) {
-                (2, _) => b.close_animated(id),
-                (3, _) => {
-                    if let Some(w) = anchor {
-                        b.tab_menu(id, &w);
-                    }
-                }
-                (1, true) => b.split_with(id),
-                // A click on the tab you're on: its site card.
-                (1, false) if front => b.open_site_card(),
-                _ => b.select(id),
-            });
+            glib::idle_add_local_once(move || b.tab_clicked(id, which, alt, front, anchor));
         });
         widget.add_controller(click);
+    }
+
+    fn tab_clicked(&self, id: rippl_core::tabs::TabId, which: u32, alt: bool, front: bool, anchor: Option<gtk::Widget>) {
+        match (which, alt) {
+            (2, _) => self.close_animated(id),
+            (3, _) => {
+                if let Some(w) = anchor {
+                    self.tab_menu(id, &w);
+                }
+            }
+            (1, true) => self.split_with(id),
+            // A click on the tab you're on: its site card.
+            (1, false) if front => self.open_site_card(),
+            _ => self.select(id),
+        }
     }
 }

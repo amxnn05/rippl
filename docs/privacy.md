@@ -63,6 +63,7 @@ models do not depend on profiling you. If you want certainty, host SearXNG yours
 | **Sync without a server** | `sync_folder`: files in a folder you choose; never history, passwords, cookies or open tabs | `sync.rs`, `rippl_core::sync` |
 | **Importing reads copies** | Another browser's files are copied and read; its passwords are decrypted in memory and go only to your keyring, after you confirm | `rippl_core::import_more` |
 | **Certificates only when chosen** | A site asking for a client certificate gets one only if you pick it; a private tab asks for itself | `certificates.rs` |
+| **The downloads list is local** | `downloads.log` in rippl's data folder: each finished or failed download's name, file path and address (the newest 500), for rippl://downloads. Never a private tab's; `history = off` stops it; *Clear list* empties it. Nothing is sent anywhere | `downloads.rs`, `rippl_core::downloads` |
 | **The archive is history** | Tabs rippl closes by itself (`close_after`) are kept in `places.sqlite` for a month, only while `history = on`, never private tabs; clearing history empties it | `closing.rs`, `rippl_core::places` |
 | **Address suggestions are local** | Offers come from your own history, bookmarks and tabs; nothing typed is sent anywhere before Return | `omnibox.rs` |
 | **rippl:// pages unreachable from the web** | The scheme is local and display-isolated; buttons need a per-launch random token, so neither a website nor a downloaded HTML file can clear history or change permissions | `internal_pages.rs` |

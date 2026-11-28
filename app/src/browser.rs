@@ -528,6 +528,8 @@ impl Browser {
         browser.wire_omnibox();
         browser.wire_find();
         browser.wire_grab();
+        browser.wire_downloads_page();
+        browser.downloads.keep_list.set(browser.config.borrow().history);
         browser.wire_permission_bar();
         browser.wire_internal_pages();
         browser.wire_curtain();
@@ -1272,8 +1274,8 @@ impl Browser {
         if p > 0.0 && p < self.progress_shown.get() {
             self.progress_shown.set(p * 0.5);
         }
-        if self.progress_tick.get().is_some() || !self.config.borrow().motion_full {
-            if !self.config.borrow().motion_full {
+        if self.progress_tick.get().is_some() || !self.moving() {
+            if !self.moving() {
                 self.show_progress();
             }
             return;
@@ -1694,6 +1696,10 @@ impl Browser {
                 let first = self.pins.first_child();
                 format!("pins {} | first pin {}", b(self.pins.upcast_ref()), first.map(|p| b(&p)).unwrap_or_default())
             }
+            "peek" if rest.trim() == "close" => {
+                self.close_peek();
+                format!("ok shown={}", self.peek_dim.is_visible())
+            }
             "peek" => match self.front() {
                 Some(id) => {
                     self.peek(rest, id);
@@ -1713,7 +1719,11 @@ impl Browser {
             // A setting, as rippl://settings changes it (written to the file).
             "set" => {
                 let (key, value) = rest.split_once(' ').unwrap_or((rest, ""));
-                self.change_setting(key.trim(), value.trim()).unwrap_or_else(|e| format!("error {e}"))
+                match self.change_setting(key.trim(), value.trim()) {
+                    Ok(note) if note.is_empty() => "ok".into(),
+                    Ok(note) => note,
+                    Err(e) => format!("error {e}"),
+                }
             }
             "switcher" => match rest.trim() {
                 "" => self.walk_state(),
@@ -2181,6 +2191,7 @@ impl Browser {
         });
         self.action(app, "bookmark", &["<Ctrl>d"], |b| b.toggle_bookmark());
         self.action(app, "history", &["<Ctrl>h"], |b| b.open_internal("history"));
+        self.action(app, "downloads", &["<Ctrl>j"], |b| b.open_internal("downloads"));
         self.action(app, "bookmarks", &["<Ctrl><Shift>o"], |b| b.open_internal("bookmarks"));
         self.action(app, "settings", &["<Ctrl>comma"], |b| b.open_internal("settings"));
         self.action(app, "pin", &["<Ctrl><Shift>p"], |b| b.toggle_pin());

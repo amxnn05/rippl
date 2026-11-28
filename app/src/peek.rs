@@ -152,7 +152,7 @@ impl Browser {
 
     /// Shift+click on a link in `from`'s page.
     pub(crate) fn peek(&self, url: &str, from: TabId) {
-        self.close_peek();
+        self.put_away_peek(false);
         let (private, space) = match self.tabs.borrow().get(from) {
             Some(t) => (t.private, t.space),
             None => return,
@@ -162,20 +162,38 @@ impl Browser {
         view.set_vexpand(true);
         view.load_uri(url);
         self.peek_frame.append(&view);
-        self.peek_dim.set_visible(true);
+        Browser::arrive(&self.peek_dim);
         view.grab_focus();
         *self.peeking.borrow_mut() = Some(Peeking { view, from });
     }
 
-    /// Put away: the page goes with the panel.
+    /// Put away: the page goes with the panel, which shrinks back as the
+    /// dim lifts (motion.rs, `leave`).
     pub(crate) fn close_peek(&self) {
+        self.put_away_peek(true);
+    }
+
+    fn put_away_peek(&self, animated: bool) {
         let Some(p) = self.peeking.borrow_mut().take() else { return };
-        self.peek_frame.remove(&p.view);
-        self.peek_dim.set_visible(false);
-        p.view.terminate_web_process();
         if let Some(v) = self.front_view() {
             v.grab_focus();
         }
+        let view = p.view;
+        if !animated || !self.moving() {
+            self.peek_frame.remove(&view);
+            self.peek_dim.set_visible(false);
+            view.terminate_web_process();
+            return;
+        }
+        self.leave(&self.peek_dim);
+        // The page stays in the panel while it goes, then ends.
+        let frame = self.peek_frame.clone();
+        glib::timeout_add_local_once(crate::motion::LEAVE, move || {
+            if view.parent().is_some() {
+                frame.remove(&view);
+            }
+            view.terminate_web_process();
+        });
     }
 
     /// Kept: a tab after the one it came from, in front, as it is.

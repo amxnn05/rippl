@@ -62,7 +62,8 @@ icons = on
 # The new tab shows the sites of the bookmark folder "Home" (off, default)
 home_grid = off
 
-# Animations: springs, fades, the column's slide (full, default) or everything immediate (reduced)
+# Animations: fades, slides, the column's slide (full, default) or everything immediate (reduced).
+# With the desktop's own "reduce animation" on (gtk-enable-animations off), rippl is reduced too.
 motion = full
 
 # Pages stretch a little past their top and bottom and spring back (on, default)
@@ -211,6 +212,7 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 | `Ctrl+D`, click the ☆ in the field | Bookmark the page, or remove the bookmark |
 | Focus the field with nothing typed | Bookmarks, then recent pages |
 | `Ctrl+H` | `rippl://history`: search, forget, clear |
+| `Ctrl+J` | `rippl://downloads`, a page of its own: every download, open, show in folder, try again (also a click on *Downloads* at the column's foot) |
 | `Ctrl+Shift+O` | `rippl://bookmarks`: remove, import from another browser |
 | `Ctrl+,` | `rippl://settings`: permissions, Shield exceptions, hidden elements, configuration |
 | `Ctrl+Alt+P` | `rippl://passwords`: saved accounts (delete), sites never offered saving |
