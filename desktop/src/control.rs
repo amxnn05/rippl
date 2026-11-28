@@ -87,6 +87,10 @@ impl Browser {
                     Err(e) => format!("error: {e}"),
                 }
             }
+            "grab" => {
+                self.grab(rest, false);
+                "ok".into()
+            }
             "eval" => {
                 self.front_view_eval(rest);
                 "ok".into()

@@ -45,6 +45,7 @@ pub enum Ev {
     ShieldApplied,
     Menu(String),
     Control(String, std::sync::mpsc::Sender<String>),
+    Grab(u64, crate::grab::GrabEv),
     Tick,
 }
 
@@ -65,6 +66,7 @@ impl std::fmt::Debug for Ev {
             Ev::ShieldApplied => "ShieldApplied",
             Ev::Menu(..) => "Menu",
             Ev::Control(..) => "Control",
+            Ev::Grab(..) => "Grab",
             Ev::Tick => "Tick",
         };
         f.write_str(name)
@@ -122,6 +124,7 @@ pub struct Browser {
     pub pending: RefCell<Vec<Box<dyn FnOnce(&Browser)>>>,
     pub window_theme: Cell<Option<Option<tao::window::Theme>>>,
     pub scheme_set: Cell<bool>,
+    pub children: std::sync::Arc<std::sync::Mutex<Vec<(u64, std::process::Child)>>>,
 }
 
 fn session_path() -> PathBuf {
@@ -202,6 +205,7 @@ impl Browser {
             pending: RefCell::new(Vec::new()),
             window_theme: Cell::new(None),
             scheme_set: Cell::new(false),
+            children: Default::default(),
         });
         b.build_chrome();
         b.restore(urls, first_run);
@@ -749,6 +753,7 @@ impl Browser {
     }
 
     pub fn quit(&self) {
+        self.stop_grabs();
         self.save_session();
         std::process::exit(0);
     }

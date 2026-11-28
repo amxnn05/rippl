@@ -172,7 +172,7 @@ impl Browser {
             "reader" => self.toggle_reader(),
             "hide-element" => self.pick_to_hide(),
             "unhide" => self.unhide_here(),
-            "grab" => self.notice("Downloading videos comes with yt-dlp in a later update on this system"),
+            "grab" => self.open_grab_bar(),
             "ask-page" | "translate" => self.notice("The AI add-on is set up in Settings › AI"),
             "split" => self.toggle_split(),
             "pane-left" | "pane-right" => {}

@@ -249,3 +249,10 @@ input::placeholder { color: var(--faint); }
 @media (prefers-reduced-motion: reduce) {
   .tab.enter, .notice, #bar, .find, .offers { animation: rippl-fade 150ms ease-out; }
 }
+
+/* Ctrl+Shift+Y: a link for yt-dlp, above the page. */
+.grab { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; padding: 0 6px 0 16px; min-height: 46px; border-radius: 14px;
+  background: var(--ground); box-shadow: var(--edge), 0 0 0 1px var(--hairline), var(--lift-1); font-size: 14px;
+  animation: rippl-drop 180ms var(--ease-out); }
+.grab input { flex: 1; height: 44px; user-select: text; -webkit-user-select: text; letter-spacing: -0.01em; }
+.grab-mark { color: var(--muted); font-size: 11px; }

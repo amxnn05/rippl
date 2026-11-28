@@ -153,6 +153,16 @@ $("find-text").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); send({ t: "find", text: $("find-text").value, dir: e.shiftKey ? -1 : 1 }); }
   if (e.key === "Escape") { e.preventDefault(); send({ t: "find-close" }); }
 });
+$("grab-text").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const url = $("grab-text").value.trim();
+    if (url) send({ t: "grab", url, audio: e.shiftKey });
+    $("grab").hidden = true;
+  }
+  if (e.key === "Escape") { e.preventDefault(); $("grab").hidden = true; send({ t: "escape" }); }
+});
+$("grab-close").onclick = () => { $("grab").hidden = true; send({ t: "escape" }); };
 $("find-next").onclick = () => send({ t: "find", text: $("find-text").value, dir: 1 });
 $("find-prev").onclick = () => send({ t: "find", text: $("find-text").value, dir: -1 });
 $("find-close").onclick = () => send({ t: "find-close" });
@@ -422,6 +432,14 @@ window.rippl = {
   find(open) {
     $("find").hidden = !open;
     if (open) { $("find-text").focus(); $("find-text").select(); }
+  },
+  grab(fill) {
+    $("grab").hidden = false;
+    const input = $("grab-text");
+    input.value = fill || "";
+    input.focus();
+    input.select();
+    requestAnimationFrame(reportPage);
   },
   findCount(text) { $("find-count").textContent = text; },
 };

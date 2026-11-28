@@ -93,6 +93,7 @@ impl Browser {
                     a(self);
                 }
             }
+            Ev::Grab(id, ev) => self.grab_event(id, ev),
             Ev::Control(line, reply) => {
                 let answer = self.control(&line);
                 let _ = reply.send(answer);
@@ -266,7 +267,12 @@ impl Browser {
                     None => self.command("downloads", false),
                 }
             }
+            "grab" => self.grab(&s("url"), b("audio")),
             "download-forget" => {
+                let d = m.get("id").and_then(Value::as_u64).unwrap_or(0);
+                if self.downloads.is_grab(d) {
+                    self.cancel_grab(d);
+                }
                 self.downloads.forget_live(m.get("id").and_then(Value::as_u64).unwrap_or(0));
                 self.render_due.set(true);
             }

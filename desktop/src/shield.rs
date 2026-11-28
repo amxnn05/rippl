@@ -149,9 +149,9 @@ fn build(ublock: bool) -> Lists {
     {
         let mut set = adblock::lists::FilterSet::new(false);
         for (_, text) in &bundles {
-            set.add_filter_list(text, adblock::lists::ParseOptions::default());
+            set.add_filter_list(text.clone(), adblock::lists::ParseOptions::default());
         }
-        let engine = adblock::Engine::from_filter_set(set, true);
+        let engine = adblock::Engine::new_with_filter_set(set);
         return Lists { bundles: Vec::new(), engine: Some(engine) };
     }
     #[cfg(not(windows))]
@@ -334,8 +334,6 @@ pub mod win {
     #[derive(Default)]
     pub struct Rules {
         pub engine: RefCell<Option<adblock::Engine>>,
-        /// Views Shield is off in, by their window.
-        pub off: RefCell<Vec<isize>>,
     }
 
     fn take(p: PWSTR) -> String {
@@ -412,9 +410,8 @@ pub mod win {
                     s.Source(&mut source)?;
                 }
                 let source = take(source);
-                if let Ok(req) = adblock::request::Request::new(&url, &source, kind(context)) {
-                    let result = engine.check_network_request(&req);
-                    if result.matched && result.exception.is_none() {
+                if let Ok(req) = adblock::request::Request::new(&url, &source, kind(context), "GET") {
+                    if engine.check_network_request(&req).should_block() {
                         let response = env.CreateWebResourceResponse(None, 403, &HSTRING::from("Blocked by Shield"), &HSTRING::from(""))?;
                         args.SetResponse(&response)?;
                     }

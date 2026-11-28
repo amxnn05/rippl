@@ -52,8 +52,11 @@ pub fn cache() -> PathBuf {
     return xdg("XDG_CACHE_HOME", ".cache").join("rippl");
 }
 
-/// The Downloads folder.
+/// The Downloads folder (`RIPPL_DOWNLOADS` moves it, for tests).
 pub fn downloads() -> PathBuf {
+    if let Some(d) = std::env::var_os("RIPPL_DOWNLOADS").filter(|d| !d.is_empty()) {
+        return PathBuf::from(d);
+    }
     #[cfg(all(unix, not(target_os = "macos")))]
     if let Ok(text) = std::fs::read_to_string(xdg("XDG_CONFIG_HOME", ".config").join("user-dirs.dirs")) {
         for line in text.lines() {

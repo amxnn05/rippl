@@ -9,6 +9,7 @@ mod control;
 mod downloads;
 mod events;
 mod extras;
+mod grab;
 mod home;
 mod internal;
 mod menus;

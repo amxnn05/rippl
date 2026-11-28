@@ -21,6 +21,12 @@ pub struct Live {
     pub bytes: u64,
     pub done: Option<bool>,
     pub why: String,
+    /// A video through yt-dlp: what it keeps, its title, how far along.
+    pub grab: Option<rippl_core::ytdlp::Format>,
+    pub title: String,
+    pub fraction: f64,
+    pub line: String,
+    pub private: bool,
 }
 
 pub struct Downloads {
@@ -56,7 +62,7 @@ impl Downloads {
     pub fn started(&self, url: String, path: PathBuf) {
         let id = self.next.get();
         self.next.set(id + 1);
-        self.live.borrow_mut().push(Live { id, url, path, started: Instant::now(), bytes: 0, done: None, why: String::new() });
+        self.live.borrow_mut().push(Live { id, url, path, started: Instant::now(), bytes: 0, done: None, why: String::new(), grab: None, title: String::new(), fraction: -1.0, line: String::new(), private: false });
     }
 
     /// The engine's word that one ended. `private`: from a private tab.
@@ -91,7 +97,7 @@ impl Downloads {
     /// How far each is, from its file.
     pub fn poll(&self) -> bool {
         let mut changed = false;
-        for d in self.live.borrow_mut().iter_mut().filter(|d| d.done.is_none()) {
+        for d in self.live.borrow_mut().iter_mut().filter(|d| d.done.is_none() && d.grab.is_none()) {
             let mut b = std::fs::metadata(&d.path).map(|m| m.len()).unwrap_or(0);
             for ext in ["crdownload", "download"] {
                 let mut part = d.path.clone().into_os_string();
@@ -106,6 +112,98 @@ impl Downloads {
         changed
     }
 
+    // ---- videos, through yt-dlp ------------------------------------------
+
+    pub fn grab_started(&self, url: &str, format: rippl_core::ytdlp::Format, private: bool) -> u64 {
+        let id = self.next.get();
+        self.next.set(id + 1);
+        self.live.borrow_mut().push(Live {
+            id,
+            url: url.to_string(),
+            path: PathBuf::new(),
+            started: Instant::now(),
+            bytes: 0,
+            done: None,
+            why: String::new(),
+            grab: Some(format),
+            title: String::new(),
+            fraction: -1.0,
+            line: String::new(),
+            private,
+        });
+        id
+    }
+
+    pub fn grab_line(&self, id: u64, line: rippl_core::ytdlp::Line) {
+        use rippl_core::ytdlp::Line;
+        let mut live = self.live.borrow_mut();
+        let Some(d) = live.iter_mut().find(|d| d.id == id) else { return };
+        match line {
+            Line::Title(t) => {
+                if t.ends_with('…') { d.line = t } else { d.title = t }
+            }
+            Line::Progress(p) => {
+                if let Some(f) = p.fraction() {
+                    d.fraction = f;
+                }
+                d.bytes = p.got;
+                let mut s = match p.total {
+                    Some(t) => format!("{} of {}", size(p.got), size(t)),
+                    None => size(p.got),
+                };
+                if let Some(v) = p.speed {
+                    s.push_str(&format!(" · {}/s", size(v as u64)));
+                }
+                if let Some(e) = p.eta {
+                    s.push_str(&if e >= 60 { format!(" · {} min left", e / 60) } else { format!(" · {e} s left") });
+                }
+                d.line = s;
+            }
+            Line::Finishing => d.line = "Putting it together…".into(),
+            Line::File(path) => d.path = path,
+            Line::Error(e) => d.why = e,
+            Line::Other => {}
+        }
+    }
+
+    /// yt-dlp ended (or never began: `why`).
+    pub fn grab_ended(&self, id: u64, ok: bool, why: &str) -> Option<String> {
+        let mut live = self.live.borrow_mut();
+        let d = live.iter_mut().find(|d| d.id == id && d.done.is_none())?;
+        d.done = Some(ok);
+        if !why.is_empty() {
+            d.why = why.to_string();
+        }
+        if !ok && d.why.is_empty() {
+            d.why = "yt-dlp stopped".into();
+        }
+        if ok {
+            d.fraction = 1.0;
+            d.bytes = std::fs::metadata(&d.path).map(|m| m.len()).unwrap_or(d.bytes);
+        }
+        let name = Self::name(d);
+        let format = d.grab.map(|f| f.key()).unwrap_or("video");
+        let entry = Entry {
+            when: rippl_core::places::now(),
+            done: ok,
+            name: name.clone(),
+            path: if ok { d.path.to_string_lossy().to_string() } else { String::new() },
+            url: d.url.clone(),
+            note: if ok { format!("{format} (yt-dlp)") } else { format!("{} (yt-dlp)", d.why) },
+        };
+        let private = d.private;
+        drop(live);
+        if !private && self.keep_list.get() {
+            self.kept.borrow_mut().push(entry);
+            self.save();
+        }
+        Some(name)
+    }
+
+    pub fn is_grab(&self, id: u64) -> bool {
+        self.live.borrow().iter().any(|d| d.id == id && d.grab.is_some() && d.done.is_none())
+    }
+
     fn save(&self) {
         let _ = std::fs::write(log_path(), dl::write_log(&self.kept.borrow()));
     }
@@ -118,7 +216,18 @@ impl Downloads {
         self.live.borrow().iter().find(|d| d.id == id && d.done == Some(true)).map(|d| d.path.clone())
     }
 
+    fn name(d: &Live) -> String {
+        match d.path.file_name() {
+            Some(n) if !n.is_empty() => n.to_string_lossy().to_string(),
+            _ if !d.title.is_empty() => d.title.clone(),
+            _ => d.url.clone(),
+        }
+    }
+
     fn status(d: &Live) -> String {
+        if d.grab.is_some() && d.done.is_none() {
+            return if d.line.is_empty() { "Starting yt-dlp…".into() } else { d.line.clone() };
+        }
         match d.done {
             Some(true) => format!("{} · done", size(d.bytes)),
             Some(false) => d.why.clone(),
@@ -141,8 +250,8 @@ impl Downloads {
                 .map(|d| {
                     json!({
                         "id": d.id,
-                        "name": d.path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
-                        "status": Self::status(d), "fraction": -1.0,
+                        "name": Self::name(d),
+                        "status": Self::status(d), "fraction": d.fraction,
                         "done": d.done == Some(true), "failed": d.done == Some(false),
                     })
                 })
@@ -156,9 +265,9 @@ impl Downloads {
             .iter()
             .filter(|d| d.done.is_none())
             .map(|d| LiveDownload {
-                name: d.path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
+                name: Self::name(d),
                 status: Self::status(d),
-                fraction: -1.0,
+                fraction: d.fraction,
                 paused: false,
             })
             .collect()
