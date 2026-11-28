@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+/* Over the page (macOS, Windows): Ctrl+Tab's cards, on the grey dim every
+   layer that takes the focus shares with the GTK build. */
+:root { --ground: #fff; --frame: #f4f4f4; --ink: #171717; --muted: rgba(0,0,0,0.424); --hairline: #e8e8e8;
+  --wash: rgba(0,0,0,0.063); --mark: rgba(23,23,23,0.06);
+  --lift-3: 0 2px 6px rgba(0,0,0,0.10), 0 20px 48px rgba(0,0,0,0.22); --edge: inset 0 0 0 0 transparent;
+  --dim: rgba(138,138,146,0.30); --dim-glow: rgba(138,138,146,0.18); --ease-out: cubic-bezier(0.23, 1, 0.32, 1); }
+:root.dark { --ground: #1c1c1c; --frame: #131313; --ink: #ededed; --muted: rgba(255,255,255,0.546); --hairline: #333;
+  --wash: rgba(255,255,255,0.087); --mark: rgba(237,237,237,0.06);
+  --lift-3: 0 2px 6px rgba(0,0,0,0.40), 0 20px 48px rgba(0,0,0,0.50); --edge: inset 0 1px 0 rgba(255,255,255,0.07);
+  --dim: rgba(38,38,42,0.62); --dim-glow: rgba(58,58,64,0.30); }
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; -webkit-user-select: none; cursor: default;
+  font: 12px/1.3 "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: var(--ink); }
+#dim { position: fixed; inset: 0; background-color: var(--dim);
+  background-image: radial-gradient(ellipse at 50% 42%, var(--dim-glow), transparent 75%); animation: fade 120ms ease-out; }
+#switcher { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: 86vw; background: var(--ground);
+  border-radius: 14px; padding: 18px; box-shadow: var(--edge), 0 0 0 1px var(--hairline), var(--lift-3);
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; animation: fade 120ms ease-out; }
+.card { width: 150px; padding: 6px; border-radius: 10px; }
+.card.chosen { background: var(--wash); }
+.face { height: 92px; border-radius: 7px; background: var(--frame); box-shadow: inset 0 0 0 1px var(--hairline);
+  display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.face img { width: 28px; height: 28px; border-radius: 6px; }
+.letter { font-size: 28px; font-weight: 600; opacity: 0.6; letter-spacing: -0.02em; }
+.title { margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.site { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes fade { from { opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="dim"></div>
+<div id="switcher"></div>
+<script>
+"use strict";
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const send = (m) => window.ipc.postMessage(JSON.stringify(m));
+window.rippl = {
+  switcher(s) {
+    document.documentElement.classList.toggle("dark", !!s.dark);
+    document.getElementById("switcher").innerHTML = s.cards.map((c, i) =>
+      `<div class="card${i === s.chosen ? " chosen" : ""}" data-id="${c.id}"><div class="face">${c.icon ? `<img src="${esc(c.icon)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'letter',textContent:'${esc(c.letter)}'}))">` : `<span class="letter">${esc(c.letter)}</span>`}</div><div class="title">${esc(c.title)}</div><div class="site">${esc(c.site)}</div></div>`).join("");
+  },
+};
+document.addEventListener("mousedown", (e) => {
+  const card = e.target.closest(".card");
+  send(card ? { t: "pick", id: +card.dataset.id } : { t: "cancel" });
+});
+addEventListener("keyup", (e) => { if (e.key === "Control" || e.key === "Meta") send({ t: "mod-up" }); });
+addEventListener("keydown", (e) => {
+  if (e.key === "Escape") send({ t: "cancel" });
+  if (e.key === "Tab" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send({ t: "walk", back: e.shiftKey }); }
+});
+send({ t: "ready" });
+</script>
+</body>
+</html>

@@ -18,6 +18,7 @@ mod passwords;
 mod platform;
 mod scripts;
 mod shield;
+mod switcher;
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};

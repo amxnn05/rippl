@@ -47,6 +47,7 @@ pub enum Ev {
     Menu(String),
     Control(String, std::sync::mpsc::Sender<String>),
     Grab(u64, crate::grab::GrabEv),
+    Overlay(String),
     Tick,
 }
 
@@ -68,6 +69,7 @@ impl std::fmt::Debug for Ev {
             Ev::Menu(..) => "Menu",
             Ev::Control(..) => "Control",
             Ev::Grab(..) => "Grab",
+            Ev::Overlay(..) => "Overlay",
             Ev::Tick => "Tick",
         };
         f.write_str(name)
@@ -135,6 +137,13 @@ pub struct Browser {
     pub children: Children,
     /// Tabs side by side (2 to 4), when the front tab is one of them.
     pub split: RefCell<Vec<TabId>>,
+    /// Tabs latest looked at first (Ctrl+Tab's order).
+    pub recent: RefCell<Vec<TabId>>,
+    /// Ctrl+Tab in progress: the order, and which card.
+    pub walking: RefCell<Option<(Vec<TabId>, usize)>>,
+    pub overlay: RefCell<Option<WebView>>,
+    pub overlay_ready: Cell<bool>,
+    pub overlay_queued: RefCell<Option<String>>,
 }
 
 fn session_path() -> PathBuf {
@@ -217,6 +226,11 @@ impl Browser {
             scheme_set: Cell::new(false),
             children: Default::default(),
             split: RefCell::new(Vec::new()),
+            recent: RefCell::new(Vec::new()),
+            walking: RefCell::new(None),
+            overlay: RefCell::new(None),
+            overlay_ready: Cell::new(false),
+            overlay_queued: RefCell::new(None),
         });
         b.build_chrome();
         b.restore(urls, first_run);
@@ -449,6 +463,7 @@ impl Browser {
 
     pub fn select(&self, id: TabId) {
         self.tabs.borrow_mut().select(id);
+        self.looked_at(id);
         let url = self.tabs.borrow().get(id).map(|t| t.url.clone()).unwrap_or_default();
         if !url.is_empty() && !self.views.borrow().contains_key(&id) {
             self.wake(id);

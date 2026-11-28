@@ -87,6 +87,11 @@ impl Browser {
                     Err(e) => format!("error: {e}"),
                 }
             }
+            // Ctrl let go (after `cmd tab-switcher`).
+            "release" => {
+                self.end_walk(true);
+                "ok".into()
+            }
             "grab" => {
                 self.grab(rest, false);
                 "ok".into()

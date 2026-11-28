@@ -94,6 +94,7 @@ impl Browser {
                 }
             }
             Ev::Grab(id, ev) => self.grab_event(id, ev),
+            Ev::Overlay(text) => self.on_overlay(&text),
             Ev::Control(line, reply) => {
                 let answer = self.control(&line);
                 let _ = reply.send(answer);
@@ -149,7 +150,7 @@ impl Browser {
         let s = |k: &str| m.get(k).and_then(Value::as_str).unwrap_or("").to_string();
         match m.get("t").and_then(Value::as_str).unwrap_or("") {
             "cmd" => self.command(&s("name"), m.get("repeat").and_then(Value::as_bool).unwrap_or(false)),
-            "mod-up" => {}
+            "mod-up" => self.end_walk(true),
             "icon" => {
                 let href = s("href");
                 if href.starts_with("https://") || href.starts_with("http://") || href.starts_with("data:image/") {
@@ -201,6 +202,7 @@ impl Browser {
                 self.place_views();
             }
             "cmd" => self.command(&s("name"), b("repeat")),
+            "mod-up" => self.end_walk(true),
             "select" => {
                 if b("meta") {
                     // Ctrl/⌘+click: into a split with the front tab.

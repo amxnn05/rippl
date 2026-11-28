@@ -160,13 +160,17 @@ impl Browser {
                 self.window.set_fullscreen(if full { None } else { Some(tao::window::Fullscreen::Borderless(None)) });
             }
             "escape" => {
-                if self.find.borrow().is_some() {
+                if self.walking.borrow().is_some() {
+                    self.end_walk(false);
+                } else if self.find.borrow().is_some() {
                     self.close_find();
                 } else if self.window.fullscreen().is_some() {
                     self.window.set_fullscreen(None);
                 }
             }
             "switch-tab" => self.eval_chrome_pub("rippl.focusField()"),
+            "tab-switcher" => self.walk(false),
+            "tab-switcher-back" => self.walk(true),
             "quit" => self.quit(),
             "capture" => self.capture(),
             "reader" => self.toggle_reader(),
