@@ -1,4 +1,4 @@
-rippl 1.0.0 beta, for macOS and Linux.
+rippl 1.0.0, for Linux, and macOS in beta.
 
 ## Install
 
