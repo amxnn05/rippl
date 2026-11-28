@@ -126,7 +126,7 @@ jobs:
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [macos, windows, linux]
+    needs: [macos, linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -139,6 +139,7 @@ jobs:
         run: |
           ls -R out
           gh release create "$GITHUB_REF_NAME" --title "rippl ${GITHUB_REF_NAME#v}" --notes-file packaging/release-notes.md \
-            out/macos/rippl-macos-universal.tar.gz out/macos/rippl-macos-universal.dmg \
-            out/windows/rippl-windows-x64-setup.exe out/windows/rippl-windows-x64-portable.zip \
+            out/macos/rippl-macos-universal.tar.gz \
             out/rippl-linux-x86_64-x86_64.flatpak/rippl-linux-x86_64.flatpak
+          # Windows (built and tried above) waits for signing, through the
+          # Microsoft Store; the .dmg waits for Apple's signature.

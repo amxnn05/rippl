@@ -1,7 +1,7 @@
 # Phase 12: everywhere (macOS, Windows, one install command each)
 
-**Status:** in progress (started 2026-11-28). 1.0.0 ships when the macOS and Windows builds have
-what the Linux build has.
+**Status:** 1.0.0 beta released 2026-11-28 for macOS (by the install command only) and Linux.
+Windows waits for signing; the rest of the macOS port continues.
 
 ## Goal
 
@@ -45,6 +45,17 @@ programs videos need (yt-dlp, ffmpeg, Deno), and built and released for all thre
   alone, and registers rippl with Default apps.
 - `.github/workflows/release.yml` builds all three on every push to a `release-*` branch, starts
   each once (`RIPPL_CONTROL`, a screenshot of Settings), and publishes them on a `v*` tag.
+
+## Released, and held back
+
+- **Windows is held back.** Smart App Control (on by default on new Windows 11 installs) refuses
+  any unsigned program, from the terminal or a double-click, with no way past it but turning it
+  off for good. Windows waits for a signed build: the Microsoft Store (which signs it), or a
+  certificate (SignPath Foundation, Certum). CI still builds and tries it on every push.
+- **No .dmg.** Unsigned, a downloaded .dmg needs Privacy & Security › Open Anyway on macOS 15.
+  Installed by the command (curl leaves no quarantine mark), rippl opens as any app. The
+  release carries only `rippl-macos-universal.tar.gz` and the Flatpak; `install.ps1` is gone
+  from the website.
 
 ## Decisions
 

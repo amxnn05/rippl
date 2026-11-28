@@ -1,30 +1,20 @@
-rippl 1.0.0: the first release, for Linux, macOS and Windows.
+rippl 1.0.0 beta, for macOS and Linux.
 
 ## Install
 
-**macOS and Linux**, in a terminal:
+In a terminal, on macOS (Apple silicon and Intel) or Linux:
 
 ```sh
 curl -fsSL https://ripplbrowser.web.app/install.sh | sh
 ```
 
-**Windows**, in PowerShell:
+It installs rippl, and yt-dlp, ffmpeg and Deno for downloading videos (Ctrl+Shift+Y). On Linux rippl comes as a Flatpak (any distro); `rippl-linux-x86_64.flatpak` below is the same.
 
-```powershell
-irm https://ripplbrowser.web.app/install.ps1 | iex
-```
-
-Each installs rippl, and yt-dlp, ffmpeg and Deno for downloading videos (Ctrl+Shift+Y). Or take a file below: `rippl-macos-universal.dmg` (Apple silicon and Intel), `rippl-windows-x64-setup.exe`, `rippl-linux-x86_64.flatpak`.
+Windows is coming through the Microsoft Store: Windows only runs signed apps on many PCs (Smart App Control), and the Store signs them.
 
 ## What runs where
 
-- **Linux**: the full rippl, on WebKitGTK (GTK 4), as a Flatpak (any distro).
-- **macOS**: on the system's WebKit. **Windows**: on WebView2, Edge's engine, part of Windows 10 and 11.
-  Both have the column with tabs, pins, groups and spaces; the field with suggestions; every `rippl://` page and setting; your own shortcuts; Shield; downloads and videos; find; zoom; split view; Ctrl+Tab; the session; light and dark.
-  Still to come there: peek, reading mode, hiding elements, capture, more windows, saving passwords, the AI add-on, sync, painted new-tab walls, the player and a few more (see docs/phases/phase-12-everywhere.md).
+- **Linux**: the full rippl, on WebKitGTK (GTK 4).
+- **macOS**: on the system's WebKit: the column with tabs, pins, groups and spaces; the field with suggestions; every `rippl://` page and setting; your own shortcuts; Shield; downloads and videos; find; zoom; split view; Ctrl+Tab; the session; light and dark. Still to come there: peek, reading mode, hiding elements, capture, more windows, saving passwords, the AI add-on, sync and a few more.
 
-## Not signed yet
-
-The macOS app and the Windows installer aren't signed by Apple or Microsoft yet. Installed with the commands above, they open without a warning. Downloaded in a browser:
-- **macOS**: right-click rippl › Open the first time, or System Settings › Privacy & Security › Open Anyway.
-- **Windows**: if SmartScreen says "Windows protected your PC", choose More info › Run anyway.
+The Mac app isn't signed by Apple yet. Installed with the command it opens as any app; that's why there is no .dmg for now.
