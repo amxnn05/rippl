@@ -13,12 +13,12 @@ impl Browser {
         match ev {
             Ev::Chrome(text) => {
                 if let Ok(m) = serde_json::from_str::<Value>(&text) {
-                    self.from_chrome(&m);
+                    self.on_chrome(&m);
                 }
             }
             Ev::Page(id, text) => {
                 if let Ok(m) = serde_json::from_str::<Value>(&text) {
-                    self.from_page(id, &m);
+                    self.on_page(id, &m);
                 }
             }
             Ev::Title(id, title) => {
@@ -145,7 +145,7 @@ impl Browser {
         self.render_due.set(true);
     }
 
-    fn from_page(&self, id: TabId, m: &Value) {
+    fn on_page(&self, id: TabId, m: &Value) {
         let s = |k: &str| m.get(k).and_then(Value::as_str).unwrap_or("").to_string();
         match m.get("t").and_then(Value::as_str).unwrap_or("") {
             "cmd" => self.command(&s("name"), m.get("repeat").and_then(Value::as_bool).unwrap_or(false)),
@@ -186,7 +186,7 @@ impl Browser {
         }
     }
 
-    fn from_chrome(&self, m: &Value) {
+    fn on_chrome(&self, m: &Value) {
         let n = |k: &str| m.get(k).and_then(Value::as_f64).unwrap_or(0.0);
         let id = || m.get("id").and_then(Value::as_u64).unwrap_or(0) as TabId;
         let s = |k: &str| m.get(k).and_then(Value::as_str).unwrap_or("").to_string();

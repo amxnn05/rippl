@@ -1,7 +1,7 @@
 # rippl documentation
 
-rippl is a small, fast, private web browser for Linux. It is built on WebKit (WebKitGTK 6.0 + GTK4) and
-written in Rust. These pages explain how it works, why it is built the way it is, and what each
+rippl is a small, fast, private web browser for Linux, macOS and Windows, written in Rust. On Linux it is
+built on WebKit (WebKitGTK 6.0 + GTK4); on macOS on the system's WebKit, on Windows on WebView2. These pages explain how it works, why it is built the way it is, and what each
 development phase did.
 
 | Page | What it covers |
@@ -38,6 +38,7 @@ development phase did.
 | Phase 9: shipping — logo, desktop entry, default browser, install script, packages, welcome | done | [phase-9-ship.md](phases/phase-9-ship.md) |
 | Phase 10: downloading videos with yt-dlp (Ctrl+Shift+Y) | done | [phase-10-grab.md](phases/phase-10-grab.md) |
 | Phase 11: polish — site groups (Ctrl+Alt+G), the best video, instant Shield per site, splits kept, a capped cache | done | [phase-11-polish.md](phases/phase-11-polish.md) |
+| Phase 12: everywhere — macOS and Windows, install commands, release builds | in progress | [phase-12-everywhere.md](phases/phase-12-everywhere.md) |
 
 ## Keeping these docs current
 

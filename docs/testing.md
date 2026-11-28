@@ -128,6 +128,15 @@ Why a socket? Sending keys with `wtype` is unreliable while someone else is usin
 desktop, because focus moves. Hyprland 0.56 also changed its `hyprctl dispatch` syntax (it is Lua
 now), so old `sendshortcut` commands fail.
 
+## The macOS and Windows build
+
+`cargo run -p rippl-desktop` runs it on Linux too (wry's WebKitGTK 4.1 port), which is how it is
+developed. With `RIPPL_CONTROL=7788`, `scripts/dctl.sh` sends one command and prints the answer:
+`tabs`, `open <url>`, `go <text>`, `cmd <command>`, `select <n>`, `set key=value`, `grab <url>`,
+`downloads`, `notice`, `eval <js>`, `quit`. On Hyprland, a headless output keeps its window off
+your screen and lets `grim -o` take pictures of it. CI (`release.yml`) starts the real macOS and
+Windows builds the same way and keeps a screenshot of each.
+
 ## Measuring memory
 
 ```sh

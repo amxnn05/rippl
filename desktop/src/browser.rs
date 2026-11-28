@@ -42,6 +42,7 @@ pub enum Ev {
     DownloadDone(String, Option<PathBuf>, bool),
     Suggest(String, Vec<String>),
     ShieldLists(crate::shield::Lists),
+    #[cfg_attr(all(unix, not(target_os = "macos")), allow(dead_code))]
     ShieldApplied,
     Menu(String),
     Control(String, std::sync::mpsc::Sender<String>),
@@ -72,6 +73,13 @@ impl std::fmt::Debug for Ev {
         f.write_str(name)
     }
 }
+
+/// yt-dlp processes running, by download.
+pub type Children = std::sync::Arc<std::sync::Mutex<Vec<(u64, std::process::Child)>>>;
+/// Work for after the event at hand.
+pub type Pending = RefCell<Vec<Box<dyn FnOnce(&Browser)>>>;
+/// What each item of the menu on screen does.
+pub type MenuActions = RefCell<HashMap<String, Box<dyn Fn(&Browser)>>>;
 
 /// The proxy, shareable with the engine's threads.
 pub type Proxy = std::sync::Arc<std::sync::Mutex<EventLoopProxy<Ev>>>;
@@ -118,13 +126,13 @@ pub struct Browser {
     pub shield: Shield,
     pub column_hidden: Cell<bool>,
     pub dark: Cell<bool>,
-    pub menu_actions: RefCell<HashMap<String, Box<dyn Fn(&Browser)>>>,
+    pub menu_actions: MenuActions,
     pub last_tick: Cell<Instant>,
     pub ready: Cell<bool>,
-    pub pending: RefCell<Vec<Box<dyn FnOnce(&Browser)>>>,
+    pub pending: Pending,
     pub window_theme: Cell<Option<Option<tao::window::Theme>>>,
     pub scheme_set: Cell<bool>,
-    pub children: std::sync::Arc<std::sync::Mutex<Vec<(u64, std::process::Child)>>>,
+    pub children: Children,
     /// Tabs side by side (2 to 4), when the front tab is one of them.
     pub split: RefCell<Vec<TabId>>,
 }

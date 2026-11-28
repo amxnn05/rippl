@@ -34,6 +34,7 @@ fn entry(origin: &str, username: &str) -> Result<keyring::Entry, String> {
     keyring::Entry::new(&format!("rippl {origin}"), username).map_err(|e| e.to_string())
 }
 
+#[allow(dead_code)]
 pub fn save(origin: &str, username: &str, password: &str) -> Result<(), String> {
     entry(origin, username)?.set_password(password).map_err(|e| e.to_string())?;
     let mut list = accounts();
@@ -44,6 +45,7 @@ pub fn save(origin: &str, username: &str, password: &str) -> Result<(), String> 
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn password(origin: &str, username: &str) -> Option<String> {
     entry(origin, username).ok()?.get_password().ok()
 }

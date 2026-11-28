@@ -44,6 +44,7 @@ const MAX_AGE: Duration = Duration::from_secs(4 * 24 * 60 * 60);
 pub struct Lists {
     /// (bundle, WebKit's JSON) on macOS and Linux; (bundle, raw ABP text)
     /// on Windows.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub bundles: Vec<(String, String)>,
     #[cfg(windows)]
     pub engine: Option<adblock::Engine>,
@@ -188,7 +189,7 @@ impl Shield {
             #[cfg(windows)]
             win: std::rc::Rc::new(win::Rules::default()),
             #[cfg(all(unix, not(target_os = "macos")))]
-            gtk: gtk_rules::Rules::default(),
+            gtk: gtk_rules::Rules,
         }
     }
 

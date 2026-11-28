@@ -19,8 +19,6 @@ use webkit6::prelude::*;
 
 use crate::browser::Browser;
 
-/// The choices, as `home_theme` takes them.
-
 const W: f64 = 1920.0;
 const H: f64 = 1200.0;
 

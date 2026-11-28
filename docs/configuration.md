@@ -187,7 +187,8 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 | `RIPPL_LEAN=1` | WebKit's smaller cache model: less RAM, slower Back |
 | `RIPPL_NO_SHARE=1` | Every tab in a page process of its own, even on the same site |
 | `RIPPL_NO_GPU=1` | Pages drawn without the GPU: 167 → 95 MB per light page, but about twice the CPU while scrolling ([performance.md](performance.md)) |
-| `RIPPL_CONTROL=1` | Opens the control socket ([testing.md](testing.md)) |
+| `RIPPL_CONTROL=1` | Opens the control socket ([testing.md](testing.md)); on macOS and Windows `RIPPL_CONTROL=<port>`, on 127.0.0.1 |
+| `RIPPL_DOWNLOADS=<folder>` | Downloads go there instead of your Downloads folder (for tests) |
 | `RIPPL_DEBUG=1` | Logs tab life and Shield activity to stderr |
 | `RIPPL_EXTENSION=/path/librippl_web_extension.so` | Use this web process extension (otherwise beside the binary, then `/usr/lib/rippl`) |
 | `RIPPL_KEYRING=memory` | Keep passwords in memory instead of the system keyring (tests) |
@@ -252,3 +253,15 @@ default profile; its control socket is `rippl-work.sock` (`RIPPL_PROFILE=work sc
 | `Ctrl+S` | Hide or show the tab column |
 | `Ctrl+Shift+I`, `F12` | Web Inspector |
 | `Ctrl++` `Ctrl+-` `Ctrl+0` | Zoom |
+
+## macOS and Windows
+
+The same `config` file and keys, in each system's own folder (`rippl_core::dirs`):
+
+| | Settings (`config`, `shield-allow`) | Data (history, session, `tools/`) | Cache (Shield's lists) |
+|---|---|---|---|
+| Linux | `~/.config/rippl` | `~/.local/share/rippl` | `~/.cache/rippl` |
+| macOS | `~/Library/Application Support/rippl` | the same | `~/Library/Caches/rippl` |
+| Windows | `%APPDATA%\rippl` | the same | `%LOCALAPPDATA%\rippl` |
+
+On macOS, a key written with `<Ctrl>` (or `<Primary>`) is ⌘, except with Tab.

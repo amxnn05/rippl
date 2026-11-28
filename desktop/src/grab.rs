@@ -11,7 +11,7 @@
 
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::time::{Duration, SystemTime};
 
 use rippl_core::ytdlp::{self, Format, Line};
@@ -162,7 +162,7 @@ pub enum GrabEv {
 
 /// Starts yt-dlp (fetching it first, if need be) for `url`, on threads;
 /// lines come back as `Ev::Grab(id, …)`.
-pub fn start(id: u64, url: String, format: Format, proxy: Proxy, children: std::sync::Arc<std::sync::Mutex<Vec<(u64, Child)>>>) {
+pub fn start(id: u64, url: String, format: Format, proxy: Proxy, children: crate::browser::Children) {
     std::thread::spawn(move || {
         let exe = match ytdlp() {
             Some(p) => {

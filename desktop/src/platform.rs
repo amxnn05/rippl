@@ -69,6 +69,7 @@ pub fn build(builder: WebViewBuilder, window: &Window, host: &Host) -> wry::Resu
 }
 
 /// Puts a view over every other view in the window.
+#[allow(dead_code)]
 pub fn raise(view: &WebView, window: &Window, host: &Host) {
     #[cfg(all(unix, not(target_os = "macos")))]
     {
@@ -122,7 +123,9 @@ pub fn to_engine(url: &str) -> String {
 pub fn from_engine(url: &str) -> String {
     if cfg!(windows) {
         if let Some(rest) = url.strip_prefix("https://rippl.") {
-            return format!("rippl://{rest}");
+            // WebView2 adds a "/" after the page's name: rippl's has none.
+            let (head, tail) = rest.split_at(rest.find(['?', '#']).unwrap_or(rest.len()));
+            return format!("rippl://{}{tail}", head.trim_end_matches('/'));
         }
         if let Some(rest) = url.strip_prefix("https://rippl-ui.") {
             return format!("rippl-ui://{rest}");
@@ -211,4 +214,19 @@ pub fn make_default_browser() -> Result<String, String> {
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     Err("On Linux, use rippl's GTK build to set it as the default browser.".into())
+}
+
+/// rippl's icon for the window (and the taskbar or Dock while it runs).
+pub fn window_icon() -> Option<tao::window::Icon> {
+    let bytes: &[u8] = include_bytes!("../../data/icons/hicolor/128x128/apps/dev.rippl.Rippl.png");
+    let decoder = png::Decoder::new(std::io::Cursor::new(bytes));
+    let mut reader = decoder.read_info().ok()?;
+    let mut buf = vec![0; reader.output_buffer_size()?];
+    let info = reader.next_frame(&mut buf).ok()?;
+    let rgba = match info.color_type {
+        png::ColorType::Rgba => buf[..info.buffer_size()].to_vec(),
+        png::ColorType::Rgb => buf[..info.buffer_size()].chunks(3).flat_map(|c| [c[0], c[1], c[2], 255]).collect(),
+        _ => return None,
+    };
+    tao::window::Icon::from_rgba(rgba, info.width, info.height).ok()
 }

@@ -46,7 +46,7 @@ fn main() {
         bar
     };
 
-    let builder = WindowBuilder::new().with_title("rippl").with_inner_size(tao::dpi::LogicalSize::new(1280.0, 820.0)).with_min_inner_size(tao::dpi::LogicalSize::new(480.0, 360.0));
+    let builder = WindowBuilder::new().with_title("rippl").with_inner_size(tao::dpi::LogicalSize::new(1280.0, 820.0)).with_min_inner_size(tao::dpi::LogicalSize::new(480.0, 360.0)).with_window_icon(platform::window_icon());
     #[cfg(target_os = "macos")]
     let builder = {
         use tao::platform::macos::WindowBuilderExtMacOS;
