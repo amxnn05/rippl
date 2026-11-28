@@ -125,6 +125,8 @@ pub struct Browser {
     pub window_theme: Cell<Option<Option<tao::window::Theme>>>,
     pub scheme_set: Cell<bool>,
     pub children: std::sync::Arc<std::sync::Mutex<Vec<(u64, std::process::Child)>>>,
+    /// Tabs side by side (2 to 4), when the front tab is one of them.
+    pub split: RefCell<Vec<TabId>>,
 }
 
 fn session_path() -> PathBuf {
@@ -206,6 +208,7 @@ impl Browser {
             window_theme: Cell::new(None),
             scheme_set: Cell::new(false),
             children: Default::default(),
+            split: RefCell::new(Vec::new()),
         });
         b.build_chrome();
         b.restore(urls, first_run);
@@ -302,6 +305,7 @@ impl Browser {
         let extra = self.extra.borrow();
         let config = self.config.borrow();
         let front = tabs.front;
+        let split = self.split.borrow().clone();
         let list: Vec<Value> = tabs
             .here()
             .map(|t| {
@@ -312,6 +316,7 @@ impl Browser {
                     "asleep": t.life != Life::Awake && Some(t.id) != front, "loading": t.loading, "private": t.private,
                     "group": t.group, "letter": address::monogram(&t.url, &t.title), "icon": e.icon,
                     "unread": rippl_core::tabs::unread(&t.title),
+                    "split": split.contains(&t.id) && split.len() > 1,
                 })
             })
             .collect();
@@ -489,7 +494,7 @@ impl Browser {
         let p_serve = std::sync::Arc::new(std::sync::Mutex::new(proxy.clone()));
         let (x, y, w, h) = self.page_rect.get();
         let config = self.config.borrow().clone();
-        let script = crate::scripts::page_script(&self.keymap.borrow(), &config);
+        let script = crate::scripts::page_script(&self.keymap.borrow(), &config, self.shield.is_allowed("youtube.com"));
         let label = id.to_string();
         let dark = self.dark.get();
         let mut context = self.context.borrow_mut();
@@ -563,18 +568,80 @@ impl Browser {
         }
     }
 
-    /// The front tab's view on the page card; the others hidden.
+    /// The front tab's view on the page card (or its split, side by side);
+    /// the others hidden.
     pub fn place_views(&self) {
         let (x, y, w, h) = self.page_rect.get();
         let front = self.front();
+        let split: Vec<TabId> = {
+            let sp = self.split.borrow();
+            if front.is_some_and(|f| sp.contains(&f)) { sp.clone() } else { Vec::new() }
+        };
+        let gap = 6.0;
+        let n = split.len().max(1) as f64;
+        let pane = (w - gap * (n - 1.0)) / n;
         for (id, view) in self.views.borrow().iter() {
-            if Some(*id) == front && w > 1.0 {
+            let slot = split.iter().position(|t| t == id);
+            if let Some(i) = slot.filter(|_| w > 1.0) {
+                let _ = view.set_bounds(rect(x + i as f64 * (pane + gap), y, pane, h));
+                let _ = view.set_visible(true);
+            } else if Some(*id) == front && split.is_empty() && w > 1.0 {
                 let _ = view.set_bounds(rect(x, y, w, h));
                 let _ = view.set_visible(true);
             } else {
                 let _ = view.set_visible(false);
             }
         }
+    }
+
+    /// Ctrl+Alt+S: the front tab and the one before it, side by side; again,
+    /// apart. A third and fourth tab join with Ctrl/⌘+click.
+    pub fn toggle_split(&self) {
+        let Some(front) = self.front() else { return };
+        if self.split.borrow().contains(&front) {
+            self.split.borrow_mut().clear();
+        } else {
+            let other = {
+                let tabs = self.tabs.borrow();
+                tabs.neighbour(-1).filter(|o| *o != front && tabs.get(*o).is_some_and(|t| !t.url.is_empty()))
+            };
+            let other = match other {
+                Some(o) => o,
+                None => {
+                    self.notice("Split view needs a second tab with a page");
+                    return;
+                }
+            };
+            self.wake(other);
+            *self.split.borrow_mut() = vec![other, front];
+        }
+        self.place_views();
+        self.render_due.set(true);
+    }
+
+    /// Ctrl/⌘+click on a tab: into the split with the front one.
+    pub fn add_to_split(&self, id: TabId) {
+        let Some(front) = self.front() else { return };
+        if id == front {
+            return;
+        }
+        {
+            let mut sp = self.split.borrow_mut();
+            if !sp.contains(&front) {
+                *sp = vec![front];
+            }
+            if sp.contains(&id) {
+                sp.retain(|t| *t != id);
+            } else if sp.len() < 4 {
+                sp.push(id);
+            }
+            if sp.len() < 2 {
+                sp.clear();
+            }
+        }
+        self.wake(id);
+        self.place_views();
+        self.render_due.set(true);
     }
 
     pub fn close(&self, id: TabId) {
@@ -592,6 +659,13 @@ impl Browser {
         let view = self.views.borrow_mut().remove(&id);
         drop(view);
         self.extra.borrow_mut().remove(&id);
+        {
+            let mut sp = self.split.borrow_mut();
+            sp.retain(|t| *t != id);
+            if sp.len() < 2 {
+                sp.clear();
+            }
+        }
         let next = self.tabs.borrow_mut().close(id);
         match next {
             Some(n) => self.select(n),

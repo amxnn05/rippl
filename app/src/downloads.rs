@@ -633,8 +633,8 @@ impl Downloads {
 
     /// Starts downloading `url` with yt-dlp. The error says what is missing.
     pub fn grab(&self, url: &str, format: Format) -> Result<(), String> {
-        if glib::find_program_in_path("yt-dlp").is_none() {
-            return Err("yt-dlp isn't installed (on Arch: sudo pacman -S yt-dlp)".into());
+        if rippl_core::dirs::find_tool("yt-dlp").is_none() {
+            return Err("yt-dlp isn't installed (run rippl's installer again, or on Arch: sudo pacman -S yt-dlp)".into());
         }
         let widgets = self.new_row(url);
         widgets.status.set_label("Starting…");
@@ -698,12 +698,15 @@ impl Downloads {
         };
         let dir = folder();
         let _ = std::fs::create_dir_all(&dir);
-        let ffmpeg = glib::find_program_in_path("ffmpeg").is_some();
-        let mut argv: Vec<OsString> = vec!["yt-dlp".into()];
+        let ffmpeg = rippl_core::dirs::find_tool("ffmpeg").is_some();
+        let ytdlp = rippl_core::dirs::find_tool("yt-dlp").map(OsString::from).unwrap_or_else(|| "yt-dlp".into());
+        let mut argv: Vec<OsString> = vec![ytdlp];
         argv.extend(ytdlp::args(&url, format, &dir, &crate::engine::proxy_setting(), ffmpeg).into_iter().map(OsString::from));
         let argv: Vec<&std::ffi::OsStr> = argv.iter().map(OsString::as_os_str).collect();
 
         let launcher = gio::SubprocessLauncher::new(gio::SubprocessFlags::STDOUT_PIPE | gio::SubprocessFlags::STDERR_PIPE);
+        // rippl's own ffmpeg and Deno (from the installer) are found first.
+        launcher.setenv("PATH", rippl_core::dirs::tools_path(), true);
         // If rippl ends, so does yt-dlp: nothing keeps downloading unseen.
         launcher.set_child_setup(|| unsafe {
             libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM);

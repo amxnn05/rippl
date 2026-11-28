@@ -68,3 +68,29 @@ pub fn downloads() -> PathBuf {
     }
     home().join("Downloads")
 }
+
+/// Where rippl keeps the programs it runs beside itself (yt-dlp, ffmpeg,
+/// Deno), put there by the installer or fetched on first use.
+pub fn tools() -> PathBuf {
+    data().join("tools")
+}
+
+/// A program: rippl's own copy in `tools()`, else the one on PATH.
+pub fn find_tool(name: &str) -> Option<PathBuf> {
+    let exe = if cfg!(windows) && !name.ends_with(".exe") { format!("{name}.exe") } else { name.to_string() };
+    let mine = tools().join(&exe);
+    if mine.is_file() {
+        return Some(mine);
+    }
+    std::env::split_paths(&std::env::var_os("PATH")?).map(|d| d.join(&exe)).find(|p| p.is_file())
+}
+
+/// PATH with `tools()` first, for a program rippl runs (yt-dlp finds
+/// ffmpeg and Deno through it).
+pub fn tools_path() -> std::ffi::OsString {
+    let mut paths = vec![tools()];
+    if let Some(p) = std::env::var_os("PATH") {
+        paths.extend(std::env::split_paths(&p));
+    }
+    std::env::join_paths(paths).unwrap_or_default()
+}

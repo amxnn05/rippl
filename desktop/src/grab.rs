@@ -28,29 +28,16 @@ const ASSET: &str = "yt-dlp_linux";
 const EXE: &str = if cfg!(windows) { "yt-dlp.exe" } else { "yt-dlp" };
 
 fn tools() -> PathBuf {
-    rippl_core::dirs::data().join("tools")
-}
-
-/// A program on PATH.
-fn on_path(name: &str) -> Option<PathBuf> {
-    let exe = if cfg!(windows) && !name.ends_with(".exe") { format!("{name}.exe") } else { name.to_string() };
-    std::env::split_paths(&std::env::var_os("PATH")?).map(|d| d.join(&exe)).find(|p| p.is_file())
+    rippl_core::dirs::tools()
 }
 
 /// yt-dlp: rippl's own copy, else the system's.
 pub fn ytdlp() -> Option<PathBuf> {
-    let mine = tools().join(EXE);
-    if mine.is_file() {
-        return Some(mine);
-    }
-    on_path("yt-dlp")
+    rippl_core::dirs::find_tool("yt-dlp")
 }
 
 pub fn ffmpeg() -> bool {
-    if cfg!(not(all(unix, not(target_os = "macos")))) && !helpers().is_empty() && !tools().join(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" }).is_file() && on_path("ffmpeg").is_none() {
-        return false;
-    }
-    tools().join(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" }).is_file() || on_path("ffmpeg").is_some()
+    rippl_core::dirs::find_tool("ffmpeg").is_some()
 }
 
 /// Fetches yt-dlp's standalone build (blocking; run on a thread).
@@ -76,6 +63,7 @@ fn fetch_ytdlp() -> Result<PathBuf, String> {
 /// Where this system's ffmpeg and Deno come from, zipped: (what, address,
 /// the program's name inside).
 fn helpers() -> Vec<(&'static str, &'static str, &'static str)> {
+    #[allow(unused_mut)]
     let mut out = Vec::new();
     #[cfg(windows)]
     {
@@ -99,7 +87,7 @@ fn helpers() -> Vec<(&'static str, &'static str, &'static str)> {
 /// has it.
 fn ensure_helper(what: &str, url: &str, inside: &str) -> Result<(), String> {
     let name = inside.trim_end_matches(".exe");
-    if tools().join(inside).is_file() || on_path(name).is_some() {
+    if rippl_core::dirs::find_tool(name).is_some() {
         return Ok(());
     }
     let dir = tools();
@@ -196,7 +184,7 @@ pub fn start(id: u64, url: String, format: Format, proxy: Proxy, children: std::
         // JavaScript runtime for YouTube), once, where the system has none.
         for (what, url, inside) in helpers() {
             let name = inside.trim_end_matches(".exe");
-            if tools().join(inside).is_file() || on_path(name).is_some() {
+            if rippl_core::dirs::find_tool(name).is_some() {
                 continue;
             }
             post(&proxy, Ev::Grab(id, GrabEv::Line(Line::Title(format!("Getting {what} (once)…")))));
@@ -209,15 +197,8 @@ pub fn start(id: u64, url: String, format: Format, proxy: Proxy, children: std::
         let args = ytdlp::args(&url, format, &dir, &rippl_core::address::Proxy::System, ffmpeg());
         let mut c = Command::new(&exe);
         c.args(&args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        if let Some(t) = tools().to_str() {
-            // rippl's own ffmpeg, if one is put there, is found first.
-            let path = std::env::var_os("PATH").unwrap_or_default();
-            let mut paths = vec![PathBuf::from(t)];
-            paths.extend(std::env::split_paths(&path));
-            if let Ok(p) = std::env::join_paths(paths) {
-                c.env("PATH", p);
-            }
-        }
+        // rippl's own ffmpeg and Deno are found first.
+        c.env("PATH", rippl_core::dirs::tools_path());
         hide_window(&mut c);
         let mut child = match c.spawn() {
             Ok(ch) => ch,

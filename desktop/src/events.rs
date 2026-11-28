@@ -203,8 +203,8 @@ impl Browser {
             "cmd" => self.command(&s("name"), b("repeat")),
             "select" => {
                 if b("meta") {
-                    // Ctrl/⌘+click: a split with the front tab.
-                    self.select(id());
+                    // Ctrl/⌘+click: into a split with the front tab.
+                    self.add_to_split(id());
                 } else {
                     self.select(id());
                 }

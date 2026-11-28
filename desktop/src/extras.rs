@@ -23,7 +23,4 @@ impl Browser {
             self.notice("Hidden elements are back on this site");
         }
     }
-    pub fn toggle_split(&self) {
-        self.notice("Split view comes in a later update on this system");
-    }
 }

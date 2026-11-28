@@ -289,7 +289,8 @@ mod mac {
             let path = super::dir().join("compiled");
             let _ = std::fs::create_dir_all(&path);
             let url = NSURL::fileURLWithPath(&NSString::from_str(&path.to_string_lossy()));
-            let Some(store) = (unsafe { WKContentRuleListStore::storeWithURL(&url) }) else { return };
+            let Some(mtm) = objc2::MainThreadMarker::new() else { return };
+            let Some(store) = (unsafe { WKContentRuleListStore::storeWithURL(Some(&url), mtm) }) else { return };
             let total = lists.bundles.len();
             let done = Rc::new(RefCell::new(Vec::<Retained<WKContentRuleList>>::new()));
             let answered = Rc::new(std::cell::Cell::new(0usize));
@@ -313,7 +314,7 @@ mod mac {
                     store.compileContentRuleListForIdentifier_encodedContentRuleList_completionHandler(
                         Some(&NSString::from_str(&format!("rippl-{name}"))),
                         Some(&NSString::from_str(&json)),
-                        &block,
+                        Some(&block),
                     );
                 }
             }
